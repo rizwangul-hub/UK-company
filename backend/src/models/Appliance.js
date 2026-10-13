@@ -75,7 +75,18 @@ const documentSchema = new mongoose.Schema(
     url: { type: String, required: true },
     docType: {
       type: String,
-      enum: ['PURCHASE_RECEIPT', 'CARE_REPAIR_PLAN', 'VALET_REPORT', 'INVOICE', 'WARRANTY_CERT', 'OTHER'],
+      enum: [
+        'PURCHASE_RECEIPT',
+        'EXTENDED_WARRANTY_CERT',
+        'MANUFACTURER_WARRANTY_DOC',
+        'CARE_REPAIR_AGREEMENT',
+        'SERVICE_CONTRACT',
+        'TERMS_AND_CONDITIONS',
+        'INSTALLATION_DOC',
+        'REPAIR_INVOICE',
+        'VALET_REPORT',
+        'OTHER',
+      ],
       default: 'PURCHASE_RECEIPT',
     },
     uploadedAt: { type: Date, default: Date.now },
@@ -101,10 +112,23 @@ const applianceSchema = new mongoose.Schema(
       enum: VALID_COMPANY_IDS,
       index: true,
     },
+    // Optional/nullable until property assignment is confirmed
     propertyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Property',
-      required: [true, 'Linked property is required'],
+      default: null,
+      index: true,
+    },
+    propertyAssignmentStatus: {
+      type: String,
+      enum: ['PENDING_VERIFICATION', 'ASSIGNED', 'UNASSIGNED'],
+      default: 'ASSIGNED',
+      index: true,
+    },
+    supplierReceiptId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SupplierReceipt',
+      default: null,
       index: true,
     },
     name: {
@@ -148,11 +172,22 @@ const applianceSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: 'Currys',
+      index: true,
+    },
+    itemCode: {
+      type: String,
+      trim: true,
+      default: '',
     },
     purchasePrice: {
       type: Number,
       default: 0,
       min: [0, 'Purchase price cannot be negative'],
+    },
+    careServicesChargeGBP: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     purchaseDate: {
       type: Date,
@@ -163,48 +198,81 @@ const applianceSchema = new mongoose.Schema(
       default: null,
     },
 
-    // Standard Warranty Information
-    hasWarranty: {
-      type: Boolean,
-      default: true,
-    },
-    warrantyStartDate: {
-      type: Date,
-      default: null,
-    },
-    warrantyExpiryDate: {
-      type: Date,
-      default: null,
-    },
-    hasExtendedWarranty: {
-      type: Boolean,
-      default: false,
-    },
-    extendedWarrantyExpiryDate: {
-      type: Date,
-      default: null,
-    },
-    warrantyProvider: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    warrantyPolicyNumber: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    isWarrantyVerified: {
-      type: Boolean,
-      default: false,
+    // 1. Separate Manufacturer Warranty Record
+    manufacturerWarranty: {
+      provider: { type: String, trim: true, default: '' },
+      warrantyType: {
+        type: String,
+        enum: ['STANDARD_MANUFACTURER', 'PARTS_AND_LABOUR', 'PARTS_ONLY', 'EXTENDED_MANUFACTURER', 'NONE', 'OTHER'],
+        default: 'STANDARD_MANUFACTURER',
+      },
+      startDate: { type: Date, default: null },
+      expiryDate: { type: Date, default: null },
+      durationYears: { type: Number, default: 1 }, // 1, 2, 5, 10 or custom
+      policyNumber: { type: String, trim: true, default: '' },
+      documentUrl: { type: String, default: '' },
+      verificationStatus: {
+        type: String,
+        enum: ['NOT_VERIFIED', 'VERIFIED', 'EXPIRED', 'MISSING_DOCS'],
+        default: 'NOT_VERIFIED',
+      },
+      verificationNotes: { type: String, trim: true, default: '' },
     },
 
-    // Official Currys Care & Repair Plan
-    currysCareAndRepair: {
-      hasPlan: {
-        type: Boolean,
-        default: false,
+    // 2. Separate Extended Warranty Record
+    extendedWarranty: {
+      hasExtendedWarranty: { type: Boolean, default: false },
+      provider: { type: String, trim: true, default: '' },
+      policyNumber: { type: String, trim: true, default: '' },
+      startDate: { type: Date, default: null },
+      expiryDate: { type: Date, default: null },
+      durationYears: { type: Number, default: 5 }, // 5-year, 10-year or custom
+      documentUrl: { type: String, default: '' },
+      verificationStatus: {
+        type: String,
+        enum: ['NOT_VERIFIED', 'VERIFIED', 'EXPIRED', 'MISSING_DOCS'],
+        default: 'NOT_VERIFIED',
       },
+      verificationNotes: { type: String, trim: true, default: '' },
+    },
+
+    // 3. Separate Supplier Service Agreement (Care & Repair / Service Contract)
+    serviceAgreement: {
+      hasAgreement: { type: Boolean, default: false },
+      provider: { type: String, trim: true, default: 'Currys' },
+      agreementReference: { type: String, trim: true, default: '' },
+      planType: {
+        type: String,
+        enum: ['PAY_MONTHLY', 'PAY_UPFRONT', 'ANNUAL_CONTRACT', 'NOT_APPLICABLE'],
+        default: 'NOT_APPLICABLE',
+      },
+      durationYears: { type: Number, default: 5 }, // 2, 3, 5, 10 years
+      startDate: { type: Date, default: null },
+      endDate: { type: Date, default: null },
+      chargeGBP: { type: Number, default: 0 },
+      includedServices: { type: String, trim: true, default: '7-day fix promise, parts and labour, annual valet' },
+      exclusions: { type: String, trim: true, default: '' },
+      contractDocumentUrl: { type: String, default: '' },
+      verificationStatus: {
+        type: String,
+        enum: ['NOT_VERIFIED', 'VERIFIED', 'EXPIRED'],
+        default: 'NOT_VERIFIED',
+      },
+      verificationNotes: { type: String, trim: true, default: '' },
+    },
+
+    // Backwards-compatible legacy mirror fields
+    hasWarranty: { type: Boolean, default: true },
+    warrantyStartDate: { type: Date, default: null },
+    warrantyExpiryDate: { type: Date, default: null },
+    hasExtendedWarranty: { type: Boolean, default: false },
+    extendedWarrantyExpiryDate: { type: Date, default: null },
+    warrantyProvider: { type: String, trim: true, default: '' },
+    warrantyPolicyNumber: { type: String, trim: true, default: '' },
+    isWarrantyVerified: { type: Boolean, default: false },
+
+    currysCareAndRepair: {
+      hasPlan: { type: Boolean, default: false },
       planType: {
         type: String,
         enum: ['PAY_MONTHLY', 'PAY_UPFRONT', 'NOT_APPLICABLE'],
@@ -215,35 +283,15 @@ const applianceSchema = new mongoose.Schema(
         enum: ['MONTHLY_ROLLING', '2_YEARS', '3_YEARS', '5_YEARS', 'CUSTOM'],
         default: 'MONTHLY_ROLLING',
       },
-      planReferenceNumber: {
-        type: String,
-        trim: true,
-        default: '',
-      },
-      planStartDate: {
-        type: Date,
-        default: null,
-      },
-      planEndDate: {
-        type: Date,
-        default: null,
-      },
-      monthlyFeeGBP: {
-        type: Number,
-        default: 0,
-        min: 0,
-      },
-      isPlanVerified: {
-        type: Boolean,
-        default: false,
-      },
-      planDocumentUrl: {
-        type: String,
-        default: '',
-      },
+      planReferenceNumber: { type: String, trim: true, default: '' },
+      planStartDate: { type: Date, default: null },
+      planEndDate: { type: Date, default: null },
+      monthlyFeeGBP: { type: Number, default: 0, min: 0 },
+      isPlanVerified: { type: Boolean, default: false },
+      planDocumentUrl: { type: String, default: '' },
     },
 
-    // Annual Squeaky Clean Valet
+    // 4. Annual Squeaky Clean Valet / Annual Servicing
     squeakyCleanValet: {
       eligibilityStatus: {
         type: String,
@@ -260,43 +308,15 @@ const applianceSchema = new mongoose.Schema(
         default: 'NOT_VERIFIED',
         index: true,
       },
-      eligibilityEvidence: {
-        type: String,
-        trim: true,
-        default: '',
-      },
-      lastValetDate: {
-        type: Date,
-        default: null,
-      },
-      nextValetDueDate: {
-        type: Date,
-        default: null,
-      },
-      bookingReference: {
-        type: String,
-        trim: true,
-        default: '',
-      },
-      bookedAppointmentDate: {
-        type: Date,
-        default: null,
-      },
-      appointedServiceProvider: {
-        type: String,
-        trim: true,
-        default: 'Currys',
-      },
-      serviceNotes: {
-        type: String,
-        trim: true,
-        default: '',
-      },
+      eligibilityEvidence: { type: String, trim: true, default: '' },
+      lastValetDate: { type: Date, default: null },
+      nextValetDueDate: { type: Date, default: null },
+      bookingReference: { type: String, trim: true, default: '' },
+      bookedAppointmentDate: { type: Date, default: null },
+      appointedServiceProvider: { type: String, trim: true, default: 'Currys' },
+      serviceNotes: { type: String, trim: true, default: '' },
       completedChecklist: [valetChecklistItemSchema],
-      valetReportDocumentUrl: {
-        type: String,
-        default: '',
-      },
+      valetReportDocumentUrl: { type: String, default: '' },
     },
 
     // Receipt and Certificate Attachments
@@ -304,14 +324,8 @@ const applianceSchema = new mongoose.Schema(
 
     // Tenant Visit Communication & Property Access
     tenantAccessNotice: {
-      isNotified: {
-        type: Boolean,
-        default: false,
-      },
-      notificationDate: {
-        type: Date,
-        default: null,
-      },
+      isNotified: { type: Boolean, default: false },
+      notificationDate: { type: Date, default: null },
       communicationMethod: {
         type: String,
         enum: ['EMAIL', 'SMS', 'PHONE', 'WRITTEN_NOTICE', 'WHATSAPP', 'OTHER'],
@@ -329,11 +343,7 @@ const applianceSchema = new mongoose.Schema(
         ],
         default: 'NOT_NOTIFIED',
       },
-      tenantNotes: {
-        type: String,
-        trim: true,
-        default: '',
-      },
+      tenantNotes: { type: String, trim: true, default: '' },
     },
 
     status: {
@@ -357,8 +367,41 @@ const applianceSchema = new mongoose.Schema(
   }
 );
 
-// Pre-save hook: initialize default checklist if not already populated
+// Pre-save hook: sync legacy mirrors with decoupled structures and initialize valet checklists
 applianceSchema.pre('save', function () {
+  // Sync propertyAssignmentStatus
+  if (this.propertyId) {
+    if (this.propertyAssignmentStatus === 'PENDING_VERIFICATION' && this.isPropertyAssignedVerified) {
+      this.propertyAssignmentStatus = 'ASSIGNED';
+    }
+  } else {
+    this.propertyAssignmentStatus = 'PENDING_VERIFICATION';
+  }
+
+  // Sync serviceAgreement with currysCareAndRepair mirror
+  if (this.serviceAgreement?.hasAgreement) {
+    this.currysCareAndRepair.hasPlan = true;
+    this.currysCareAndRepair.planReferenceNumber = this.serviceAgreement.agreementReference || this.currysCareAndRepair.planReferenceNumber;
+    this.currysCareAndRepair.planStartDate = this.serviceAgreement.startDate || this.currysCareAndRepair.planStartDate;
+    this.currysCareAndRepair.planEndDate = this.serviceAgreement.endDate || this.currysCareAndRepair.planEndDate;
+    this.currysCareAndRepair.isPlanVerified = this.serviceAgreement.verificationStatus === 'VERIFIED';
+  } else if (this.currysCareAndRepair?.hasPlan) {
+    this.serviceAgreement.hasAgreement = true;
+    this.serviceAgreement.agreementReference = this.currysCareAndRepair.planReferenceNumber || '';
+    this.serviceAgreement.startDate = this.currysCareAndRepair.planStartDate;
+    this.serviceAgreement.endDate = this.currysCareAndRepair.planEndDate;
+    this.serviceAgreement.verificationStatus = this.currysCareAndRepair.isPlanVerified ? 'VERIFIED' : 'NOT_VERIFIED';
+  }
+
+  // Sync manufacturerWarranty with hasWarranty legacy mirror
+  if (this.manufacturerWarranty?.expiryDate) {
+    this.hasWarranty = true;
+    this.warrantyStartDate = this.manufacturerWarranty.startDate;
+    this.warrantyExpiryDate = this.manufacturerWarranty.expiryDate;
+    this.warrantyProvider = this.manufacturerWarranty.provider || this.brand;
+  }
+
+  // Initialize checklist if needed
   if (
     (!this.squeakyCleanValet.completedChecklist || this.squeakyCleanValet.completedChecklist.length === 0) &&
     OFFICIAL_VALET_CHECKLISTS[this.applianceType]
@@ -375,6 +418,7 @@ applianceSchema.pre('save', function () {
 applianceSchema.index({ companyId: 1, propertyId: 1 });
 applianceSchema.index({ companyId: 1, applianceType: 1 });
 applianceSchema.index({ companyId: 1, supplier: 1 });
+applianceSchema.index({ companyId: 1, propertyAssignmentStatus: 1 });
 applianceSchema.index({ companyId: 1, 'squeakyCleanValet.eligibilityStatus': 1 });
 applianceSchema.index({ companyId: 1, 'currysCareAndRepair.hasPlan': 1 });
 

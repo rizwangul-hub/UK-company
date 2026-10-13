@@ -31,6 +31,7 @@ import Transaction from '../src/models/Transaction.js';
 import Voucher from '../src/models/Voucher.js';
 import Appliance from '../src/models/Appliance.js';
 import MaintenanceTask from '../src/models/MaintenanceTask.js';
+import SupplierReceipt from '../src/models/SupplierReceipt.js';
 
 // -----------------------------------------------------------------------------
 // 1. COMPANY REGISTRY & IDENTIFIER VALIDATION
@@ -942,5 +943,23 @@ test('MAINTENANCE: MaintenanceTask schema requires companyId', () => {
   const companyIdPath = taskSchema.path('companyId');
   assert.ok(companyIdPath.isRequired, 'companyId must be required on MaintenanceTask');
 });
+
+test('RECEIPTS: SupplierReceipt schema requires companyId and validates against 6 UK entities', () => {
+  const receiptSchema = SupplierReceipt.schema;
+  const companyIdPath = receiptSchema.path('companyId');
+  assert.ok(companyIdPath.isRequired, 'companyId must be required on SupplierReceipt');
+  assert.deepEqual(companyIdPath.enumValues, VALID_COMPANY_IDS);
+  assert.equal(receiptSchema.path('financialLedgerStatus').defaultValue, 'SOURCE_RECORD_ONLY');
+});
+
+test('APPLIANCES: Decoupled warranty structures and optional propertyId for pending items', () => {
+  const applianceSchema = Appliance.schema;
+  assert.equal(!applianceSchema.path('propertyId').isRequired, true, 'propertyId must be optional for unassigned items');
+  assert.ok(applianceSchema.path('manufacturerWarranty.provider'), 'manufacturerWarranty must be separate');
+  assert.ok(applianceSchema.path('extendedWarranty.durationYears'), 'extendedWarranty must be separate');
+  assert.ok(applianceSchema.path('serviceAgreement.agreementReference'), 'serviceAgreement must be separate');
+  assert.ok(applianceSchema.path('squeakyCleanValet.eligibilityStatus'), 'squeakyCleanValet must be separate');
+});
+
 
 

@@ -8,6 +8,11 @@ import {
   deleteAppliance,
   uploadApplianceDocument,
   deleteApplianceDocument,
+  assignPropertyToAppliance,
+  getSupplierReceipts,
+  createSupplierReceipt,
+  uploadReceiptDocument,
+  getApplianceReminders,
   getCurrysContacts,
   getMaintenanceTasks,
   updateMaintenanceTask,
@@ -30,10 +35,21 @@ router.use(protect, requireCompanyContext);
 // Currys contact directory
 router.get('/currys-contacts', getCurrysContacts);
 
+// Reminders & Expiry Alerts
+router.get('/reminders', getApplianceReminders);
+
+// Supplier Receipts (Master source invoices: Currys, Howdens, etc.)
+router.get('/receipts', getSupplierReceipts);
+router.post('/receipts', createSupplierReceipt);
+router.post('/receipts/:id/documents', upload.single('file'), uploadReceiptDocument);
+
 // Maintenance Action Tasks
 router.get('/tasks', getMaintenanceTasks);
 router.post('/tasks', createMaintenanceTask);
 router.put('/tasks/:id', updateMaintenanceTask);
+
+// Appliance Property Assignment
+router.put('/:id/assign-property', assignPropertyToAppliance);
 
 // Appliance CRUD
 router.get('/', getAppliances);
@@ -42,7 +58,7 @@ router.post('/', createAppliance);
 router.put('/:id', updateAppliance);
 router.delete('/:id', deleteAppliance);
 
-// Document Attachments
+// Appliance Document Attachments
 router.post('/:id/documents', upload.single('file'), uploadApplianceDocument);
 router.delete('/:id/documents/:documentId', deleteApplianceDocument);
 
