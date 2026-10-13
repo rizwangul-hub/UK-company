@@ -1,5 +1,5 @@
 import Appliance, { OFFICIAL_VALET_CHECKLISTS } from '../models/Appliance.js';
-import MaintenanceTask, { KHURSHID_DEFAULT_TASKS } from '../models/MaintenanceTask.js';
+import MaintenanceTask, { DEFAULT_MAINTENANCE_TASKS } from '../models/MaintenanceTask.js';
 import Property from '../models/Property.js';
 import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
@@ -287,7 +287,7 @@ export const getCurrysContacts = async (req, res) => {
 };
 
 /**
- * 9. Khurshid's Action Checklist & Maintenance Tasks
+ * 9. Action Checklist & Maintenance Tasks
  */
 export const getMaintenanceTasks = async (req, res) => {
   try {
@@ -295,12 +295,12 @@ export const getMaintenanceTasks = async (req, res) => {
       .sort({ taskNumber: 1, createdAt: 1 })
       .lean();
 
-    // Auto-seed Khurshid's default 8 tasks if company has none
+    // Auto-seed default operational tasks if company has none
     if (tasks.length === 0) {
-      const initialTasks = KHURSHID_DEFAULT_TASKS.map((t) => ({
+      const initialTasks = DEFAULT_MAINTENANCE_TASKS.map((t) => ({
         ...t,
         companyId: req.companyId,
-        assignedTo: 'Khurshid',
+        assignedTo: '',
         status: 'PENDING',
       }));
       await MaintenanceTask.insertMany(initialTasks);
@@ -355,7 +355,7 @@ export const createMaintenanceTask = async (req, res) => {
       ...req.body,
       companyId: req.companyId,
       taskNumber: req.body.taskNumber || count + 1,
-      assignedTo: req.body.assignedTo || 'Khurshid',
+      assignedTo: req.body.assignedTo || '',
     };
 
     const task = await MaintenanceTask.create(payload);

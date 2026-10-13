@@ -937,11 +937,10 @@ test('APPLIANCES: Appliance schema requires companyId and validates against 6 UK
   assert.deepEqual(companyIdPath.enumValues, VALID_COMPANY_IDS);
 });
 
-test('MAINTENANCE: MaintenanceTask schema requires companyId and defaults to Khurshid', () => {
+test('MAINTENANCE: MaintenanceTask schema requires companyId', () => {
   const taskSchema = MaintenanceTask.schema;
   const companyIdPath = taskSchema.path('companyId');
   assert.ok(companyIdPath.isRequired, 'companyId must be required on MaintenanceTask');
-  assert.equal(taskSchema.path('assignedTo').defaultValue, 'Khurshid');
 });
 
 

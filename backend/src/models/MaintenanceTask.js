@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { VALID_COMPANY_IDS } from '../config/companies.js';
 
-export const KHURSHID_DEFAULT_TASKS = [
+export const DEFAULT_MAINTENANCE_TASKS = [
   {
     taskNumber: 1,
     title: 'Identify Currys washing machines, fridges & household appliances',
@@ -85,7 +85,7 @@ const maintenanceTaskSchema = new mongoose.Schema(
     assignedTo: {
       type: String,
       trim: true,
-      default: 'Khurshid',
+      default: '',
     },
     priority: {
       type: String,

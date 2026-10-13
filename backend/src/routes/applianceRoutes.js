@@ -30,7 +30,7 @@ router.use(protect, requireCompanyContext);
 // Currys contact directory
 router.get('/currys-contacts', getCurrysContacts);
 
-// Khurshid's Action Tasks
+// Maintenance Action Tasks
 router.get('/tasks', getMaintenanceTasks);
 router.post('/tasks', createMaintenanceTask);
 router.put('/tasks/:id', updateMaintenanceTask);

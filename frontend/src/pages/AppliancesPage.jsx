@@ -35,7 +35,7 @@ import ApplianceModal from '../components/ApplianceModal.jsx';
 import { APPLIANCE_ICONS, APPLIANCE_TYPE_TITLES } from '../components/PropertyAppliancesSection.jsx';
 
 export function AppliancesPage({ selectedCompany }) {
-  const [activeTab, setActiveTab] = useState('appliances'); // 'appliances' | 'calendar' | 'khurshid' | 'access' | 'currys'
+  const [activeTab, setActiveTab] = useState('appliances'); // 'appliances' | 'calendar' | 'tasks' | 'access' | 'currys'
   const [appliances, setAppliances] = useState([]);
   const [properties, setProperties] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -59,7 +59,7 @@ export function AppliancesPage({ selectedCompany }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
-  // New Khurshid Task Modal
+  // New Maintenance Task Modal
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskForm, setTaskForm] = useState({
     title: '',
@@ -193,7 +193,7 @@ export function AppliancesPage({ selectedCompany }) {
     }
   };
 
-  // Khurshid Task Status Toggle
+  // Maintenance Task Status Toggle
   const handleToggleTaskStatus = async (task) => {
     const statusCycle = {
       PENDING: 'IN_PROGRESS',
@@ -222,7 +222,7 @@ export function AppliancesPage({ selectedCompany }) {
     try {
       const res = await appliancesAPI.createTask({
         ...taskForm,
-        assignedTo: 'Khurshid',
+        assignedTo: taskForm.assignedTo || '',
         companyId: selectedCompany?.id,
       });
       if (res?.success) {
@@ -315,7 +315,7 @@ export function AppliancesPage({ selectedCompany }) {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Complete property appliance register, Currys Care &amp; Repair tracking, Annual Squeaky Clean Valets, and Khurshid's maintenance operations for {selectedCompany?.legalName || selectedCompany?.name || 'this portfolio'}.
+            Complete property appliance register, Currys Care &amp; Repair tracking, Annual Squeaky Clean Valets, and operational maintenance workflow for {selectedCompany?.legalName || selectedCompany?.name || 'this portfolio'}.
           </p>
         </div>
 
@@ -387,7 +387,7 @@ export function AppliancesPage({ selectedCompany }) {
 
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Khurshid's Tasks</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider">Action Tasks</span>
             <Wrench className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-blue-300 mt-1 tabular-nums">
@@ -435,15 +435,15 @@ export function AppliancesPage({ selectedCompany }) {
         </button>
 
         <button
-          onClick={() => setActiveTab('khurshid')}
+          onClick={() => setActiveTab('tasks')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'khurshid'
+            activeTab === 'tasks'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Wrench className="w-3.5 h-3.5" />
-          <span>Khurshid's Action Plan ({tasks.length})</span>
+          <span>Action Checklist ({tasks.length})</span>
         </button>
 
         <button
@@ -859,18 +859,18 @@ export function AppliancesPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* TAB 3: KHURSHID'S ACTION PLAN */}
-      {activeTab === 'khurshid' && (
+      {/* TAB 3: OPERATIONAL ACTION CHECKLIST */}
+      {activeTab === 'tasks' && (
         <div className="space-y-4">
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-indigo-400" />
-                  <span>Khurshid's Appliance Maintenance &amp; Audit Responsibilities</span>
+                  <span>Appliance Maintenance &amp; Audit Responsibilities</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Interactive operational action checklist assigned to Khurshid for property appliance registers, Currys Care validation, and valet coordination.
+                  Interactive operational action checklist for property appliance registers, Currys Care validation, and valet coordination.
                 </p>
               </div>
 
@@ -938,9 +938,11 @@ export function AppliancesPage({ selectedCompany }) {
                             >
                               {task.priority}
                             </span>
-                            <span className="text-[10px] text-indigo-400 font-semibold">
-                              Assigned: {task.assignedTo || 'Khurshid'}
-                            </span>
+                            {task.assignedTo && (
+                              <span className="text-[10px] text-indigo-400 font-semibold">
+                                Assignee: {task.assignedTo}
+                              </span>
+                            )}
                           </div>
 
                           <p className="text-xs text-slate-400 max-w-2xl">
@@ -1284,14 +1286,14 @@ export function AppliancesPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* Add Khurshid Task Modal */}
+      {/* Add Maintenance Task Modal */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-indigo-400" />
-                <span>Add Maintenance Task for Khurshid</span>
+                <span>Add Maintenance Task</span>
               </h3>
               <button
                 onClick={() => setShowTaskModal(false)}
