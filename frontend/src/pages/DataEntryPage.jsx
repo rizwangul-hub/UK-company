@@ -43,12 +43,15 @@ export function DataEntryPage({ selectedCompany }) {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [generatingSchedules, setGeneratingSchedules] = useState(false);
   const [feedback, setFeedback] = useState({ text: '', type: '' });
   const [searchTerm, setSearchTerm] = useState('');
 
   // 1. Rent Collection Form State
   const [rentForm, setRentForm] = useState({
     scheduleId: '',
+    propertyId: '',
+    billingMonth: new Date().toISOString().slice(0, 7),
     amount: '',
     paymentDate: new Date().toISOString().slice(0, 10),
     receivingAccountId: '',
@@ -108,13 +111,16 @@ export function DataEntryPage({ selectedCompany }) {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      const companyId = selectedCompany?.slug || selectedCompany?.id || localStorage.getItem('selected_company');
+      const params = companyId && companyId !== 'all' ? { companyId } : {};
+
       const [accRes, propRes, catRes, mtgRes, rentRes, txRes] = await Promise.all([
-        accountsAPI.getAll().catch(() => ({ data: { accounts: [] } })),
-        propertiesAPI.getAll().catch(() => ({ data: { properties: [] } })),
+        accountsAPI.getAll(params).catch(() => ({ data: { accounts: [] } })),
+        propertiesAPI.getAll(params).catch(() => ({ data: { properties: [] } })),
         ledgerAPI.getCategories().catch(() => ({ data: { categories: [] } })),
-        mortgagesAPI.getAll({ status: 'ACTIVE' }).catch(() => ({ data: { mortgages: [] } })),
-        rentAPI.getSchedules({ status: 'PENDING,PARTIAL,OVERDUE' }).catch(() => ({ data: { schedules: [] } })),
-        ledgerAPI.getTransactions({ limit: 50 }).catch(() => ({ data: { transactions: [] } })),
+        mortgagesAPI.getAll({ ...params, status: 'ACTIVE' }).catch(() => ({ data: { mortgages: [] } })),
+        rentAPI.getSchedules({ ...params, status: 'PENDING,PARTIAL,OVERDUE' }).catch(() => ({ data: { schedules: [] } })),
+        ledgerAPI.getTransactions({ ...params, limit: 50 }).catch(() => ({ data: { transactions: [] } })),
       ]);
 
       const accList = accRes?.data?.accounts || accRes?.accounts || [];
@@ -145,38 +151,141 @@ export function DataEntryPage({ selectedCompany }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedCompany]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Handle Rent Schedule Selection
+  // Handle Rent Billing Month Change
+  const handleBillingMonthChange = (e) => {
+    const newMonth = e.target.value;
+    setRentForm((prev) => {
+      let updatedNotes = prev.notes;
+      if (prev.propertyId) {
+        const prop = properties.find((p) => p._id === prev.propertyId);
+        if (prop) {
+          updatedNotes = `Rent for ${prop.name}${prop.tenantName ? ` (Tenant: ${prop.tenantName})` : ''} - Month: ${newMonth}`;
+        }
+      }
+      return {
+        ...prev,
+        billingMonth: newMonth,
+        notes: updatedNotes,
+      };
+    });
+  };
+
+  // Handle Rent Schedule or Direct Property Selection
   const handleScheduleSelect = (e) => {
-    const sId = e.target.value;
-    const selected = rentSchedules.find((s) => s._id === sId);
-    setRentForm((prev) => ({
-      ...prev,
-      scheduleId: sId,
-      amount: selected ? String(selected.outstandingAmount || selected.expectedAmount || '') : '',
-      notes: selected
-        ? `Rent for ${selected.propertyId?.name || 'Property'} (${selected.unitId?.unitName || 'Unit'}) - Month: ${selected.billingMonth}`
-        : '',
-    }));
+    const val = e.target.value;
+    if (!val) {
+      setRentForm((prev) => ({
+        ...prev,
+        scheduleId: '',
+        propertyId: '',
+        amount: '',
+        notes: '',
+      }));
+      return;
+    }
+
+    if (val.startsWith('schedule:')) {
+      const sId = val.replace('schedule:', '');
+      const selected = rentSchedules.find((s) => s._id === sId);
+      if (selected) {
+        const propId = selected.propertyId?._id || selected.propertyId;
+        const tenantName = selected.tenantId?.fullName || selected.notes || 'Tenant';
+        const propName = selected.propertyId?.name || 'Property';
+        const month = selected.billingMonth || rentForm.billingMonth;
+        setRentForm((prev) => ({
+          ...prev,
+          scheduleId: sId,
+          propertyId: propId || '',
+          billingMonth: month,
+          amount: String(selected.outstandingAmount ?? selected.expectedAmount ?? ''),
+          notes: `Rent for ${propName} (Tenant: ${tenantName}) - Month: ${month}`,
+        }));
+      }
+    } else if (val.startsWith('property:')) {
+      const pId = val.replace('property:', '');
+      const selectedProp = properties.find((p) => p._id === pId);
+      if (selectedProp) {
+        setRentForm((prev) => ({
+          ...prev,
+          scheduleId: '',
+          propertyId: pId,
+          amount: selectedProp.contractualRent ? String(selectedProp.contractualRent) : '',
+          notes: `Rent for ${selectedProp.name}${selectedProp.tenantName ? ` (Tenant: ${selectedProp.tenantName})` : ''} - Month: ${prev.billingMonth}`,
+        }));
+      }
+    } else {
+      // Direct raw ID fallback
+      const selected = rentSchedules.find((s) => s._id === val);
+      if (selected) {
+        const propId = selected.propertyId?._id || selected.propertyId;
+        setRentForm((prev) => ({
+          ...prev,
+          scheduleId: val,
+          propertyId: propId || '',
+          billingMonth: selected.billingMonth || prev.billingMonth,
+          amount: String(selected.outstandingAmount ?? selected.expectedAmount ?? ''),
+          notes: `Rent for ${selected.propertyId?.name || 'Property'} - Month: ${selected.billingMonth}`,
+        }));
+      } else {
+        const selectedProp = properties.find((p) => p._id === val);
+        if (selectedProp) {
+          setRentForm((prev) => ({
+            ...prev,
+            scheduleId: '',
+            propertyId: val,
+            amount: selectedProp.contractualRent ? String(selectedProp.contractualRent) : '',
+            notes: `Rent for ${selectedProp.name} - Month: ${prev.billingMonth}`,
+          }));
+        }
+      }
+    }
+  };
+
+  // Quick generate monthly invoices for selected billing month
+  const handleQuickGenerateSchedules = async () => {
+    if (!rentForm.billingMonth) return;
+    try {
+      setGeneratingSchedules(true);
+      const res = await rentAPI.generateMonthlySchedules(rentForm.billingMonth);
+      setFeedback({
+        text: res?.message || `Generated monthly invoices for ${rentForm.billingMonth}.`,
+        type: 'success',
+      });
+      await loadData();
+    } catch (err) {
+      setFeedback({
+        text: err.response?.data?.message || err.message || 'Failed to generate monthly invoices.',
+        type: 'error',
+      });
+    } finally {
+      setGeneratingSchedules(false);
+    }
   };
 
   // Submit 1: Rent Payment Receipt
   const handleRentSubmit = async (e) => {
     e.preventDefault();
-    if (!rentForm.scheduleId || !rentForm.amount || !rentForm.receivingAccountId) {
-      setFeedback({ text: 'Please select a tenant schedule, amount, and receiving bank account.', type: 'error' });
+    if ((!rentForm.scheduleId && !rentForm.propertyId) || !rentForm.amount || !rentForm.receivingAccountId) {
+      setFeedback({ text: 'Please select a tenant schedule or property, amount, and receiving bank account.', type: 'error' });
+      return;
+    }
+    if (!rentForm.billingMonth) {
+      setFeedback({ text: 'Please select the rent month (billing period).', type: 'error' });
       return;
     }
     try {
       setSubmitting(true);
       setFeedback({ text: '', type: '' });
       const res = await rentAPI.recordPayment({
-        scheduleId: rentForm.scheduleId,
+        scheduleId: rentForm.scheduleId || undefined,
+        propertyId: rentForm.propertyId || undefined,
+        billingMonth: rentForm.billingMonth,
         amount: Number(rentForm.amount),
         paymentDate: rentForm.paymentDate,
         receivingAccountId: rentForm.receivingAccountId,
@@ -186,12 +295,13 @@ export function DataEntryPage({ selectedCompany }) {
 
       if (res?.success) {
         setFeedback({
-          text: `Rent receipt of ${formatGBP(Number(rentForm.amount))} successfully posted into bank account.`,
+          text: `Rent receipt of ${formatGBP(Number(rentForm.amount))} for ${rentForm.billingMonth} successfully posted into bank account.`,
           type: 'success',
         });
         setRentForm((prev) => ({
           ...prev,
           scheduleId: '',
+          propertyId: '',
           amount: '',
           notes: '',
         }));
@@ -650,42 +760,94 @@ export function DataEntryPage({ selectedCompany }) {
       {/* ------------------------------------------------------------------ */}
       {activeTab === 'rent' && (
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
-          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
-            <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
-              <Receipt className="w-5 h-5" />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 mb-5 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white">
+                  Record Tenant Rent Collection
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Deposit rent into bank account and automatically reduce tenant outstanding balance.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">
-                Record Tenant Rent Collection
-              </h2>
-              <p className="text-xs text-slate-400">
-                Deposit rent into bank account and automatically reduce tenant outstanding balance.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={handleQuickGenerateSchedules}
+              disabled={generatingSchedules || !rentForm.billingMonth}
+              className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+              title="Generate billing invoices for all properties for this month"
+            >
+              <Zap className={`w-3.5 h-3.5 ${generatingSchedules ? 'animate-spin' : ''}`} />
+              <span>{generatingSchedules ? 'Generating...' : `Generate Invoices (${rentForm.billingMonth})`}</span>
+            </button>
           </div>
 
           <form onSubmit={handleRentSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Select Tenant & Billing Schedule <span className="text-rose-400">*</span>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+                  <span>Rent Month <span className="text-rose-400">*</span></span>
+                  <span className="text-[10px] text-slate-400 font-normal">YYYY-MM</span>
                 </label>
+                <input
+                  type="month"
+                  value={rentForm.billingMonth}
+                  onChange={handleBillingMonthChange}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Select Tenant & Billing Schedule <span className="text-rose-400">*</span>
+                  </label>
+                  {rentSchedules.length > 0 && (
+                    <span className="text-[11px] text-emerald-400 font-medium">
+                      {rentSchedules.length} active invoice{rentSchedules.length > 1 ? 's' : ''} available
+                    </span>
+                  )}
+                </div>
                 <select
-                  value={rentForm.scheduleId}
+                  value={
+                    rentForm.scheduleId
+                      ? `schedule:${rentForm.scheduleId}`
+                      : rentForm.propertyId
+                      ? `property:${rentForm.propertyId}`
+                      : ''
+                  }
                   onChange={handleScheduleSelect}
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
                 >
-                  <option value="">-- Choose Tenant Invoice / Billing Month --</option>
-                  {rentSchedules.map((s) => (
-                    <option key={s._id} value={s._id}>
-                      {s.tenantId?.fullName || 'Tenant'} &bull; {s.propertyId?.name || 'Property'} (Unit {s.unitId?.unitName || ''}) &bull; Month: {s.billingMonth} &bull; Due: {formatGBP(s.outstandingAmount)} ({s.status})
-                    </option>
-                  ))}
+                  <option value="">-- Choose Tenant Invoice or Direct Property --</option>
+                  {rentSchedules.length > 0 && (
+                    <optgroup label="📋 Active Billing Invoices & Schedules">
+                      {rentSchedules.map((s) => (
+                        <option key={s._id} value={`schedule:${s._id}`}>
+                          {s.tenantId?.fullName || s.notes || 'Tenant'} &bull; {s.propertyId?.name || 'Property'} {s.unitId?.unitName ? `(Unit ${s.unitId.unitName})` : ''} &bull; Month: {s.billingMonth} &bull; Due: {formatGBP(s.outstandingAmount)} ({s.status})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {properties.length > 0 && (
+                    <optgroup label="🏢 Direct Company Properties (Contractual Rent)">
+                      {properties.map((p) => (
+                        <option key={p._id} value={`property:${p._id}`}>
+                          {p.name} {p.tenantName ? `(Tenant: ${p.tenantName})` : ''} &bull; Monthly Rent: {formatGBP(p.contractualRent || 0)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
-                {rentSchedules.length === 0 && (
-                  <p className="text-[11px] text-emerald-400 mt-1">
-                    All scheduled rents are currently up-to-date! No outstanding balances.
+                {rentSchedules.length === 0 && properties.length > 0 && (
+                  <p className="text-[11px] text-cyan-400 mt-1">
+                    Select any company property from the dropdown above to record rent for {rentForm.billingMonth}.
                   </p>
                 )}
               </div>
@@ -755,7 +917,7 @@ export function DataEntryPage({ selectedCompany }) {
                 </select>
               </div>
 
-              <div className="lg:col-span-3">
+              <div className="lg:col-span-2">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                   Receipt Narration / Note
                 </label>

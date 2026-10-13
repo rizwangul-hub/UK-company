@@ -104,11 +104,17 @@ export const getSchedules = async (req, res) => {
     const query = { companyId: req.companyId };
     if (billingMonth) query.billingMonth = billingMonth;
     if (propertyId) query.propertyId = propertyId;
-    if (status) query.status = status;
+    if (status) {
+      if (status.includes(',')) {
+        query.status = { $in: status.split(',').map((s) => s.trim().toUpperCase()) };
+      } else {
+        query.status = status.toUpperCase();
+      }
+    }
 
     const schedules = await RentSchedule.find(query)
       .populate('tenantId', 'fullName email phone')
-      .populate('propertyId', 'name addressLine1 postcode')
+      .populate('propertyId', 'name addressLine1 postcode contractualRent')
       .populate('unitId', 'unitName unitType')
       .sort({ dueDate: 1 })
       .lean();
@@ -138,8 +144,10 @@ export const getSchedules = async (req, res) => {
 
 export const recordPayment = async (req, res) => {
   try {
-    const {
+    let {
       scheduleId,
+      propertyId,
+      billingMonth,
       amount,
       paymentDate = new Date(),
       receivingAccountId,
@@ -155,13 +163,51 @@ export const recordPayment = async (req, res) => {
       return apiError(res, 'Receiving bank account is required.', 400);
     }
 
-    const schedule = await RentSchedule.findOne({ _id: scheduleId, companyId: req.companyId })
-      .populate('tenantId')
-      .populate('propertyId')
-      .populate('unitId');
+    let schedule = null;
+
+    if (scheduleId) {
+      schedule = await RentSchedule.findOne({ _id: scheduleId, companyId: req.companyId })
+        .populate('tenantId')
+        .populate('propertyId')
+        .populate('unitId');
+    }
+
+    // Direct Property Collection fallback if no scheduleId or schedule not found
+    if (!schedule && propertyId && billingMonth) {
+      schedule = await RentSchedule.findOne({
+        companyId: req.companyId,
+        propertyId,
+        billingMonth,
+      })
+        .populate('tenantId')
+        .populate('propertyId')
+        .populate('unitId');
+
+      if (!schedule) {
+        const prop = await Property.findOne({ _id: propertyId, companyId: req.companyId });
+        if (!prop) {
+          return apiError(res, 'Property not found in active company.', 404);
+        }
+        // Create schedule on the fly for this direct property and billing month
+        schedule = await RentSchedule.create({
+          companyId: req.companyId,
+          propertyId: prop._id,
+          unitId: null,
+          tenantId: null,
+          billingMonth,
+          dueDate: new Date(`${billingMonth}-01`),
+          expectedAmount: prop.contractualRent || numAmount,
+          paidAmount: 0,
+          outstandingAmount: prop.contractualRent || numAmount,
+          status: 'PENDING',
+          notes: `Rent billing for ${billingMonth}`,
+        });
+        await schedule.populate('propertyId');
+      }
+    }
 
     if (!schedule) {
-      return apiError(res, 'Rent billing schedule not found in this company.', 404);
+      return apiError(res, 'Rent billing schedule or property and billing month required.', 404);
     }
 
     // Verify receiving account belongs to the same company
