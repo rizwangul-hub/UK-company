@@ -53,7 +53,16 @@ export function MainLayout({
   const displayLegalName = selectedCompany?.legalName || 'UK Property Finance';
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+    <div className="h-screen h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+      {/* Mobile Drawer Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden transition-opacity duration-200"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-label="Close navigation menu"
+        />
+      )}
+
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800 sticky top-0 z-40 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -99,6 +108,7 @@ export function MainLayout({
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -107,12 +117,36 @@ export function MainLayout({
 
       {/* Sidebar Navigation - Strictly Fixed & Stuck on Left Side */}
       <aside
-        className={`fixed md:relative top-0 left-0 h-screen w-72 lg:w-80 bg-slate-900/95 md:bg-slate-900 border-r border-slate-800 flex flex-col z-50 shrink-0 transition-transform duration-200 ease-in-out ${
+        className={`fixed md:relative top-0 left-0 bottom-0 md:bottom-auto h-screen h-[100dvh] max-h-[100dvh] w-72 lg:w-80 bg-slate-900/98 md:bg-slate-900 border-r border-slate-800 flex flex-col z-50 shrink-0 transition-transform duration-200 ease-in-out shadow-2xl md:shadow-none ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        {/* Brand Area */}
-        <div className="p-4 lg:p-5 border-b border-slate-800/80 hidden md:flex flex-col gap-2.5">
+        {/* Mobile Drawer Header with Close Button */}
+        <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 shrink-0 bg-slate-900">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden">
+              <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-extrabold text-sm tracking-tight text-white truncate">
+                {displayName}
+              </div>
+              <div className="text-[11px] text-indigo-400 font-semibold tracking-wider uppercase truncate">
+                {displayLegalName}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer shrink-0"
+            title="Close Menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Brand Area for Desktop */}
+        <div className="p-4 lg:p-5 border-b border-slate-800/80 hidden md:flex flex-col gap-2.5 shrink-0">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-center p-1.5 shadow-md shrink-0 overflow-hidden">
               <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
@@ -152,8 +186,38 @@ export function MainLayout({
           </div>
         </div>
 
+        {/* Quick Actions for Mobile in Drawer */}
+        {(onOpenMasterDashboard || onSwitchCompany) && (
+          <div className="grid grid-cols-2 gap-2 p-3 border-b border-slate-800/80 md:hidden shrink-0">
+            {onOpenMasterDashboard && (
+              <button
+                onClick={() => {
+                  onOpenMasterDashboard();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs font-bold transition shadow-xs cursor-pointer truncate"
+              >
+                <Layers className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate">Master Group</span>
+              </button>
+            )}
+            {onSwitchCompany && (
+              <button
+                onClick={() => {
+                  onSwitchCompany();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/25 text-xs font-bold transition shadow-xs cursor-pointer truncate"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span className="truncate">Switch Entity</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Currency & Operator Card */}
-        <div className="mx-3.5 my-3.5 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between shadow-sm">
+        <div className="mx-3.5 my-3 p-3 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between shadow-sm shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20">
               <ShieldCheck className="w-4.5 h-4.5" />
@@ -168,67 +232,69 @@ export function MainLayout({
           </span>
         </div>
 
-        {/* Navigation Links with Enlarged Heights and Widths */}
-        <nav className="flex-1 px-3.5 py-2 space-y-2 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onViewChange(item.id);
-                  setMobileMenuOpen(false);
-                }}
-                className={`group w-full flex items-center justify-between px-3.5 py-3 rounded-2xl min-h-[52px] text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-600/25 border border-indigo-400/30'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent hover:border-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-3.5">
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                      isActive
-                        ? 'bg-white/20 text-white shadow-sm'
-                        : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:bg-indigo-500/20 group-hover:text-indigo-300 group-hover:border-indigo-500/40'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
+        {/* Scrollable Container with Navigation Links and Software Developer Credits */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col justify-between">
+          <nav className="px-3.5 py-1 space-y-2">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onViewChange(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`group w-full flex items-center justify-between px-3.5 py-3 rounded-2xl min-h-[50px] text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                    isActive
+                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-600/25 border border-indigo-400/30'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent hover:border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                        isActive
+                          ? 'bg-white/20 text-white shadow-sm'
+                          : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:bg-indigo-500/20 group-hover:text-indigo-300 group-hover:border-indigo-500/40'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="tracking-tight">{item.label}</span>
                   </div>
-                  <span className="tracking-tight">{item.label}</span>
-                </div>
-                {item.badge && (
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
-                      isActive
-                        ? 'bg-white/20 text-white border border-white/30'
-                        : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+                  {item.badge && (
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                        isActive
+                          ? 'bg-white/20 text-white border border-white/30'
+                          : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
 
-        {/* Software Developer Credits on Left Side of Sidebar */}
-        <div className="p-3.5 border-t border-slate-800/80 mt-auto">
-          <div className="p-3 rounded-2xl developer-credit-card bg-slate-100 dark:bg-gradient-to-br dark:from-slate-950 dark:via-indigo-950/20 dark:to-slate-950 border border-slate-200 dark:border-indigo-500/20 shadow-sm flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 shadow-sm">
-              <Code2 className="w-5 h-5" />
-            </div>
-            <div className="truncate min-w-0">
-              <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                Software Developer
+          {/* Software Developer Credits - Inside scroll flow with safe area padding */}
+          <div className="p-3.5 border-t border-slate-800/80 mt-auto shrink-0 pb-mobile-safe">
+            <div className="p-3 rounded-2xl developer-credit-card bg-slate-100 dark:bg-gradient-to-br dark:from-slate-950 dark:via-indigo-950/20 dark:to-slate-950 border border-slate-200 dark:border-indigo-500/20 shadow-sm flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 shadow-sm">
+                <Code2 className="w-5 h-5" />
               </div>
-              <div className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight truncate">
-                Rizwan Ullah
-              </div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
-                PIXX Technologies UK
+              <div className="truncate min-w-0">
+                <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                  Software Developer
+                </div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight truncate">
+                  Rizwan Ullah
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                  PIXX Technologies UK
+                </div>
               </div>
             </div>
           </div>
@@ -297,7 +363,7 @@ export function MainLayout({
         </header>
 
         {/* Page Content */}
-        <div className="flex-1">
+        <div className="flex-1 pb-page-safe">
           {children}
         </div>
       </main>
