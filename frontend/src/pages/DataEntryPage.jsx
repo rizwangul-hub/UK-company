@@ -351,7 +351,7 @@ export function DataEntryPage({ selectedCompany }) {
         categoryId: expenseForm.categoryId,
         amount: Number(expenseForm.amount),
         propertyId: expenseForm.propertyId || null,
-        unitId: expenseForm.unitId || null,
+        unitId: null,
         narration: expenseForm.narration,
         reference: expenseForm.reference,
         periodMonth: expenseForm.transactionDate.slice(0, 7),
@@ -435,8 +435,8 @@ export function DataEntryPage({ selectedCompany }) {
         accountId: otherIncomeForm.accountId,
         categoryId: otherIncomeForm.categoryId,
         amount: Number(otherIncomeForm.amount),
-        propertyId: otherIncomeForm.propertyId || null,
-        unitId: otherIncomeForm.unitId || null,
+        propertyId: null,
+        unitId: null,
         narration: otherIncomeForm.receivedFrom
           ? `${otherIncomeForm.narration} (Received from: ${otherIncomeForm.receivedFrom})`
           : otherIncomeForm.narration,
@@ -1098,32 +1098,13 @@ export function DataEntryPage({ selectedCompany }) {
                 </label>
                 <select
                   value={expenseForm.propertyId}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, propertyId: e.target.value, unitId: '' })}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, propertyId: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
                 >
                   <option value="">-- General / Non-Property Specific --</option>
                   {properties.map((p) => (
                     <option key={p._id} value={p._id}>
                       🏢 {p.name} ({p.postcode || p.city || 'UK'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Unit Allocation (Optional)
-                </label>
-                <select
-                  value={expenseForm.unitId}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, unitId: e.target.value })}
-                  disabled={!expenseForm.propertyId || unitsForExpense.length === 0}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none disabled:opacity-50"
-                >
-                  <option value="">-- Whole Property --</option>
-                  {unitsForExpense.map((u) => (
-                    <option key={u._id} value={u._id}>
-                      {u.unitName} ({u.unitType})
                     </option>
                   ))}
                 </select>
@@ -1529,23 +1510,18 @@ export function DataEntryPage({ selectedCompany }) {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Property Allocation (Optional)
+                  Reference No.
                 </label>
-                <select
-                  value={otherIncomeForm.propertyId}
-                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, propertyId: e.target.value, unitId: '' })}
+                <input
+                  type="text"
+                  placeholder="e.g. REC-OTH-0042"
+                  value={otherIncomeForm.reference}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, reference: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
-                >
-                  <option value="">-- General Company / Portfolio --</option>
-                  {properties.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
-              <div className="lg:col-span-2">
+              <div className="sm:col-span-2 lg:col-span-3">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                   Narration / Detail <span className="text-rose-400">*</span>
                 </label>
@@ -1555,19 +1531,6 @@ export function DataEntryPage({ selectedCompany }) {
                   value={otherIncomeForm.narration}
                   onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, narration: e.target.value })}
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Reference No.
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. REC-OTH-0042"
-                  value={otherIncomeForm.reference}
-                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, reference: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
                 />
               </div>
