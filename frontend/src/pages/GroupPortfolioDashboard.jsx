@@ -41,13 +41,28 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
     try {
       const res = await reportsAPI.getConsolidatedOverview();
       if (res?.success) {
-        setData(res.data);
+        // Robust extraction: handles res.data, res.message, or res itself
+        const payload =
+          res.data && typeof res.data === 'object' && res.data.totals
+            ? res.data
+            : res.message && typeof res.message === 'object' && res.message.totals
+            ? res.message
+            : res.totals
+            ? res
+            : null;
+
+        if (payload) {
+          setData(payload);
+        } else {
+          console.warn('Unexpected consolidated overview response structure:', res);
+          setError('Failed to load portfolio overview: invalid response structure.');
+        }
       } else {
         setError(res?.message || 'Failed to load master overview');
       }
     } catch (err) {
       console.error('Failed to load consolidated group data:', err);
-      setError(err.message || 'Network error loading consolidated data');
+      setError(err.response?.data?.message || err.message || 'Network error loading consolidated data');
     } finally {
       setLoading(false);
     }
@@ -185,7 +200,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
           </div>
         )}
 
-        {data && (
+        {data && data.totals && (
           <>
             {/* Top KPI Metric Cards (6 Tiles) */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
@@ -194,7 +209,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                   Direct Assets
                 </div>
                 <div className="text-xl sm:text-2xl font-black text-white">
-                  {data.totals.totalProperties}
+                  {data.totals?.totalProperties ?? 0}
                 </div>
                 <div className="text-[10px] text-emerald-400 font-medium mt-1">
                   Across 6 Companies
@@ -206,7 +221,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                   Monthly Rent Roll
                 </div>
                 <div className="text-xl sm:text-2xl font-black text-emerald-300">
-                  {formatGBP(data.totals.totalMonthlyRent)}
+                  {formatGBP(data.totals?.totalMonthlyRent ?? 0)}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-1">
                   Contractual expected
@@ -218,7 +233,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                   Annual Rent Roll
                 </div>
                 <div className="text-xl sm:text-2xl font-black text-emerald-300">
-                  {formatGBP(data.totals.totalAnnualRent)}
+                  {formatGBP(data.totals?.totalAnnualRent ?? 0)}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-1">
                   Full annual capacity
@@ -230,7 +245,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                   Asset Valuation
                 </div>
                 <div className="text-xl sm:text-2xl font-black text-blue-300">
-                  {formatGBP(data.totals.totalValuation)}
+                  {formatGBP(data.totals?.totalValuation ?? 0)}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-1">
                   Acquisition / Book value
@@ -242,10 +257,10 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                   Mortgage Liabilities
                 </div>
                 <div className="text-xl sm:text-2xl font-black text-rose-300">
-                  {formatGBP(data.totals.totalMortgageDebt)}
+                  {formatGBP(data.totals?.totalMortgageDebt ?? 0)}
                 </div>
                 <div className="text-[10px] text-rose-400/80 mt-1">
-                  27 Active Facilities
+                  {data.totals?.totalMortgages ?? 27} Active Facilities
                 </div>
               </div>
 
@@ -254,7 +269,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                   Debt Servicing / Mo
                 </div>
                 <div className="text-xl sm:text-2xl font-black text-indigo-300">
-                  {formatGBP(data.totals.totalMonthlyDebtService)}
+                  {formatGBP(data.totals?.totalMonthlyDebtService ?? 0)}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-1">
                   Monthly installments
@@ -364,7 +379,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
             {activeTab === 'overview' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {data.companySummaries.map((comp) => {
+                  {(data.companySummaries || []).map((comp) => {
                     const compConfig = COMPANIES.find((c) => c.id === comp.companyId);
                     return (
                       <div
@@ -510,9 +525,9 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
-                      {data.allMortgages.map((m, idx) => {
+                      {(data.allMortgages || []).map((m, idx) => {
                         const comp = COMPANIES.find((c) => c.id === m.companyId);
-                        const matchedProp = data.allProperties.find((p) => String(p._id) === String(m.propertyId));
+                        const matchedProp = (data.allProperties || []).find((p) => String(p._id) === String(m.propertyId));
                         return (
                           <tr key={m._id || idx} className="hover:bg-slate-850/50 transition">
                             <td className="py-2.5 px-4 text-center font-bold text-slate-400">{idx + 1}</td>

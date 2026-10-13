@@ -442,7 +442,7 @@ export const exportLandlordRentStatementExcel = async (req, res) => {
 export const getConsolidatedOverview = async (req, res) => {
   try {
     const data = await getConsolidatedGroupOverviewData();
-    return apiSuccess(res, 'Consolidated group portfolio overview retrieved successfully', data);
+    return apiSuccess(res, data, 'Consolidated group portfolio overview retrieved successfully');
   } catch (error) {
     return apiError(res, 'Failed to fetch consolidated overview', 500, error);
   }
