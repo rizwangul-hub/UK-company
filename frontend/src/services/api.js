@@ -305,6 +305,26 @@ export const appliancesAPI = {
     const res = await api.put(`/appliances/tasks/${id}`, data);
     return res.data;
   },
+  assignProperty: async (id, data) => {
+    const res = await api.put(`/appliances/${id}/assign-property`, data);
+    return res.data;
+  },
+  getReceipts: async (config = {}) => {
+    return cachedGet('/appliances/receipts', config);
+  },
+  createReceipt: async (data) => {
+    const res = await api.post('/appliances/receipts', data);
+    return res.data;
+  },
+  uploadReceiptDocument: async (id, formData) => {
+    const res = await api.post(`/appliances/receipts/${id}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  getReminders: async (params, config = {}) => {
+    return cachedGet('/appliances/reminders', { params, ...config });
+  },
 };
 
 // --------------------------------------------------------------------------

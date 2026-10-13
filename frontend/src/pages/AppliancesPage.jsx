@@ -28,6 +28,12 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  Receipt,
+  CreditCard,
+  MapPin,
+  Bell,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { appliancesAPI, propertiesAPI, triggerBlobDownload } from '../services/api.js';
@@ -35,8 +41,10 @@ import ApplianceModal from '../components/ApplianceModal.jsx';
 import { APPLIANCE_ICONS, APPLIANCE_TYPE_TITLES } from '../components/PropertyAppliancesSection.jsx';
 
 export function AppliancesPage({ selectedCompany }) {
-  const [activeTab, setActiveTab] = useState('appliances'); // 'appliances' | 'calendar' | 'tasks' | 'access' | 'currys'
+  const [activeTab, setActiveTab] = useState('appliances'); // 'appliances' | 'receipts' | 'reminders' | 'calendar' | 'tasks' | 'access' | 'currys'
   const [appliances, setAppliances] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [reminders, setReminders] = useState([]);
   const [properties, setProperties] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [currysContacts, setCurrysContacts] = useState(null);
@@ -46,9 +54,11 @@ export function AppliancesPage({ selectedCompany }) {
   // Filter States
   const [search, setSearch] = useState('');
   const [propertyFilter, setPropertyFilter] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [careFilter, setCareFilter] = useState('ALL'); // 'ALL' | 'COVERED' | 'NOT_COVERED' | 'UNVERIFIED'
+  const [careFilter, setCareFilter] = useState('ALL'); // 'ALL' | 'COVERED' | 'NOT_COVERED' | 'PENDING_LOCATION'
   const [valetFilter, setValetFilter] = useState('ALL'); // 'ALL' | 'DUE' | 'BOOKED' | 'COMPLETED'
+  const [reminderDays, setReminderDays] = useState(90);
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,7 +69,28 @@ export function AppliancesPage({ selectedCompany }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
-  // New Maintenance Task Modal
+  // Quick Assign Property Modal
+  const [assignModalAppliance, setAssignModalAppliance] = useState(null);
+  const [selectedAssignPropertyId, setSelectedAssignPropertyId] = useState('');
+  const [assignNotes, setAssignNotes] = useState('');
+  const [assigning, setAssigning] = useState(false);
+
+  // Create Supplier Receipt Modal
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptForm, setReceiptForm] = useState({
+    supplier: 'Currys',
+    branch: '',
+    receiptNumber: '',
+    receiptDate: new Date().toISOString().slice(0, 10),
+    totalAmountDueGBP: '',
+    cardPaymentGBP: '',
+    hasMandate: false,
+    monthlyInstalmentGBP: '',
+    numberOfInstalments: '10',
+    notes: '',
+  });
+
+  // Task Modal
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskForm, setTaskForm] = useState({
     title: '',
@@ -75,17 +106,23 @@ export function AppliancesPage({ selectedCompany }) {
     else setLoading(true);
 
     try {
-      const [appRes, propRes, taskRes, contactRes] = await Promise.all([
+      const [appRes, propRes, taskRes, contactRes, receiptRes, remRes] = await Promise.all([
         appliancesAPI.getAll({}, { forceRefresh: force }),
         propertiesAPI.getAll({}, { forceRefresh: force }),
         appliancesAPI.getTasks({ forceRefresh: force }),
         appliancesAPI.getCurrysContacts({ forceRefresh: force }),
+        appliancesAPI.getReceipts({ forceRefresh: force }),
+        appliancesAPI.getReminders({ days: reminderDays }, { forceRefresh: force }),
       ]);
 
-      if (appRes?.success) setAppliances(appRes.data || []);
+      if (appRes?.success) {
+        setAppliances(appRes.data?.appliances || appRes.data || []);
+      }
       if (propRes?.success) setProperties(propRes.data?.properties || []);
       if (taskRes?.success) setTasks(taskRes.data || []);
       if (contactRes?.success) setCurrysContacts(contactRes.data || null);
+      if (receiptRes?.success) setReceipts(receiptRes.data || []);
+      if (remRes?.success) setReminders(remRes.data?.reminders || []);
     } catch (err) {
       console.error('Failed to load appliances & maintenance data:', err);
     } finally {
@@ -96,7 +133,7 @@ export function AppliancesPage({ selectedCompany }) {
 
   useEffect(() => {
     loadData();
-  }, [selectedCompany?.id]);
+  }, [selectedCompany?.id, reminderDays]);
 
   // Filtered Appliances
   const filteredAppliances = useMemo(() => {
@@ -106,23 +143,29 @@ export function AppliancesPage({ selectedCompany }) {
         const q = search.toLowerCase();
         const matchName = item.name?.toLowerCase().includes(q);
         const matchBrand = item.brand?.toLowerCase().includes(q);
-        const matchModel = item.model?.toLowerCase().includes(q);
+        const matchModel = item.modelNumber?.toLowerCase().includes(q);
         const matchSerial = item.serialNumber?.toLowerCase().includes(q);
+        const matchItemCode = item.itemCode?.toLowerCase().includes(q);
+        const matchRef = item.serviceAgreement?.agreementReference?.toLowerCase().includes(q);
         const matchProp = item.propertyId?.name?.toLowerCase().includes(q);
-        if (!matchName && !matchBrand && !matchModel && !matchSerial && !matchProp) return false;
+        if (!matchName && !matchBrand && !matchModel && !matchSerial && !matchItemCode && !matchRef && !matchProp) return false;
       }
       // Property
       if (propertyFilter && item.propertyId?._id !== propertyFilter && item.propertyId !== propertyFilter) {
         return false;
       }
-      // Type
-      if (typeFilter && item.type !== typeFilter) {
+      // Supplier (Currys / Howdens / other)
+      if (supplierFilter && !item.supplier?.toLowerCase().includes(supplierFilter.toLowerCase())) {
         return false;
       }
-      // Currys Care
-      if (careFilter === 'COVERED' && !item.currysCarePlan?.hasCarePlan) return false;
-      if (careFilter === 'NOT_COVERED' && item.currysCarePlan?.hasCarePlan) return false;
-      if (careFilter === 'UNVERIFIED' && item.currysCarePlan?.planVerification !== 'NOT_VERIFIED') return false;
+      // Type
+      if (typeFilter && item.applianceType !== typeFilter) {
+        return false;
+      }
+      // Care Filter
+      if (careFilter === 'COVERED' && !item.serviceAgreement?.hasAgreement && !item.currysCareAndRepair?.hasPlan) return false;
+      if (careFilter === 'NOT_COVERED' && (item.serviceAgreement?.hasAgreement || item.currysCareAndRepair?.hasPlan)) return false;
+      if (careFilter === 'PENDING_LOCATION' && item.propertyAssignmentStatus !== 'PENDING_VERIFICATION') return false;
       // Valet Status
       if (valetFilter === 'DUE' && item.squeakyCleanValet?.eligibilityStatus !== 'DUE') return false;
       if (valetFilter === 'BOOKED' && item.squeakyCleanValet?.eligibilityStatus !== 'BOOKED') return false;
@@ -130,20 +173,21 @@ export function AppliancesPage({ selectedCompany }) {
 
       return true;
     });
-  }, [appliances, search, propertyFilter, typeFilter, careFilter, valetFilter]);
+  }, [appliances, search, propertyFilter, supplierFilter, typeFilter, careFilter, valetFilter]);
 
   // Summary Metrics
   const metrics = useMemo(() => {
     const total = appliances.length;
-    const covered = appliances.filter((a) => a.currysCarePlan?.hasCarePlan).length;
+    const covered = appliances.filter((a) => a.serviceAgreement?.hasAgreement || a.currysCareAndRepair?.hasPlan).length;
+    const pendingLocation = appliances.filter((a) => a.propertyAssignmentStatus === 'PENDING_VERIFICATION' || !a.propertyId).length;
     const valetDue = appliances.filter(
-      (a) => a.squeakyCleanValet?.eligibilityStatus === 'DUE' || a.squeakyCleanValet?.eligibilityStatus === 'BOOKED'
+      (a) => a.squeakyCleanValet?.eligibilityStatus === 'DUE' || a.squeakyCleanValet?.eligibilityStatus === 'BOOKING_REQUIRED'
     ).length;
-    const pendingTasks = tasks.filter((t) => t.status !== 'COMPLETED').length;
-    const missingSerial = appliances.filter((a) => !a.serialNumber || a.serialNumber.trim() === '').length;
+    const totalReceipts = receipts.length;
+    const activeReminders = reminders.length;
 
-    return { total, covered, valetDue, pendingTasks, missingSerial };
-  }, [appliances, tasks]);
+    return { total, covered, pendingLocation, valetDue, totalReceipts, activeReminders };
+  }, [appliances, receipts, reminders]);
 
   // Handlers
   const handleOpenAdd = () => {
@@ -157,7 +201,7 @@ export function AppliancesPage({ selectedCompany }) {
   };
 
   const handleDeleteAppliance = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this appliance? All maintenance and valet records will be permanently removed.')) {
+    if (!window.confirm('Are you sure you want to delete this appliance record?')) {
       return;
     }
     try {
@@ -193,7 +237,30 @@ export function AppliancesPage({ selectedCompany }) {
     }
   };
 
-  // Maintenance Task Status Toggle
+  // Property Assignment Handler
+  const handleAssignPropertySubmit = async (e) => {
+    e.preventDefault();
+    if (!assignModalAppliance || !selectedAssignPropertyId) return;
+
+    setAssigning(true);
+    try {
+      await appliancesAPI.assignProperty(assignModalAppliance._id, {
+        propertyId: selectedAssignPropertyId,
+        notes: assignNotes,
+      });
+      setAssignModalAppliance(null);
+      setSelectedAssignPropertyId('');
+      setAssignNotes('');
+      loadData(true);
+    } catch (err) {
+      console.error('Failed to assign property:', err);
+      alert('Assign failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  // Task Status Toggle
   const handleToggleTaskStatus = async (task) => {
     const statusCycle = {
       PENDING: 'IN_PROGRESS',
@@ -222,7 +289,7 @@ export function AppliancesPage({ selectedCompany }) {
     try {
       const res = await appliancesAPI.createTask({
         ...taskForm,
-        assignedTo: taskForm.assignedTo || '',
+        assignedTo: '',
         companyId: selectedCompany?.id,
       });
       if (res?.success) {
@@ -243,7 +310,53 @@ export function AppliancesPage({ selectedCompany }) {
     }
   };
 
-  // Export CSV of Appliances & Valet Schedules
+  // Create Supplier Receipt Submit
+  const handleCreateReceiptSubmit = async (e) => {
+    e.preventDefault();
+    if (!receiptForm.receiptNumber.trim() || !receiptForm.totalAmountDueGBP) return;
+
+    try {
+      await appliancesAPI.createReceipt({
+        supplier: receiptForm.supplier.trim() || 'Currys',
+        branch: receiptForm.branch.trim(),
+        receiptNumber: receiptForm.receiptNumber.trim(),
+        receiptDate: receiptForm.receiptDate,
+        totalAmountDueGBP: Number(receiptForm.totalAmountDueGBP) || 0,
+        paymentInformation: {
+          method: receiptForm.hasMandate ? 'SPLIT_CARD_DIRECT_DEBIT' : 'CARD',
+          cardPaymentGBP: Number(receiptForm.cardPaymentGBP) || Number(receiptForm.totalAmountDueGBP) || 0,
+          directDebitMandate: {
+            hasMandate: receiptForm.hasMandate,
+            monthlyInstalmentGBP: Number(receiptForm.monthlyInstalmentGBP) || 0,
+            numberOfInstalments: Number(receiptForm.numberOfInstalments) || 10,
+            totalMandateGBP: (Number(receiptForm.monthlyInstalmentGBP) || 0) * (Number(receiptForm.numberOfInstalments) || 10),
+          },
+          notes: receiptForm.notes,
+        },
+        financialLedgerStatus: 'SOURCE_RECORD_ONLY',
+        notes: receiptForm.notes,
+      });
+      setShowReceiptModal(false);
+      setReceiptForm({
+        supplier: 'Currys',
+        branch: '',
+        receiptNumber: '',
+        receiptDate: new Date().toISOString().slice(0, 10),
+        totalAmountDueGBP: '',
+        cardPaymentGBP: '',
+        hasMandate: false,
+        monthlyInstalmentGBP: '',
+        numberOfInstalments: '10',
+        notes: '',
+      });
+      loadData(true);
+    } catch (err) {
+      console.error('Failed to create supplier receipt:', err);
+      alert('Record receipt failed: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  // Export CSV of Appliances & Valet Registers
   const handleExportCSV = () => {
     if (appliances.length === 0) {
       alert('No appliances available to export.');
@@ -251,59 +364,61 @@ export function AppliancesPage({ selectedCompany }) {
     }
     const headers = [
       'Property',
+      'Location Status',
       'Appliance Name',
-      'Type',
+      'Category',
       'Brand',
-      'Model',
+      'Model Number',
       'Serial Number',
       'Supplier',
+      'Supplier Item Code',
       'Purchase Date',
       'Purchase Price (£)',
-      'Currys Care Plan',
-      'Plan Type',
-      'Care Plan Ref',
+      'Care Services Charge (£)',
+      'Care Plan Agreement Ref',
+      'Plan Duration (Yrs)',
+      'Agreement End Date',
       'Valet Eligibility',
-      'Annual Valet Due Date',
-      'Last Valet Date',
-      'Tenant Notice Status',
+      'Valet Next Due Date',
       'Documents Count',
     ];
 
     const rows = appliances.map((a) => [
-      `"${a.propertyId?.name || 'Unassigned'}"`,
+      `"${a.propertyId?.name || 'Unassigned Property'}"`,
+      `"${a.propertyAssignmentStatus || 'ASSIGNED'}"`,
       `"${a.name || ''}"`,
-      `"${APPLIANCE_TYPE_TITLES[a.type] || a.type}"`,
+      `"${APPLIANCE_TYPE_TITLES[a.applianceType] || a.applianceType}"`,
       `"${a.brand || ''}"`,
-      `"${a.model || ''}"`,
+      `"${a.modelNumber || ''}"`,
       `"${a.serialNumber || 'UNVERIFIED'}"`,
       `"${a.supplier || ''}"`,
+      `"${a.itemCode || ''}"`,
       `"${a.purchaseDate ? a.purchaseDate.substring(0, 10) : ''}"`,
       `"${a.purchasePrice || 0}"`,
-      `"${a.currysCarePlan?.hasCarePlan ? 'YES' : 'NO'}"`,
-      `"${a.currysCarePlan?.planType || ''}"`,
-      `"${a.currysCarePlan?.planReferenceNumber || ''}"`,
+      `"${a.careServicesChargeGBP || a.serviceAgreement?.chargeGBP || 0}"`,
+      `"${a.serviceAgreement?.agreementReference || a.currysCareAndRepair?.planReferenceNumber || ''}"`,
+      `"${a.serviceAgreement?.durationYears || 5}"`,
+      `"${a.serviceAgreement?.endDate ? a.serviceAgreement.endDate.substring(0, 10) : ''}"`,
       `"${a.squeakyCleanValet?.eligibilityStatus || 'NOT_VERIFIED'}"`,
       `"${a.squeakyCleanValet?.nextValetDueDate ? a.squeakyCleanValet.nextValetDueDate.substring(0, 10) : ''}"`,
-      `"${a.squeakyCleanValet?.lastValetDate ? a.squeakyCleanValet.lastValetDate.substring(0, 10) : ''}"`,
-      `"${a.tenantAccessNotice?.status || 'NOT_REQUIRED'}"`,
       `"${a.documents?.length || 0}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const filename = `${selectedCompany?.slug || 'company'}_appliances_and_valet_register_${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = `${selectedCompany?.slug || 'company'}_appliances_and_contracts_${new Date().toISOString().slice(0, 10)}.csv`;
     triggerBlobDownload(blob, filename);
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 page-anim-slide-top">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 page-anim-scale-pop">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-indigo-400" />
-              <span>Appliances, Warranties &amp; Currys Care</span>
+              <span>Appliances, Warranties &amp; Contracts</span>
             </h1>
             {selectedCompany?.name && (
               <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -311,11 +426,11 @@ export function AppliancesPage({ selectedCompany }) {
               </span>
             )}
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              Currys Care &amp; Valet
+              Currys &amp; Howdens
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Complete property appliance register, Currys Care &amp; Repair tracking, Annual Squeaky Clean Valets, and operational maintenance workflow for {selectedCompany?.legalName || selectedCompany?.name || 'this portfolio'}.
+            Complete property equipment register, supplier master invoices, decoupled warranties, Currys Care &amp; Repair agreements, and annual Squeaky Clean Valets for {selectedCompany?.legalName || selectedCompany?.name || 'this portfolio'}.
           </p>
         </div>
 
@@ -339,6 +454,14 @@ export function AppliancesPage({ selectedCompany }) {
           </button>
 
           <button
+            onClick={() => setShowReceiptModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-indigo-500/40 text-indigo-300 hover:text-white hover:bg-indigo-600/20 text-xs font-semibold transition cursor-pointer"
+          >
+            <Receipt className="w-4 h-4 text-indigo-400" />
+            <span>Record Supplier Invoice</span>
+          </button>
+
+          <button
             onClick={handleOpenAdd}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/20 transition cursor-pointer"
           >
@@ -349,62 +472,71 @@ export function AppliancesPage({ selectedCompany }) {
       </div>
 
       {/* KPI Metrics Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Total Appliances</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider">Total Equipment</span>
             <Sparkles className="w-4 h-4 text-indigo-400" />
           </div>
-          <div className="text-xl sm:text-2xl font-black text-white mt-1 tabular-nums">
+          <div className="text-xl font-black text-white mt-1 tabular-nums">
             {metrics.total}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Across {properties.length} properties</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">{properties.length} Properties</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Currys Care Plans</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider">Pending Location</span>
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-xl sm:text-2xl font-black text-emerald-400 mt-1 tabular-nums">
-            {metrics.covered}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">
-            {metrics.total > 0 ? `${Math.round((metrics.covered / metrics.total) * 100)}% coverage` : '0% coverage'}
-          </div>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Valets Due</span>
-            <Clock className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-amber-400 mt-1 tabular-nums">
-            {metrics.valetDue}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Annual Squeaky Clean</div>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Action Tasks</span>
-            <Wrench className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-blue-300 mt-1 tabular-nums">
-            {metrics.pendingTasks}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Active action items</div>
-        </div>
-
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 col-span-2 md:col-span-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Unverified Serials</span>
-            <ShieldAlert className="w-4 h-4 text-rose-400" />
-          </div>
-          <div className="text-xl sm:text-2xl font-black text-rose-400 mt-1 tabular-nums">
-            {metrics.missingSerial}
+          <div className="text-xl font-black text-amber-400 mt-1 tabular-nums">
+            {metrics.pendingLocation}
           </div>
           <div className="text-[10px] text-slate-500 mt-0.5">Needs physical check</div>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-semibold uppercase tracking-wider">Care &amp; Repair Plans</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-xl font-black text-emerald-400 mt-1 tabular-nums">
+            {metrics.covered}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-0.5">Currys 5-Yr / Service</div>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-semibold uppercase tracking-wider">Master Invoices</span>
+            <Receipt className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="text-xl font-black text-blue-300 mt-1 tabular-nums">
+            {metrics.totalReceipts}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-0.5">Currys &amp; Howdens</div>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-semibold uppercase tracking-wider">Annual Valet Due</span>
+            <Clock className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-xl font-black text-amber-300 mt-1 tabular-nums">
+            {metrics.valetDue}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-0.5">Currys Squeaky Clean</div>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-[10px] font-semibold uppercase tracking-wider">Expiry Alerts</span>
+            <Bell className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="text-xl font-black text-rose-400 mt-1 tabular-nums">
+            {metrics.activeReminders}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-0.5">Within 90 Days</div>
         </div>
       </div>
 
@@ -412,7 +544,7 @@ export function AppliancesPage({ selectedCompany }) {
       <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('appliances')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'appliances'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -423,20 +555,44 @@ export function AppliancesPage({ selectedCompany }) {
         </button>
 
         <button
+          onClick={() => setActiveTab('receipts')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'receipts'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <Receipt className="w-3.5 h-3.5 text-blue-400" />
+          <span>Supplier Invoices &amp; Master Receipts ({receipts.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('reminders')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'reminders'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <Bell className="w-3.5 h-3.5 text-rose-400" />
+          <span>Warranty &amp; Expiry Reminders ({reminders.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('calendar')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'calendar'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Calendar className="w-3.5 h-3.5" />
-          <span>Valet &amp; Service Calendar</span>
+          <span>Valet Schedule</span>
         </button>
 
         <button
           onClick={() => setActiveTab('tasks')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'tasks'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -448,26 +604,26 @@ export function AppliancesPage({ selectedCompany }) {
 
         <button
           onClick={() => setActiveTab('access')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'access'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <UserCheck className="w-3.5 h-3.5" />
-          <span>Tenant Access Notices</span>
+          <span>Tenant Notices</span>
         </button>
 
         <button
           onClick={() => setActiveTab('currys')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'currys'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
               : 'text-slate-400 hover:text-white hover:bg-slate-900'
           }`}
         >
           <Phone className="w-3.5 h-3.5 text-amber-400" />
-          <span>Currys Care Directory</span>
+          <span>Currys Directory</span>
         </button>
       </div>
 
@@ -482,7 +638,7 @@ export function AppliancesPage({ selectedCompany }) {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by appliance name, brand, model, serial number..."
+                placeholder="Search by appliance, brand, model, serial, item code, or agreement ref..."
                 className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
               />
             </div>
@@ -502,11 +658,21 @@ export function AppliancesPage({ selectedCompany }) {
               </select>
 
               <select
+                value={supplierFilter}
+                onChange={(e) => setSupplierFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">All Suppliers</option>
+                <option value="Currys">Currys Only</option>
+                <option value="Howdens">Howdens Only</option>
+              </select>
+
+              <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
                 className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
               >
-                <option value="">All Appliance Types</option>
+                <option value="">All Categories</option>
                 {Object.entries(APPLIANCE_TYPE_TITLES).map(([key, label]) => (
                   <option key={key} value={key}>
                     {APPLIANCE_ICONS[key]} {label}
@@ -519,10 +685,10 @@ export function AppliancesPage({ selectedCompany }) {
                 onChange={(e) => setCareFilter(e.target.value)}
                 className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
               >
-                <option value="ALL">Currys Care: All</option>
-                <option value="COVERED">Covered Only</option>
-                <option value="NOT_COVERED">No Plan</option>
-                <option value="UNVERIFIED">Unverified Only</option>
+                <option value="ALL">Care Plan: All</option>
+                <option value="COVERED">Covered Plans</option>
+                <option value="PENDING_LOCATION">Pending Location</option>
+                <option value="NOT_COVERED">Standard Only</option>
               </select>
 
               <select
@@ -538,7 +704,7 @@ export function AppliancesPage({ selectedCompany }) {
             </div>
           </div>
 
-          {/* Appliances Table / Grid */}
+          {/* Appliances Table */}
           {loading ? (
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
               <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-400 mb-3" />
@@ -547,17 +713,10 @@ export function AppliancesPage({ selectedCompany }) {
           ) : filteredAppliances.length === 0 ? (
             <div className="bg-slate-900/90 border border-dashed border-slate-800 rounded-2xl p-12 text-center space-y-3">
               <Sparkles className="w-10 h-10 text-slate-600 mx-auto" />
-              <div className="text-sm font-bold text-slate-300">No appliances found</div>
+              <div className="text-sm font-bold text-slate-300">No appliances match filter</div>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                No appliance records matched your filter criteria. Click "Add Appliance" to record a washing machine, fridge freezer, boiler, cooker, or dishwasher.
+                No appliance records matched your filter criteria. Click "Add Appliance" or check the Supplier Invoices tab.
               </p>
-              <button
-                onClick={handleOpenAdd}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Register First Appliance</span>
-              </button>
             </div>
           ) : (
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden">
@@ -566,19 +725,20 @@ export function AppliancesPage({ selectedCompany }) {
                   <thead className="text-[10px] uppercase tracking-wider text-slate-400 bg-slate-950/80 border-b border-slate-800">
                     <tr>
                       <th className="py-3 px-3.5">Appliance</th>
-                      <th className="py-3 px-3.5">Property</th>
+                      <th className="py-3 px-3.5">Property Location</th>
                       <th className="py-3 px-3.5">Model &amp; Serial</th>
-                      <th className="py-3 px-3.5">Currys Care Plan</th>
+                      <th className="py-3 px-3.5">Care &amp; Repair Plan</th>
                       <th className="py-3 px-3.5">Valet Status</th>
                       <th className="py-3 px-3.5">Purchase / Cost</th>
-                      <th className="py-3 px-3.5">Receipt / Docs</th>
+                      <th className="py-3 px-3.5">Receipt Link</th>
                       <th className="py-3 px-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-slate-300">
                     {filteredAppliances.map((app) => {
-                      const icon = APPLIANCE_ICONS[app.type] || '🔌';
-                      const hasPlan = app.currysCarePlan?.hasCarePlan;
+                      const icon = APPLIANCE_ICONS[app.applianceType] || '🔌';
+                      const isPendingLocation = app.propertyAssignmentStatus === 'PENDING_VERIFICATION' || !app.propertyId;
+                      const hasCarePlan = app.serviceAgreement?.hasAgreement || app.currysCareAndRepair?.hasPlan;
                       const valetStatus = app.squeakyCleanValet?.eligibilityStatus || 'NOT_VERIFIED';
 
                       return (
@@ -591,29 +751,52 @@ export function AppliancesPage({ selectedCompany }) {
                                   <span>{app.name}</span>
                                 </div>
                                 <span className="text-[10px] text-slate-500">
-                                  {APPLIANCE_TYPE_TITLES[app.type] || app.type}
+                                  {APPLIANCE_TYPE_TITLES[app.applianceType] || app.applianceType}
                                 </span>
                               </div>
                             </div>
                           </td>
 
                           <td className="py-3 px-3.5">
-                            <div className="flex items-center gap-1.5 font-medium text-slate-200">
-                              <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                              <span className="truncate max-w-[140px]">
-                                {app.propertyId?.name || 'Unassigned Property'}
-                              </span>
-                            </div>
-                            <div className="text-[10px] text-slate-500 truncate max-w-[140px]">
-                              {app.propertyId?.city || 'UK'}
-                            </div>
+                            {isPendingLocation ? (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  <span>Pending Verification</span>
+                                </span>
+                                <div>
+                                  <button
+                                    onClick={() => {
+                                      setAssignModalAppliance(app);
+                                      setSelectedAssignPropertyId('');
+                                      setAssignNotes('');
+                                    }}
+                                    className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                                  >
+                                    Assign to Property &rarr;
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex items-center gap-1.5 font-medium text-slate-200">
+                                  <Building2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                  <span className="truncate max-w-[140px]">
+                                    {app.propertyId?.name || 'Property'}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 truncate max-w-[140px]">
+                                  {app.propertyId?.postcode || app.propertyId?.city || 'UK'}
+                                </div>
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3 px-3.5">
                             <div className="font-medium text-slate-200">
-                              {app.brand || 'Unbranded'} {app.model || ''}
+                              {app.brand || 'Unbranded'} {app.modelNumber || ''}
                             </div>
-                            <div className="text-[10px] mt-0.5">
+                            <div className="text-[10px] mt-0.5 space-y-0.5">
                               {app.serialNumber ? (
                                 <span className="font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
                                   S/N: {app.serialNumber}
@@ -623,19 +806,24 @@ export function AppliancesPage({ selectedCompany }) {
                                   S/N Unverified
                                 </span>
                               )}
+                              {app.itemCode && (
+                                <span className="text-[9px] text-slate-500 block">
+                                  Item Code: {app.itemCode}
+                                </span>
+                              )}
                             </div>
                           </td>
 
                           <td className="py-3 px-3.5">
-                            {hasPlan ? (
+                            {hasCarePlan ? (
                               <div className="space-y-0.5">
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                                   <ShieldCheck className="w-3 h-3" />
-                                  <span>{app.currysCarePlan.planType?.replace('_', ' ') || 'Covered'}</span>
+                                  <span>{app.serviceAgreement?.durationYears || 5}-Year Care Plan</span>
                                 </span>
-                                {app.currysCarePlan.planReferenceNumber && (
+                                {(app.serviceAgreement?.agreementReference || app.currysCareAndRepair?.planReferenceNumber) && (
                                   <div className="text-[10px] text-slate-400 font-mono">
-                                    Ref: {app.currysCarePlan.planReferenceNumber}
+                                    Ref: {app.serviceAgreement?.agreementReference || app.currysCareAndRepair?.planReferenceNumber}
                                   </div>
                                 )}
                               </div>
@@ -676,22 +864,29 @@ export function AppliancesPage({ selectedCompany }) {
                             <div className="text-[10px] text-slate-500">
                               {app.supplier || 'Currys'}
                             </div>
+                            {app.careServicesChargeGBP > 0 && (
+                              <div className="text-[9px] text-amber-400/90 font-medium">
+                                +{formatGBP(app.careServicesChargeGBP)} Care
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3 px-3.5">
-                            {app.documents && app.documents.length > 0 ? (
-                              <div className="space-y-1">
-                                <a
-                                  href={app.documents[0].url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300"
-                                >
-                                  <FileText className="w-3 h-3" />
-                                  <span>{app.documents.length} File{app.documents.length > 1 ? 's' : ''}</span>
-                                  <ExternalLink className="w-2.5 h-2.5" />
-                                </a>
+                            {app.supplierReceiptId ? (
+                              <div className="text-[10px] text-indigo-300 font-medium">
+                                <span>{app.supplierReceiptId.supplier} #{app.supplierReceiptId.receiptNumber}</span>
                               </div>
+                            ) : app.documents && app.documents.length > 0 ? (
+                              <a
+                                href={app.documents[0].url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300"
+                              >
+                                <FileText className="w-3 h-3" />
+                                <span>{app.documents.length} File{app.documents.length > 1 ? 's' : ''}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
                             ) : (
                               <button
                                 onClick={() => setUploadModalAppliance(app)}
@@ -705,6 +900,19 @@ export function AppliancesPage({ selectedCompany }) {
 
                           <td className="py-3 px-3.5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {isPendingLocation && (
+                                <button
+                                  onClick={() => {
+                                    setAssignModalAppliance(app);
+                                    setSelectedAssignPropertyId('');
+                                    setAssignNotes('');
+                                  }}
+                                  className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 transition cursor-pointer"
+                                  title="Assign to Property"
+                                >
+                                  <MapPin className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <button
                                 onClick={() => setUploadModalAppliance(app)}
                                 className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
@@ -739,7 +947,257 @@ export function AppliancesPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* TAB 2: VALET & SERVICE CALENDAR */}
+      {/* TAB 2: SUPPLIER RECEIPTS & INVOICES */}
+      {activeTab === 'receipts' && (
+        <div className="space-y-4">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-indigo-400" />
+                  <span>Master Supplier Invoices &amp; Verified Purchase Receipts</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Single master receipts covering multiple appliances without creating duplicate records or unverified bank payments.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowReceiptModal(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Record Supplier Invoice</span>
+              </button>
+            </div>
+
+            {receipts.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">
+                No supplier receipts recorded.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {receipts.map((r) => {
+                  const pay = r.paymentInformation || {};
+
+                  return (
+                    <div
+                      key={r._id}
+                      className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-lg font-bold">
+                            🧾
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-white text-sm">
+                                {r.supplier} — Receipt #{r.receiptNumber}
+                              </span>
+                              {r.branch && (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
+                                  Branch: {r.branch}
+                                </span>
+                              )}
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                Verified Source Record
+                              </span>
+                            </div>
+                            <span className="text-xs text-slate-400 mt-0.5 block">
+                              Receipt Date: {formatUKDate(r.receiptDate)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Amount Due</div>
+                          <div className="text-lg font-black text-white tabular-nums font-display">
+                            {formatGBP(r.totalAmountDueGBP)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Payment Terms Breakdown Strip */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-900/60 p-3.5 rounded-xl border border-slate-800/60">
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold block">Card Settlement</span>
+                          <span className="text-sm font-bold text-slate-200 mt-0.5 block">
+                            {formatGBP(pay.cardPaymentGBP || 0)}
+                          </span>
+                          <span className="text-[10px] text-slate-500">Upfront payment</span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold block">Direct Debit Mandate</span>
+                          {pay.directDebitMandate?.hasMandate ? (
+                            <div>
+                              <span className="text-sm font-bold text-amber-400 mt-0.5 block">
+                                {pay.directDebitMandate.numberOfInstalments} × {formatGBP(pay.directDebitMandate.monthlyInstalmentGBP)}
+                              </span>
+                              <span className="text-[10px] text-slate-500">
+                                Total: {formatGBP(pay.directDebitMandate.totalMandateGBP)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400 mt-0.5 block">No Instalment Mandate</span>
+                          )}
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold block">Financial Ledger Status</span>
+                          <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 mt-1">
+                            SOURCE_RECORD_ONLY (Unposted)
+                          </span>
+                          <span className="text-[10px] text-slate-500 block mt-0.5">Zero double-counting</span>
+                        </div>
+                      </div>
+
+                      {/* Linked Appliances Covered */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                          Covered Appliances on This Receipt ({r.linkedAppliances?.length || 0})
+                        </span>
+
+                        {r.linkedAppliances && r.linkedAppliances.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {r.linkedAppliances.map((item) => (
+                              <div
+                                key={item._id}
+                                className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between"
+                              >
+                                <div>
+                                  <span className="font-bold text-white text-xs block">{item.name}</span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {item.propertyId?.name ? `Location: ${item.propertyId.name}` : 'Location: Pending Verification'}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xs font-extrabold text-slate-200 block">
+                                    {formatGBP(item.purchasePrice)}
+                                  </span>
+                                  {item.careServicesChargeGBP > 0 && (
+                                    <span className="text-[10px] text-amber-400 block">
+                                      +{formatGBP(item.careServicesChargeGBP)} Care
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-slate-500 italic p-2">
+                            No individual appliances linked yet.
+                          </div>
+                        )}
+                      </div>
+
+                      {r.notes && (
+                        <p className="text-xs text-slate-400 italic border-t border-slate-800/60 pt-2">
+                          "{r.notes}"
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: WARRANTY & EXPIRY REMINDERS */}
+      {activeTab === 'reminders' && (
+        <div className="space-y-4">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-rose-400" />
+                  <span>Warranty, Care Contract &amp; Service Reminders</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Proactive tracking of expiring warranties, service plans, missing documents, and unassigned property locations.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold">Look Ahead:</span>
+                <select
+                  value={reminderDays}
+                  onChange={(e) => setReminderDays(Number(e.target.value))}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="30">Next 30 Days</option>
+                  <option value="60">Next 60 Days</option>
+                  <option value="90">Next 90 Days</option>
+                </select>
+              </div>
+            </div>
+
+            {reminders.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                <span>All warranties and care plans are up to date within the selected window.</span>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {reminders.map((rem, i) => {
+                  const isUrgent = rem.severity === 'URGENT';
+                  const isHigh = rem.severity === 'HIGH';
+
+                  return (
+                    <div
+                      key={i}
+                      className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isUrgent
+                          ? 'bg-rose-500/10 border-rose-500/30'
+                          : isHigh
+                          ? 'bg-amber-500/10 border-amber-500/30'
+                          : 'bg-slate-950/60 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5">
+                          {isUrgent ? (
+                            <AlertTriangle className="w-4 h-4 text-rose-400" />
+                          ) : (
+                            <Clock className="w-4 h-4 text-amber-400" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-white text-xs">{rem.title}</span>
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                isUrgent
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              }`}
+                            >
+                              {rem.severity}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">{rem.message}</p>
+                        </div>
+                      </div>
+
+                      {rem.dueDate && (
+                        <div className="text-right text-[11px] text-slate-400 shrink-0">
+                          <div>Expiry / Due</div>
+                          <div className="text-slate-200 font-bold">{formatUKDate(rem.dueDate)}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: VALET & SERVICE CALENDAR */}
       {activeTab === 'calendar' && (
         <div className="space-y-4">
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
@@ -753,15 +1211,13 @@ export function AppliancesPage({ selectedCompany }) {
                   Currys Care &amp; Repair includes an annual valet service for household washing machines, tumble dryers, dishwashers, cookers, and fridges.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href="tel:03448006080"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition cursor-pointer"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Book Valet: 0344 800 6080</span>
-                </a>
-              </div>
+              <a
+                href="tel:03448006080"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition cursor-pointer self-start sm:self-auto"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span>Book Valet: 0344 800 6080</span>
+              </a>
             </div>
 
             {appliances.length === 0 ? (
@@ -772,7 +1228,6 @@ export function AppliancesPage({ selectedCompany }) {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {appliances.map((app) => {
                   const valet = app.squeakyCleanValet;
-                  const isEligible = valet?.eligibilityStatus !== 'NOT_ELIGIBLE';
                   const isDue = valet?.eligibilityStatus === 'DUE';
                   const isBooked = valet?.eligibilityStatus === 'BOOKED';
 
@@ -789,11 +1244,11 @@ export function AppliancesPage({ selectedCompany }) {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="text-xl">{APPLIANCE_ICONS[app.type] || '🔌'}</span>
+                          <span className="text-xl">{APPLIANCE_ICONS[app.applianceType] || '🔌'}</span>
                           <div>
                             <span className="font-bold text-white text-xs block">{app.name}</span>
                             <span className="text-[10px] text-slate-400">
-                              {app.propertyId?.name || 'Property'}
+                              {app.propertyId?.name || 'Pending Location'}
                             </span>
                           </div>
                         </div>
@@ -826,11 +1281,6 @@ export function AppliancesPage({ selectedCompany }) {
                             {valet?.lastValetDate ? formatUKDate(valet.lastValetDate) : 'None'}
                           </span>
                         </div>
-                        {valet?.engineerNotes && (
-                          <div className="text-[10px] text-slate-400 italic pt-1">
-                            "{valet.engineerNotes}"
-                          </div>
-                        )}
                       </div>
 
                       <div className="mt-3 pt-2 flex items-center justify-between">
@@ -859,7 +1309,7 @@ export function AppliancesPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* TAB 3: OPERATIONAL ACTION CHECKLIST */}
+      {/* TAB 5: ACTION CHECKLIST */}
       {activeTab === 'tasks' && (
         <div className="space-y-4">
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
@@ -886,7 +1336,7 @@ export function AppliancesPage({ selectedCompany }) {
             {/* Tasks List */}
             {tasks.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-500">
-                No tasks available. Seeded maintenance responsibilities will be loaded automatically.
+                No tasks available.
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -948,24 +1398,10 @@ export function AppliancesPage({ selectedCompany }) {
                           <p className="text-xs text-slate-400 max-w-2xl">
                             {task.description}
                           </p>
-
-                          {task.notes && (
-                            <div className="text-[10px] text-slate-500 italic">
-                              Note: {task.notes}
-                            </div>
-                          )}
                         </div>
                       </div>
 
-                      {/* Status Toggle & Due Date */}
                       <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                        {task.dueDate && (
-                          <div className="text-right text-[10px] text-slate-400">
-                            <div>Due Date</div>
-                            <div className="text-slate-200 font-medium">{formatUKDate(task.dueDate)}</div>
-                          </div>
-                        )}
-
                         <button
                           onClick={() => handleToggleTaskStatus(task)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
@@ -988,7 +1424,7 @@ export function AppliancesPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* TAB 4: TENANT ACCESS NOTICES */}
+      {/* TAB 6: TENANT NOTICES */}
       {activeTab === 'access' && (
         <div className="space-y-4">
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
@@ -1010,7 +1446,7 @@ export function AppliancesPage({ selectedCompany }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {appliances.map((app) => {
                   const notice = app.tenantAccessNotice;
-                  const status = notice?.status || 'NOT_REQUIRED';
+                  const status = notice?.accessStatus || 'NOT_NOTIFIED';
 
                   return (
                     <div
@@ -1020,51 +1456,25 @@ export function AppliancesPage({ selectedCompany }) {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-bold text-white text-xs flex items-center gap-1.5">
-                            <span>{APPLIANCE_ICONS[app.type] || '🔌'}</span>
+                            <span>{APPLIANCE_ICONS[app.applianceType] || '🔌'}</span>
                             <span>{app.name}</span>
                           </div>
                           <span className="text-[10px] text-slate-400">
-                            Property: {app.propertyId?.name || 'Unassigned'}
+                            Property: {app.propertyId?.name || 'Pending Location'}
                           </span>
                         </div>
 
                         <span
                           className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                            status === 'ACCESS_CONFIRMED'
+                            status === 'TENANT_CONFIRMED'
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : status === 'NOTICE_SERVED'
+                              : status === 'NOTICE_SENT'
                               ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                              : status === 'TENANT_RESCHEDULED'
-                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                               : 'bg-slate-800 text-slate-400 border-slate-700'
                           }`}
                         >
-                          {status.replace('_', ' ')}
+                          {status.replace(/_/g, ' ')}
                         </span>
-                      </div>
-
-                      <div className="space-y-1.5 text-xs bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/60">
-                        <div className="flex justify-between text-slate-400 text-[11px]">
-                          <span>Notice Served Date:</span>
-                          <span className="text-slate-200 font-medium">
-                            {notice?.noticeServedDate ? formatUKDate(notice.noticeServedDate) : 'Not Served'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-slate-400 text-[11px]">
-                          <span>Scheduled Visit Date:</span>
-                          <span className="text-slate-200 font-medium">
-                            {notice?.scheduledVisitDate ? formatUKDate(notice.scheduledVisitDate) : 'TBD'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-slate-400 text-[11px]">
-                          <span>Time Slot:</span>
-                          <span className="text-slate-200 font-medium">{notice?.timeSlot || 'Morning (8am - 12pm)'}</span>
-                        </div>
-                        {notice?.notes && (
-                          <div className="text-[10px] text-slate-400 italic pt-1">
-                            Notes: {notice.notes}
-                          </div>
-                        )}
                       </div>
 
                       <div className="flex items-center justify-end">
@@ -1084,10 +1494,9 @@ export function AppliancesPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* TAB 5: CURRYS DIRECTORY & GUIDE */}
+      {/* TAB 7: CURRYS DIRECTORY & GUIDE */}
       {activeTab === 'currys' && (
         <div className="space-y-5">
-          {/* Official Hotlines Card */}
           <div className="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-2xl">
@@ -1104,7 +1513,7 @@ export function AppliancesPage({ selectedCompany }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">General Customer Service</span>
+                  <span className="text-xs font-bold text-white">Customer Service &amp; Valet Booking</span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Standard Line</span>
                 </div>
                 <div className="text-xl font-extrabold text-amber-400 font-mono">
@@ -1131,7 +1540,7 @@ export function AppliancesPage({ selectedCompany }) {
                   0800 0121 909
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Call if a repair has taken more than 7 days from engineer visit to claim a brand new replacement or voucher.
+                  Call if a repair has taken more than 7 days from engineer visit to claim a brand new replacement.
                 </p>
                 <a
                   href="tel:08000121909"
@@ -1140,61 +1549,6 @@ export function AppliancesPage({ selectedCompany }) {
                   <Phone className="w-3.5 h-3.5" />
                   <span>Call 0800 0121 909</span>
                 </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Official Currys Leaflet Breakdown Guide */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4" />
-                <span>What Is Covered by Currys Care &amp; Repair?</span>
-              </h4>
-              <ul className="text-xs text-slate-300 space-y-2">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>7-Day Fix Promise:</strong> If Currys cannot repair your product within 7 days, you can request a brand new replacement.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>No Repair Bills:</strong> Never pay a penny for parts, labour, or call-out charges.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>Annual Squeaky Clean Valet:</strong> Included each year on eligible household appliances to keep them running efficiently.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>Flexible Terms:</strong> Pay monthly rolling or pay upfront for 2, 3, or 5 years.</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                <span>Official Squeaky Clean Valet Checklists</span>
-              </h4>
-              <div className="space-y-2 text-xs text-slate-300">
-                <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60">
-                  <span className="font-bold text-white block">🫧 Washing Machines &amp; Washer Dryers:</span>
-                  <span className="text-[11px] text-slate-400">
-                    Clean inside &amp; outside, soap drawer, door and seal, fluff removal from vents, and full descaling cycle.
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60">
-                  <span className="font-bold text-white block">❄️ Fridges, Freezers &amp; Fridge Freezers:</span>
-                  <span className="text-[11px] text-slate-400">
-                    Defrost where applicable, dry interior, clean racks, trays, shelves, seals, apply antibacterial protection, check water filters.
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/60">
-                  <span className="font-bold text-white block">🍽️ Dishwashers:</span>
-                  <span className="text-[11px] text-slate-400">
-                    Clean inside/outside, filter clean, check waste blockages, clear food particles from seal, run cleaning cycle.
-                  </span>
-                </div>
               </div>
             </div>
           </div>
@@ -1209,6 +1563,249 @@ export function AppliancesPage({ selectedCompany }) {
         onSuccess={() => loadData(true)}
       />
 
+      {/* Quick Assign Property Modal */}
+      {assignModalAppliance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-amber-400" />
+                <span>Confirm Property Assignment</span>
+              </h3>
+              <button
+                onClick={() => setAssignModalAppliance(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Appliance: <span className="font-bold text-white">{assignModalAppliance.name}</span>
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Select the property where this appliance is physically located once confirmed.
+            </p>
+
+            <form onSubmit={handleAssignPropertySubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Target Property *</label>
+                <select
+                  required
+                  value={selectedAssignPropertyId}
+                  onChange={(e) => setSelectedAssignPropertyId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">Select Property...</option>
+                  {properties.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name} ({p.postcode || p.city})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Confirmation Notes (Optional)</label>
+                <textarea
+                  rows="2"
+                  value={assignNotes}
+                  onChange={(e) => setAssignNotes(e.target.value)}
+                  placeholder="e.g. Verified installed in Ground Floor Kitchen"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAssignModalAppliance(null)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assigning || !selectedAssignPropertyId}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {assigning && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Confirm Assignment</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Record Supplier Receipt Modal */}
+      {showReceiptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-indigo-400" />
+                <span>Record Master Supplier Invoice / Receipt</span>
+              </h3>
+              <button
+                onClick={() => setShowReceiptModal(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400">
+              Master supplier receipts are stored strictly as source records without generating unverified financial transactions.
+            </p>
+
+            <form onSubmit={handleCreateReceiptSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Supplier *</label>
+                  <input
+                    type="text"
+                    required
+                    value={receiptForm.supplier}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, supplier: e.target.value })}
+                    placeholder="e.g. Currys, Howdens"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Branch / Store</label>
+                  <input
+                    type="text"
+                    value={receiptForm.branch}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, branch: e.target.value })}
+                    placeholder="e.g. 2234 Chingford"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Receipt / Invoice Number *</label>
+                  <input
+                    type="text"
+                    required
+                    value={receiptForm.receiptNumber}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, receiptNumber: e.target.value })}
+                    placeholder="e.g. 159485"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Receipt Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={receiptForm.receiptDate}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, receiptDate: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Total Amount Due (£) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={receiptForm.totalAmountDueGBP}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, totalAmountDueGBP: e.target.value })}
+                    placeholder="e.g. 682.35"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Card Payment Amount (£)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={receiptForm.cardPaymentGBP}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, cardPaymentGBP: e.target.value })}
+                    placeholder="e.g. 498.15"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <label className="flex items-center gap-2 text-slate-300 font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={receiptForm.hasMandate}
+                    onChange={(e) => setReceiptForm({ ...receiptForm, hasMandate: e.target.checked })}
+                    className="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0"
+                  />
+                  <span>Includes Direct Debit Instalment Mandate</span>
+                </label>
+
+                {receiptForm.hasMandate && (
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">Monthly Instalment (£)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={receiptForm.monthlyInstalmentGBP}
+                        onChange={(e) => setReceiptForm({ ...receiptForm, monthlyInstalmentGBP: e.target.value })}
+                        placeholder="e.g. 18.42"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">Number of Instalments</label>
+                      <input
+                        type="number"
+                        value={receiptForm.numberOfInstalments}
+                        onChange={(e) => setReceiptForm({ ...receiptForm, numberOfInstalments: e.target.value })}
+                        placeholder="e.g. 10"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Notes / Item Details</label>
+                <textarea
+                  rows="2"
+                  value={receiptForm.notes}
+                  onChange={(e) => setReceiptForm({ ...receiptForm, notes: e.target.value })}
+                  placeholder="Includes delivery, discounts, Care Services charges..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition cursor-pointer"
+                >
+                  Record Source Invoice
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Quick Upload Modal */}
       {uploadModalAppliance && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -1216,7 +1813,7 @@ export function AppliancesPage({ selectedCompany }) {
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Upload className="w-4 h-4 text-indigo-400" />
-                <span>Upload Currys Receipt / Document</span>
+                <span>Upload Currys / Howdens Document</span>
               </h3>
               <button
                 onClick={() => setUploadModalAppliance(null)}
@@ -1244,11 +1841,15 @@ export function AppliancesPage({ selectedCompany }) {
                   onChange={(e) => setUploadDocType(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="PURCHASE_RECEIPT">Currys Purchase Receipt</option>
-                  <option value="CARE_REPAIR_PLAN">Care &amp; Repair Plan Certificate</option>
+                  <option value="PURCHASE_RECEIPT">Supplier Purchase Receipt / Invoice</option>
+                  <option value="CARE_REPAIR_AGREEMENT">Care &amp; Repair Plan Agreement</option>
+                  <option value="EXTENDED_WARRANTY_CERT">Extended Warranty Certificate</option>
+                  <option value="MANUFACTURER_WARRANTY_DOC">Manufacturer Warranty Documentation</option>
+                  <option value="SERVICE_CONTRACT">Service &amp; Maintenance Contract</option>
+                  <option value="TERMS_AND_CONDITIONS">Terms and Conditions</option>
+                  <option value="INSTALLATION_DOC">Installation Document</option>
+                  <option value="REPAIR_INVOICE">Repair Invoice &amp; Service Report</option>
                   <option value="VALET_REPORT">Squeaky Clean Valet Report</option>
-                  <option value="INVOICE">Supplier Invoice</option>
-                  <option value="WARRANTY_CERT">Manufacturer Warranty</option>
                   <option value="OTHER">Other Document</option>
                 </select>
               </div>
@@ -1286,7 +1887,7 @@ export function AppliancesPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* Add Maintenance Task Modal */}
+      {/* Task Modal */}
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
@@ -1311,7 +1912,7 @@ export function AppliancesPage({ selectedCompany }) {
                   required
                   value={taskForm.title}
                   onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                  placeholder="e.g. Inspect washing machine seals at 24 Old Street"
+                  placeholder="e.g. Audit kitchen appliances and match receipts"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -1322,7 +1923,7 @@ export function AppliancesPage({ selectedCompany }) {
                   rows="2"
                   value={taskForm.description}
                   onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-                  placeholder="Details of the physical check, Currys booking or receipt match..."
+                  placeholder="Details of the physical audit, booking, or receipt match..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -1351,22 +1952,6 @@ export function AppliancesPage({ selectedCompany }) {
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Linked Property (Optional)</label>
-                <select
-                  value={taskForm.propertyId}
-                  onChange={(e) => setTaskForm({ ...taskForm, propertyId: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="">General / All Properties</option>
-                  {properties.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2">
