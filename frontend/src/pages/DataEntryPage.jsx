@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Receipt,
   FileText,
@@ -157,102 +157,112 @@ export function DataEntryPage({ selectedCompany }) {
     loadData();
   }, [loadData]);
 
-  // Handle Rent Billing Month Change
-  const handleBillingMonthChange = (e) => {
-    const newMonth = e.target.value;
-    setRentForm((prev) => {
-      let updatedNotes = prev.notes;
-      if (prev.propertyId) {
-        const prop = properties.find((p) => p._id === prev.propertyId);
-        if (prop) {
-          updatedNotes = `Rent for ${prop.name}${prop.tenantName ? ` (Tenant: ${prop.tenantName})` : ''} - Month: ${newMonth}`;
-        }
-      }
-      return {
-        ...prev,
-        billingMonth: newMonth,
-        notes: updatedNotes,
-      };
-    });
-  };
+  // Unique single properties list for rent collection (no duplicate month rows)
+  const uniqueProperties = useMemo(() => {
+    const map = new Map();
 
-  // Handle Rent Schedule or Direct Property Selection
-  const handleScheduleSelect = (e) => {
-    const val = e.target.value;
-    if (!val) {
+    // 1. Add from properties master list
+    (properties || []).forEach((p) => {
+      if (p._id) {
+        map.set(String(p._id), {
+          _id: String(p._id),
+          name: p.name || p.addressLine1 || p.address?.line1 || 'Property',
+          tenantName: p.tenantName || '',
+          contractualRent: p.contractualRent || 0,
+          postcode: p.postcode || '',
+        });
+      }
+    });
+
+    // 2. Add from rentSchedules if any property is not yet in properties list
+    (rentSchedules || []).forEach((s) => {
+      const p = s.propertyId;
+      if (p && p._id && !map.has(String(p._id))) {
+        map.set(String(p._id), {
+          _id: String(p._id),
+          name: p.name || p.addressLine1 || 'Property',
+          tenantName: s.tenantId?.fullName || p.tenantName || '',
+          contractualRent: p.contractualRent || s.expectedAmount || 0,
+          postcode: p.postcode || '',
+        });
+      }
+    });
+
+    // Sort alphabetically by property name
+    return Array.from(map.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [properties, rentSchedules]);
+
+  // Handle Single Property Selection for Rent Collection
+  const handlePropertySelect = (e) => {
+    const pId = e.target.value;
+    if (!pId) {
       setRentForm((prev) => ({
         ...prev,
-        scheduleId: '',
         propertyId: '',
+        scheduleId: '',
         amount: '',
         notes: '',
       }));
       return;
     }
 
-    if (val.startsWith('schedule:')) {
-      const sId = val.replace('schedule:', '');
-      const selected = rentSchedules.find((s) => s._id === sId);
-      if (selected) {
-        const propId = selected.propertyId?._id || selected.propertyId;
-        const propName =
-          selected.propertyId?.name ||
-          selected.propertyId?.addressLine1 ||
-          properties.find((p) => p._id === propId)?.name ||
-          'Property';
-        const tenantName =
-          selected.tenantId?.fullName ||
-          (selected.notes && !selected.notes.startsWith('Invoice') ? selected.notes : '') ||
-          selected.propertyId?.tenantName ||
-          'Tenant';
-        const month = selected.billingMonth || rentForm.billingMonth;
-        setRentForm((prev) => ({
-          ...prev,
-          scheduleId: sId,
-          propertyId: propId || '',
-          billingMonth: month,
-          amount: String(selected.outstandingAmount ?? selected.expectedAmount ?? ''),
-          notes: `Rent for ${propName} (Tenant: ${tenantName}) - Month: ${month}`,
-        }));
-      }
-    } else if (val.startsWith('property:')) {
-      const pId = val.replace('property:', '');
-      const selectedProp = properties.find((p) => p._id === pId);
-      if (selectedProp) {
-        setRentForm((prev) => ({
-          ...prev,
-          scheduleId: '',
-          propertyId: pId,
-          amount: selectedProp.contractualRent ? String(selectedProp.contractualRent) : '',
-          notes: `Rent for ${selectedProp.name}${selectedProp.tenantName ? ` (Tenant: ${selectedProp.tenantName})` : ''} - Month: ${prev.billingMonth}`,
-        }));
-      }
-    } else {
-      // Direct raw ID fallback
-      const selected = rentSchedules.find((s) => s._id === val);
-      if (selected) {
-        const propId = selected.propertyId?._id || selected.propertyId;
-        setRentForm((prev) => ({
-          ...prev,
-          scheduleId: val,
-          propertyId: propId || '',
-          billingMonth: selected.billingMonth || prev.billingMonth,
-          amount: String(selected.outstandingAmount ?? selected.expectedAmount ?? ''),
-          notes: `Rent for ${selected.propertyId?.name || 'Property'} - Month: ${selected.billingMonth}`,
-        }));
-      } else {
-        const selectedProp = properties.find((p) => p._id === val);
-        if (selectedProp) {
-          setRentForm((prev) => ({
-            ...prev,
-            scheduleId: '',
-            propertyId: val,
-            amount: selectedProp.contractualRent ? String(selectedProp.contractualRent) : '',
-            notes: `Rent for ${selectedProp.name} - Month: ${prev.billingMonth}`,
-          }));
+    const prop = uniqueProperties.find((p) => p._id === pId) || properties.find((p) => p._id === pId);
+    const propName = prop?.name || 'Property';
+    const tenantName = prop?.tenantName || '';
+
+    // Check if there is an active invoice schedule for this property and current billingMonth
+    const matchingSchedule = rentSchedules.find(
+      (s) => String(s.propertyId?._id || s.propertyId) === String(pId) && s.billingMonth === rentForm.billingMonth
+    );
+
+    const amountToUse = matchingSchedule
+      ? (matchingSchedule.outstandingAmount || matchingSchedule.expectedAmount)
+      : (prop?.contractualRent || '');
+
+    setRentForm((prev) => ({
+      ...prev,
+      propertyId: pId,
+      scheduleId: matchingSchedule ? matchingSchedule._id : '',
+      amount: amountToUse ? String(amountToUse) : '',
+      notes: `Rent for ${propName}${tenantName ? ` (Tenant: ${tenantName})` : ''} - Month: ${prev.billingMonth}`,
+    }));
+  };
+
+  // Handle Rent Billing Month Change
+  const handleBillingMonthChange = (e) => {
+    const newMonth = e.target.value;
+    setRentForm((prev) => {
+      let scheduleIdToUse = '';
+      let amountToUse = prev.amount;
+      let notesToUse = prev.notes;
+
+      if (prev.propertyId) {
+        const prop = uniqueProperties.find((p) => p._id === prev.propertyId) || properties.find((p) => p._id === prev.propertyId);
+        // Find if this property has a schedule for the newly selected month
+        const matchingSchedule = rentSchedules.find(
+          (s) => String(s.propertyId?._id || s.propertyId) === String(prev.propertyId) && s.billingMonth === newMonth
+        );
+
+        if (matchingSchedule) {
+          scheduleIdToUse = matchingSchedule._id;
+          amountToUse = String(matchingSchedule.outstandingAmount || matchingSchedule.expectedAmount || '');
+        } else if (prop) {
+          amountToUse = prop.contractualRent ? String(prop.contractualRent) : prev.amount;
+        }
+
+        if (prop) {
+          notesToUse = `Rent for ${prop.name}${prop.tenantName ? ` (Tenant: ${prop.tenantName})` : ''} - Month: ${newMonth}`;
         }
       }
-    }
+
+      return {
+        ...prev,
+        billingMonth: newMonth,
+        scheduleId: scheduleIdToUse,
+        amount: amountToUse,
+        notes: notesToUse,
+      };
+    });
   };
 
   // Quick generate monthly invoices for selected billing month
@@ -596,6 +606,14 @@ export function DataEntryPage({ selectedCompany }) {
     (selectedRentSchedule?.notes && !selectedRentSchedule.notes.startsWith('Invoice') ? selectedRentSchedule.notes : '') ||
     '';
 
+  // Get all unpaid schedules for the selected property
+  const unpaidSchedulesForSelectedProp = useMemo(() => {
+    if (!rentForm.propertyId) return [];
+    return rentSchedules
+      .filter((s) => String(s.propertyId?._id || s.propertyId) === String(rentForm.propertyId) && s.status !== 'PAID')
+      .sort((a, b) => (a.billingMonth || '').localeCompare(b.billingMonth || ''));
+  }, [rentForm.propertyId, rentSchedules]);
+
   // Filter recent transactions
   const filteredRecent = recentTransactions.filter((tx) => {
     if (!searchTerm) return true;
@@ -829,58 +847,24 @@ export function DataEntryPage({ selectedCompany }) {
               <div className="lg:col-span-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Select Property &amp; Billing Schedule <span className="text-rose-400">*</span>
+                    Select Property <span className="text-rose-400">*</span>
                   </label>
-                  {rentSchedules.length > 0 && (
-                    <span className="text-[11px] text-emerald-400 font-medium">
-                      {rentSchedules.length} active schedule{rentSchedules.length > 1 ? 's' : ''} available
-                    </span>
-                  )}
+                  <span className="text-[11px] text-emerald-400 font-medium">
+                    {uniqueProperties.length} propert{uniqueProperties.length === 1 ? 'y' : 'ies'} available
+                  </span>
                 </div>
                 <select
-                  value={
-                    rentForm.scheduleId
-                      ? `schedule:${rentForm.scheduleId}`
-                      : rentForm.propertyId
-                      ? `property:${rentForm.propertyId}`
-                      : ''
-                  }
-                  onChange={handleScheduleSelect}
+                  value={rentForm.propertyId}
+                  onChange={handlePropertySelect}
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
                 >
                   <option value="">-- Choose Property for Rent Collection --</option>
-                  {rentSchedules.length > 0 && (
-                    <optgroup label="📋 Active Billing Invoices &amp; Schedules (By Property)">
-                      {rentSchedules.map((s) => {
-                        const propName =
-                          s.propertyId?.name ||
-                          s.propertyId?.addressLine1 ||
-                          properties.find((p) => p._id === (s.propertyId?._id || s.propertyId))?.name ||
-                          'Property';
-                        const unitStr = s.unitId?.unitName ? ` (${s.unitId.unitName})` : '';
-                        const tenantStr = s.tenantId?.fullName
-                          ? ` • Tenant: ${s.tenantId.fullName}`
-                          : s.propertyId?.tenantName
-                          ? ` • Tenant: ${s.propertyId.tenantName}`
-                          : '';
-                        return (
-                          <option key={s._id} value={`schedule:${s._id}`}>
-                            🏠 {propName}{unitStr}{tenantStr} &bull; Month: {s.billingMonth} &bull; Due: {formatGBP(s.outstandingAmount)} ({s.status})
-                          </option>
-                        );
-                      })}
-                    </optgroup>
-                  )}
-                  {properties.length > 0 && (
-                    <optgroup label="🏢 Direct Company Properties (Contractual Rent)">
-                      {properties.map((p) => (
-                        <option key={p._id} value={`property:${p._id}`}>
-                          🏢 {p.name}{p.tenantName ? ` &bull; Tenant: ${p.tenantName}` : ''} &bull; Monthly Rent: {formatGBP(p.contractualRent || 0)}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
+                  {uniqueProperties.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      🏠 {p.name} {p.tenantName ? `• Tenant: ${p.tenantName}` : ''} • Monthly Rent: {formatGBP(p.contractualRent || 0)}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Selected Property Preview Badge */}
@@ -911,10 +895,44 @@ export function DataEntryPage({ selectedCompany }) {
                   </div>
                 )}
 
-                {rentSchedules.length === 0 && properties.length > 0 && (
-                  <p className="text-[11px] text-cyan-400 mt-1">
-                    Select any company property from the dropdown above to record rent for {rentForm.billingMonth}.
-                  </p>
+                {/* Outstanding Invoiced Overdue Months for this Property (one-click pills) */}
+                {unpaidSchedulesForSelectedProp.length > 0 && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="flex items-center gap-1.5 text-amber-300 font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                        {unpaidSchedulesForSelectedProp.length} Outstanding Invoiced Month{unpaidSchedulesForSelectedProp.length > 1 ? 's' : ''} on Record:
+                      </span>
+                      <span className="text-amber-200 font-mono text-[11px]">
+                        Total Overdue: {formatGBP(unpaidSchedulesForSelectedProp.reduce((sum, s) => sum + (s.outstandingAmount || 0), 0))}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {unpaidSchedulesForSelectedProp.map((s) => (
+                        <button
+                          key={s._id}
+                          type="button"
+                          onClick={() => {
+                            setRentForm((prev) => ({
+                              ...prev,
+                              scheduleId: s._id,
+                              billingMonth: s.billingMonth,
+                              amount: String(s.outstandingAmount || s.expectedAmount || ''),
+                              notes: `Rent for ${currentRentPropertyName || 'Property'} - Month: ${s.billingMonth}`,
+                            }));
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer border ${
+                            rentForm.billingMonth === s.billingMonth && rentForm.scheduleId === s._id
+                              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                              : 'bg-slate-900 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                          }`}
+                          title={`Click to set collection to ${s.billingMonth} (${formatGBP(s.outstandingAmount)})`}
+                        >
+                          {s.billingMonth} &bull; {formatGBP(s.outstandingAmount)} ({s.status})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 
