@@ -33,18 +33,27 @@ html.light body {
   color: #0f172a;
 }
 
+html.light aside,
+html.light .sidebar-layout {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #e2e8f0 !important;
+}
+
 html.light .bg-slate-950 {
   background-color: #f8fafc !important;
 }
 
-html.light .bg-slate-900 {
-  background-color: #ffffff !important;
-}
-
+html.light .bg-slate-900,
+html.light .bg-slate-900\/98,
 html.light .bg-slate-900\/95,
 html.light .bg-slate-900\/90,
 html.light .bg-slate-900\/80 {
-  background-color: rgba(255, 255, 255, 0.95) !important;
+  background-color: #ffffff !important;
 }
 
 html.light .bg-slate-950\/60,
