@@ -377,25 +377,13 @@ export function MainLayout({
           <div key={currentView} className={`${getPageAnimationClass(currentView)} min-h-full flex flex-col justify-between flex-1`}>
             <div>{children}</div>
 
-            {/* Software Developer Credits for Mobile & Responsive Screens */}
-            <div className="md:hidden mt-10 mb-4 px-4 flex justify-center">
-              <div className="p-3 rounded-2xl developer-credit-card flex items-center gap-3 w-full max-w-sm">
-                <div className="w-10 h-10 rounded-xl developer-icon flex items-center justify-center shrink-0 shadow-sm">
-                  <Code2 className="w-5 h-5" />
-                </div>
-                <div className="truncate min-w-0">
-                  <div className="text-[11px] font-bold developer-title uppercase tracking-wider">
-                    Software Developer
-                  </div>
-                  <div className="text-sm font-extrabold developer-name tracking-tight truncate">
-                    Rizwan Ullah
-                  </div>
-                  <div className="text-[10px] developer-org font-medium truncate">
-                    PIXX Technologies UK
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Standard Footer for Mobile & Responsive Screens */}
+            <footer className="mt-8 mb-2 py-3 px-4 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 flex-wrap text-center">
+              <span>Software Developer:</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300">Rizwan Ullah</span>
+              <span className="text-slate-300 dark:text-slate-700">·</span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">PIXX Technologies UK</span>
+            </footer>
           </div>
         </div>
       </main>
