@@ -1,9 +1,10 @@
-const CACHE_NAME = 'uk-company-pwa-v1';
+const CACHE_NAME = 'uk-company-pwa-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/logo.png',
+  '/UK.png',
+  '/icon-32.png',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-maskable-192.png',
