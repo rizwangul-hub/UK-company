@@ -301,33 +301,41 @@ export function App() {
         <LoginForm onLoginSuccess={handleLoginSuccess} />
       ) : isMasterDashboard ? (
         /* 2. Master All-Companies Portfolio Dashboard */
-        <GroupPortfolioDashboard
-          user={user}
-          onSelectCompany={(company) => {
-            setIsMasterDashboard(false);
-            handleSelectCompany(company);
-          }}
-          onSwitchToSingleCompany={() => {
-            setIsMasterDashboard(false);
-            if (selectedCompany) {
-              navigate(`/company/${selectedCompany.slug}`);
-            } else {
-              setSelectedCompany(null);
-              navigate('/company-selection');
-            }
-          }}
-        />
+        <div key="master-dashboard-view" className="book-page-perspective h-full w-full overflow-x-hidden">
+          <div className="book-page-turn h-full w-full">
+            <GroupPortfolioDashboard
+              user={user}
+              onSelectCompany={(company) => {
+                setIsMasterDashboard(false);
+                handleSelectCompany(company);
+              }}
+              onSwitchToSingleCompany={() => {
+                setIsMasterDashboard(false);
+                if (selectedCompany) {
+                  navigate(`/company/${selectedCompany.slug}`);
+                } else {
+                  setSelectedCompany(null);
+                  navigate('/company-selection');
+                }
+              }}
+            />
+          </div>
+        </div>
       ) : !selectedCompany ? (
         /* 3. Authenticated State without active company -> Company Selection Screen */
-        <CompanySelectionPage
-          user={user}
-          onSelectCompany={handleSelectCompany}
-          onLogout={handleLogout}
-          onSelectMasterGroup={() => {
-            setIsMasterDashboard(true);
-            navigate('/master-dashboard');
-          }}
-        />
+        <div key="company-selection-view" className="book-page-perspective h-full w-full overflow-x-hidden">
+          <div className="book-page-turn h-full w-full">
+            <CompanySelectionPage
+              user={user}
+              onSelectCompany={handleSelectCompany}
+              onLogout={handleLogout}
+              onSelectMasterGroup={() => {
+                setIsMasterDashboard(true);
+                navigate('/master-dashboard');
+              }}
+            />
+          </div>
+        </div>
       ) : (
         /* 4. Authenticated State with selected company -> Independent Company Dashboard */
         <MainLayout

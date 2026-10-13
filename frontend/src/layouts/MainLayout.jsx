@@ -376,25 +376,27 @@ export function MainLayout({
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="flex-1 pb-page-safe flex flex-col justify-between">
-          <div>{children}</div>
+        {/* Page Content with 3D Book Page Flip Animation */}
+        <div className="flex-1 pb-page-safe flex flex-col justify-between book-page-perspective">
+          <div key={currentView} className="book-page-turn min-h-full flex flex-col justify-between flex-1">
+            <div>{children}</div>
 
-          {/* Software Developer Credits for Mobile & Responsive Screens */}
-          <div className="md:hidden mt-10 mb-4 px-4 flex justify-center">
-            <div className="p-3 rounded-2xl developer-credit-card flex items-center gap-3 w-full max-w-sm">
-              <div className="w-10 h-10 rounded-xl developer-icon flex items-center justify-center shrink-0 shadow-sm">
-                <Code2 className="w-5 h-5" />
-              </div>
-              <div className="truncate min-w-0">
-                <div className="text-[11px] font-bold developer-title uppercase tracking-wider">
-                  Software Developer
+            {/* Software Developer Credits for Mobile & Responsive Screens */}
+            <div className="md:hidden mt-10 mb-4 px-4 flex justify-center">
+              <div className="p-3 rounded-2xl developer-credit-card flex items-center gap-3 w-full max-w-sm">
+                <div className="w-10 h-10 rounded-xl developer-icon flex items-center justify-center shrink-0 shadow-sm">
+                  <Code2 className="w-5 h-5" />
                 </div>
-                <div className="text-sm font-extrabold developer-name tracking-tight truncate">
-                  Rizwan Ullah
-                </div>
-                <div className="text-[10px] developer-org font-medium truncate">
-                  PIXX Technologies UK
+                <div className="truncate min-w-0">
+                  <div className="text-[11px] font-bold developer-title uppercase tracking-wider">
+                    Software Developer
+                  </div>
+                  <div className="text-sm font-extrabold developer-name tracking-tight truncate">
+                    Rizwan Ullah
+                  </div>
+                  <div className="text-[10px] developer-org font-medium truncate">
+                    PIXX Technologies UK
+                  </div>
                 </div>
               </div>
             </div>
