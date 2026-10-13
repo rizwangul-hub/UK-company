@@ -1,0 +1,27 @@
+# ==========================================
+# Backend Git Ignore
+# ==========================================
+
+# Dependencies
+node_modules/
+
+# Secrets & Environment Variables (NEVER COMMIT)
+.env
+.env.*
+*.env
+
+# Runtime & Vercel
+.vercel/
+logs/
+*.log
+npm-debug.log*
+
+# Backups
+src/backups/
+backups/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

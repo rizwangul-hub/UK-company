@@ -1,0 +1,1614 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Receipt,
+  FileText,
+  ArrowLeftRight,
+  TrendingUp,
+  Landmark,
+  Clock,
+  Building2,
+  CreditCard,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Search,
+  Wallet,
+  Sparkles,
+  Plus,
+  Zap,
+  Flame,
+  Wrench,
+  Tag,
+} from 'lucide-react';
+import {
+  accountsAPI,
+  propertiesAPI,
+  ledgerAPI,
+  rentAPI,
+  mortgagesAPI,
+} from '../services/api.js';
+import { formatGBP, formatUKDate } from '../utils/formatters.js';
+import pixxLogo from '../assets/logo.png';
+
+export function DataEntryPage({ selectedCompany }) {
+  const [activeTab, setActiveTab] = useState('rent'); // 'rent' | 'expense' | 'transfer' | 'other' | 'mortgage' | 'recent'
+
+  // Master Data
+  const [accounts, setAccounts] = useState([]);
+  const [properties, setProperties] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [mortgages, setMortgages] = useState([]);
+  const [rentSchedules, setRentSchedules] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState({ text: '', type: '' });
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // 1. Rent Collection Form State
+  const [rentForm, setRentForm] = useState({
+    scheduleId: '',
+    amount: '',
+    paymentDate: new Date().toISOString().slice(0, 10),
+    receivingAccountId: '',
+    paymentMethod: 'STANDING_ORDER',
+    notes: '',
+  });
+
+  // 2. Expense Voucher Form State
+  const [expenseForm, setExpenseForm] = useState({
+    transactionDate: new Date().toISOString().slice(0, 10),
+    accountId: '',
+    categoryId: '',
+    amount: '',
+    propertyId: '',
+    unitId: '',
+    narration: '',
+    reference: '',
+  });
+
+  // 3. Internal Transfer Form State
+  const [transferForm, setTransferForm] = useState({
+    fromAccountId: '',
+    toAccountId: '',
+    amount: '',
+    transferDate: new Date().toISOString().slice(0, 10),
+    reference: '',
+    narration: '',
+  });
+
+  // 4. Other Income Form State
+  const [otherIncomeForm, setOtherIncomeForm] = useState({
+    transactionDate: new Date().toISOString().slice(0, 10),
+    accountId: '',
+    categoryId: '',
+    amount: '',
+    propertyId: '',
+    unitId: '',
+    receivedFrom: '',
+    narration: '',
+    reference: '',
+  });
+
+  // 5. Mortgage Payment Form State
+  const [mortgageForm, setMortgageForm] = useState({
+    mortgageId: '',
+    paymentDate: new Date().toISOString().slice(0, 10),
+    paymentAccountId: '',
+    totalAmountPaid: '',
+    interestAmount: '',
+    principalAmount: '',
+    feeAmount: '0',
+    paymentReference: '',
+    notes: '',
+  });
+
+  // Load All System Master Data
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [accRes, propRes, catRes, mtgRes, rentRes, txRes] = await Promise.all([
+        accountsAPI.getAll().catch(() => ({ data: { accounts: [] } })),
+        propertiesAPI.getAll().catch(() => ({ data: { properties: [] } })),
+        ledgerAPI.getCategories().catch(() => ({ data: { categories: [] } })),
+        mortgagesAPI.getAll({ status: 'ACTIVE' }).catch(() => ({ data: { mortgages: [] } })),
+        rentAPI.getSchedules({ status: 'PENDING,PARTIAL,OVERDUE' }).catch(() => ({ data: { schedules: [] } })),
+        ledgerAPI.getTransactions({ limit: 50 }).catch(() => ({ data: { transactions: [] } })),
+      ]);
+
+      const accList = accRes?.data?.accounts || accRes?.accounts || [];
+      const propList = propRes?.data?.properties || propRes?.properties || [];
+      const catList = catRes?.data?.categories || catRes?.categories || [];
+      const mtgList = mtgRes?.data?.mortgages || mtgRes?.mortgages || [];
+      const schedulesList = rentRes?.data?.schedules || rentRes?.schedules || [];
+      const txList = txRes?.data?.transactions || txRes?.transactions || [];
+
+      setAccounts(accList);
+      setProperties(propList);
+      setCategories(catList);
+      setMortgages(mtgList);
+      setRentSchedules(schedulesList);
+      setRecentTransactions(txList);
+
+      // Pre-select default account if available
+      const defaultBank = accList.find((a) => a.accountType === 'BANK')?._id || accList[0]?._id;
+      if (defaultBank) {
+        setRentForm((prev) => ({ ...prev, receivingAccountId: prev.receivingAccountId || defaultBank }));
+        setExpenseForm((prev) => ({ ...prev, accountId: prev.accountId || defaultBank }));
+        setOtherIncomeForm((prev) => ({ ...prev, accountId: prev.accountId || defaultBank }));
+        setMortgageForm((prev) => ({ ...prev, paymentAccountId: prev.paymentAccountId || defaultBank }));
+      }
+    } catch (err) {
+      console.error('Failed to load data entry master data:', err);
+      setFeedback({ text: 'Error loading reference records: ' + err.message, type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Handle Rent Schedule Selection
+  const handleScheduleSelect = (e) => {
+    const sId = e.target.value;
+    const selected = rentSchedules.find((s) => s._id === sId);
+    setRentForm((prev) => ({
+      ...prev,
+      scheduleId: sId,
+      amount: selected ? String(selected.outstandingAmount || selected.expectedAmount || '') : '',
+      notes: selected
+        ? `Rent for ${selected.propertyId?.name || 'Property'} (${selected.unitId?.unitName || 'Unit'}) - Month: ${selected.billingMonth}`
+        : '',
+    }));
+  };
+
+  // Submit 1: Rent Payment Receipt
+  const handleRentSubmit = async (e) => {
+    e.preventDefault();
+    if (!rentForm.scheduleId || !rentForm.amount || !rentForm.receivingAccountId) {
+      setFeedback({ text: 'Please select a tenant schedule, amount, and receiving bank account.', type: 'error' });
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setFeedback({ text: '', type: '' });
+      const res = await rentAPI.recordPayment({
+        scheduleId: rentForm.scheduleId,
+        amount: Number(rentForm.amount),
+        paymentDate: rentForm.paymentDate,
+        receivingAccountId: rentForm.receivingAccountId,
+        paymentMethod: rentForm.paymentMethod,
+        notes: rentForm.notes,
+      });
+
+      if (res?.success) {
+        setFeedback({
+          text: `Rent receipt of ${formatGBP(Number(rentForm.amount))} successfully posted into bank account.`,
+          type: 'success',
+        });
+        setRentForm((prev) => ({
+          ...prev,
+          scheduleId: '',
+          amount: '',
+          notes: '',
+        }));
+        await loadData();
+      }
+    } catch (err) {
+      setFeedback({ text: err.response?.data?.message || err.message || 'Failed to record rent payment.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Submit 2: Expense Voucher
+  const handleExpenseSubmit = async (e) => {
+    e.preventDefault();
+    if (!expenseForm.accountId || !expenseForm.categoryId || !expenseForm.amount || !expenseForm.narration) {
+      setFeedback({ text: 'Bank account, expense category, amount, and narration are required.', type: 'error' });
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setFeedback({ text: '', type: '' });
+      const res = await ledgerAPI.recordExpense({
+        transactionDate: expenseForm.transactionDate,
+        accountId: expenseForm.accountId,
+        categoryId: expenseForm.categoryId,
+        amount: Number(expenseForm.amount),
+        propertyId: expenseForm.propertyId || null,
+        unitId: expenseForm.unitId || null,
+        narration: expenseForm.narration,
+        reference: expenseForm.reference,
+        periodMonth: expenseForm.transactionDate.slice(0, 7),
+      });
+
+      if (res?.success) {
+        setFeedback({
+          text: `Expense voucher of ${formatGBP(Number(expenseForm.amount))} recorded and deducted from bank balance.`,
+          type: 'success',
+        });
+        setExpenseForm((prev) => ({
+          ...prev,
+          amount: '',
+          narration: '',
+          reference: '',
+        }));
+        await loadData();
+      }
+    } catch (err) {
+      setFeedback({ text: err.response?.data?.message || err.message || 'Failed to record expense voucher.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Submit 3: Internal Transfer
+  const handleTransferSubmit = async (e) => {
+    e.preventDefault();
+    if (!transferForm.fromAccountId || !transferForm.toAccountId || !transferForm.amount) {
+      setFeedback({ text: 'Source account, destination account, and transfer amount are required.', type: 'error' });
+      return;
+    }
+    if (transferForm.fromAccountId === transferForm.toAccountId) {
+      setFeedback({ text: 'Source and destination accounts must be different.', type: 'error' });
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setFeedback({ text: '', type: '' });
+      const res = await accountsAPI.transfer({
+        fromAccountId: transferForm.fromAccountId,
+        toAccountId: transferForm.toAccountId,
+        amount: Number(transferForm.amount),
+        transferDate: transferForm.transferDate,
+        reference: transferForm.reference,
+        narration: transferForm.narration,
+      });
+
+      if (res?.success) {
+        setFeedback({
+          text: `Internal transfer of ${formatGBP(Number(transferForm.amount))} executed successfully between accounts.`,
+          type: 'success',
+        });
+        setTransferForm((prev) => ({
+          ...prev,
+          amount: '',
+          reference: '',
+          narration: '',
+        }));
+        await loadData();
+      }
+    } catch (err) {
+      setFeedback({ text: err.response?.data?.message || err.message || 'Failed to execute internal transfer.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Submit 4: Other Income
+  const handleOtherIncomeSubmit = async (e) => {
+    e.preventDefault();
+    if (!otherIncomeForm.accountId || !otherIncomeForm.categoryId || !otherIncomeForm.amount || !otherIncomeForm.narration) {
+      setFeedback({ text: 'Receiving account, income category head, amount, and description are required.', type: 'error' });
+      return;
+    }
+    try {
+      setSubmitting(true);
+      setFeedback({ text: '', type: '' });
+      const res = await ledgerAPI.recordIncome({
+        transactionDate: otherIncomeForm.transactionDate,
+        accountId: otherIncomeForm.accountId,
+        categoryId: otherIncomeForm.categoryId,
+        amount: Number(otherIncomeForm.amount),
+        propertyId: otherIncomeForm.propertyId || null,
+        unitId: otherIncomeForm.unitId || null,
+        narration: otherIncomeForm.receivedFrom
+          ? `${otherIncomeForm.narration} (Received from: ${otherIncomeForm.receivedFrom})`
+          : otherIncomeForm.narration,
+        reference: otherIncomeForm.reference,
+        periodMonth: otherIncomeForm.transactionDate.slice(0, 7),
+      });
+
+      if (res?.success) {
+        setFeedback({
+          text: `Income receipt of ${formatGBP(Number(otherIncomeForm.amount))} successfully recorded into bank balance.`,
+          type: 'success',
+        });
+        setOtherIncomeForm((prev) => ({
+          ...prev,
+          amount: '',
+          receivedFrom: '',
+          narration: '',
+          reference: '',
+        }));
+        await loadData();
+      }
+    } catch (err) {
+      setFeedback({ text: err.response?.data?.message || err.message || 'Failed to record other income.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Submit 5: Mortgage Payment
+  const handleMortgageSubmit = async (e) => {
+    e.preventDefault();
+    const total = Number(mortgageForm.totalAmountPaid);
+    const interest = Number(mortgageForm.interestAmount);
+    const principal = Number(mortgageForm.principalAmount);
+    const fee = Number(mortgageForm.feeAmount || 0);
+
+    if (!mortgageForm.mortgageId || !mortgageForm.paymentAccountId || total <= 0) {
+      setFeedback({ text: 'Select mortgage facility, paying bank account, and enter payment amount.', type: 'error' });
+      return;
+    }
+
+    if (Math.abs(interest + principal + fee - total) > 0.05) {
+      setFeedback({
+        text: `Split mismatch: Interest (£${interest.toFixed(2)}) + Principal (£${principal.toFixed(2)}) + Fee (£${fee.toFixed(2)}) must equal Total Paid (£${total.toFixed(2)}).`,
+        type: 'error',
+      });
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setFeedback({ text: '', type: '' });
+      const res = await mortgagesAPI.recordPayment(mortgageForm.mortgageId, {
+        paymentDate: mortgageForm.paymentDate,
+        totalAmountPaid: total,
+        interestAmount: interest,
+        principalAmount: principal,
+        feeAmount: fee,
+        paymentAccountId: mortgageForm.paymentAccountId,
+        paymentReference: mortgageForm.paymentReference,
+        notes: mortgageForm.notes,
+      });
+
+      if (res?.success) {
+        setFeedback({
+          text: `Mortgage payment of ${formatGBP(total)} posted. Principal debt reduced by ${formatGBP(principal)}.`,
+          type: 'success',
+        });
+        setMortgageForm((prev) => ({
+          ...prev,
+          totalAmountPaid: '',
+          interestAmount: '',
+          principalAmount: '',
+          feeAmount: '0',
+          paymentReference: '',
+          notes: '',
+        }));
+        await loadData();
+      }
+    } catch (err) {
+      setFeedback({ text: err.response?.data?.message || err.message || 'Failed to record mortgage payment.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Filter Categories & Scope
+  const expenseCategories = categories.filter((c) => c.type === 'OPERATING_EXPENSE' || c.type === 'EXPENSE');
+  const incomeCategories = categories.filter((c) => c.type === 'INCOME');
+  const generalExpenseCategories = expenseCategories.filter((c) => !c.propertyId);
+
+  // Filter Units for Selected Property
+  const selectedPropObj = properties.find((p) => p._id === expenseForm.propertyId);
+  const selectedPropHeads = expenseCategories.filter(
+    (c) => (c.propertyId?._id || c.propertyId)?.toString() === expenseForm.propertyId
+  );
+  const unitsForExpense = selectedPropObj?.units || [];
+
+  // Quick Add Sub-Head on the fly
+  const [showQuickAddCat, setShowQuickAddCat] = useState(false);
+  const [quickCatName, setQuickCatName] = useState('');
+  const [savingQuickCat, setSavingQuickCat] = useState(false);
+
+  const handleQuickAddCategory = async (e) => {
+    e.preventDefault();
+    const name = quickCatName.trim();
+    if (!name) return;
+    try {
+      setSavingQuickCat(true);
+      const res = await ledgerAPI.createCategory({
+        name,
+        type: 'OPERATING_EXPENSE',
+        propertyId: expenseForm.propertyId || null,
+        unitId: expenseForm.unitId || null,
+        isAllowableTaxDeduction: true,
+        description: `Created from Data Entry Desk${expenseForm.propertyId ? ` for ${selectedPropObj?.name || 'Property'}` : ''}`,
+      });
+      const created = res.data?.category || res.category;
+      setQuickCatName('');
+      setShowQuickAddCat(false);
+      setFeedback({
+        text: `Expense head "${name}" successfully added${expenseForm.propertyId ? ` to ${selectedPropObj?.name || 'Property'}` : ' to Portfolio'} and selected!`,
+        type: 'success',
+      });
+      await loadData();
+      if (created?._id) {
+        setExpenseForm((prev) => ({ ...prev, categoryId: created._id }));
+      }
+    } catch (err) {
+      setFeedback({ text: err.response?.data?.message || err.message || 'Failed to create category.', type: 'error' });
+    } finally {
+      setSavingQuickCat(false);
+    }
+  };
+
+  const handleExpenseCategorySelect = (e) => {
+    const catId = e.target.value;
+    const catObj = expenseCategories.find((c) => c._id === catId);
+    if (catObj?.propertyId) {
+      const pId = (catObj.propertyId._id || catObj.propertyId)?.toString();
+      if (pId && pId !== expenseForm.propertyId) {
+        setExpenseForm((prev) => ({
+          ...prev,
+          categoryId: catId,
+          propertyId: pId,
+          unitId: catObj.unitId?._id || catObj.unitId || prev.unitId || '',
+        }));
+        return;
+      }
+    }
+    setExpenseForm((prev) => ({ ...prev, categoryId: catId }));
+  };
+
+  const otherIncomePropObj = properties.find((p) => p._id === otherIncomeForm.propertyId);
+  const unitsForOtherIncome = otherIncomePropObj?.units || [];
+
+  // Filter recent transactions
+  const filteredRecent = recentTransactions.filter((tx) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      tx.narration?.toLowerCase().includes(term) ||
+      tx.voucherNo?.toLowerCase().includes(term) ||
+      tx.reference?.toLowerCase().includes(term) ||
+      tx.propertyId?.name?.toLowerCase().includes(term)
+    );
+  });
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden">
+            <img src={selectedCompany?.logo || pixxLogo} alt={selectedCompany?.name || "Company Logo"} className="h-full w-full object-contain" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                Operational Workspace
+              </span>
+              {selectedCompany && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {selectedCompany.name} ({selectedCompany.legalName})
+                </span>
+              )}
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Data Entry Desk
+            </h1>
+            <p className="text-xs text-slate-400">
+              Fast daily transaction entry for Rent Collection, Expense Vouchers, Transfers, Other Receipts, and Mortgages for {selectedCompany?.name || 'the active portfolio'}.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-semibold transition cursor-pointer shadow-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh Ledger</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Live Bank Accounts Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+        {accounts.length === 0 ? (
+          <div className="col-span-full p-4 rounded-2xl bg-slate-900/60 border border-dashed border-slate-800 text-center text-xs text-slate-400">
+            No bank or cash accounts configured for <strong className="text-slate-300">{selectedCompany?.name || 'this company'}</strong>. Create accounts in the Accounts tab to record transactions.
+          </div>
+        ) : (
+          accounts.map((acc) => (
+            <div
+              key={acc._id}
+              className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 shadow-sm flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                  {acc.name}
+                </span>
+                <CreditCard className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              </div>
+              <div className="text-base sm:text-lg font-black text-slate-100 mt-1.5 font-mono">
+                {formatGBP(acc.currentBalance)}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5 capitalize">
+                {acc.accountType} &bull; {acc.bankName || 'UK Cash'}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Action Feedback Alert */}
+      {feedback.text && (
+        <div
+          className={`p-4 rounded-2xl text-xs sm:text-sm font-semibold flex items-center justify-between border shadow-sm ${
+            feedback.type === 'success'
+              ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'
+              : 'bg-rose-950/30 border-rose-800/50 text-rose-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {feedback.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+            )}
+            <span>{feedback.text}</span>
+          </div>
+          <button
+            onClick={() => setFeedback({ text: '', type: '' })}
+            className="text-xs opacity-70 hover:opacity-100 ml-4 cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* Primary Navigation Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800">
+        <button
+          onClick={() => { setActiveTab('rent'); setFeedback({ text: '', type: '' }); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'rent'
+              ? 'bg-emerald-600 text-white shadow-md'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>1. Collect Rent</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('expense'); setFeedback({ text: '', type: '' }); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'expense'
+              ? 'bg-rose-600 text-white shadow-md'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>2. Record Expense</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('transfer'); setFeedback({ text: '', type: '' }); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'transfer'
+              ? 'bg-sky-600 text-white shadow-md'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+          }`}
+        >
+          <ArrowLeftRight className="w-4 h-4" />
+          <span>3. Internal Transfer</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('other'); setFeedback({ text: '', type: '' }); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'other'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span>4. Other Income</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('mortgage'); setFeedback({ text: '', type: '' }); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'mortgage'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+          }`}
+        >
+          <Landmark className="w-4 h-4" />
+          <span>5. Mortgage Payment</span>
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('recent'); setFeedback({ text: '', type: '' }); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+            activeTab === 'recent'
+              ? 'bg-slate-700 text-white shadow-md'
+              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>6. Recent Activity</span>
+        </button>
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 1: COLLECT RENT */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'rent' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
+          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
+            <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white">
+                Record Tenant Rent Collection
+              </h2>
+              <p className="text-xs text-slate-400">
+                Deposit rent into bank account and automatically reduce tenant outstanding balance.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleRentSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Select Tenant & Billing Schedule <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={rentForm.scheduleId}
+                  onChange={handleScheduleSelect}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">-- Choose Tenant Invoice / Billing Month --</option>
+                  {rentSchedules.map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.tenantId?.fullName || 'Tenant'} &bull; {s.propertyId?.name || 'Property'} (Unit {s.unitId?.unitName || ''}) &bull; Month: {s.billingMonth} &bull; Due: {formatGBP(s.outstandingAmount)} ({s.status})
+                    </option>
+                  ))}
+                </select>
+                {rentSchedules.length === 0 && (
+                  <p className="text-[11px] text-emerald-400 mt-1">
+                    All scheduled rents are currently up-to-date! No outstanding balances.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Collection Date <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={rentForm.paymentDate}
+                  onChange={(e) => setRentForm({ ...rentForm, paymentDate: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Amount Received (£) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 1250.00"
+                  value={rentForm.amount}
+                  onChange={(e) => setRentForm({ ...rentForm, amount: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Receiving Bank Account <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={rentForm.receivingAccountId}
+                  onChange={(e) => setRentForm({ ...rentForm, receivingAccountId: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">-- Select Receiving Bank --</option>
+                  {accounts.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.name} ({a.bankName || a.accountType}) &bull; {formatGBP(a.currentBalance)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Payment Method
+                </label>
+                <select
+                  value={rentForm.paymentMethod}
+                  onChange={(e) => setRentForm({ ...rentForm, paymentMethod: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="STANDING_ORDER">Standing Order (Bank Transfer)</option>
+                  <option value="DIRECT_DEBIT">Direct Debit</option>
+                  <option value="CARD">Debit / Credit Card</option>
+                  <option value="CASH">Cash in Hand</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+
+              <div className="lg:col-span-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Receipt Narration / Note
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. October rent payment received via NatWest Standing Order"
+                  value={rentForm.notes}
+                  onChange={(e) => setRentForm({ ...rentForm, notes: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              >
+                <Receipt className="w-4 h-4" />
+                <span>{submitting ? 'Posting Receipt...' : 'Post Rent Collection'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 2: RECORD EXPENSE */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'expense' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
+          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
+            <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white">
+                Record Property Operational Expense
+              </h2>
+              <p className="text-xs text-slate-400">
+                Post repair invoices, insurance, maintenance, agent fees, or council taxes against bank accounts.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleExpenseSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Expense Date <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={expenseForm.transactionDate}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, transactionDate: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Disbursing Bank Account <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={expenseForm.accountId}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, accountId: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
+                >
+                  <option value="">-- Select Paying Account --</option>
+                  {accounts.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.name} ({formatGBP(a.currentBalance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Property Allocation (Main Head)
+                </label>
+                <select
+                  value={expenseForm.propertyId}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, propertyId: e.target.value, unitId: '' })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
+                >
+                  <option value="">-- General / Non-Property Specific --</option>
+                  {properties.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      🏢 {p.name} ({p.postcode || p.city || 'UK'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Unit Allocation (Optional)
+                </label>
+                <select
+                  value={expenseForm.unitId}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, unitId: e.target.value })}
+                  disabled={!expenseForm.propertyId || unitsForExpense.length === 0}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none disabled:opacity-50"
+                >
+                  <option value="">-- Whole Property --</option>
+                  {unitsForExpense.map((u) => (
+                    <option key={u._id} value={u._id}>
+                      {u.unitName} ({u.unitType})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Expense Head (Sub-Head) <span className="text-rose-400">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickAddCat(!showQuickAddCat)}
+                    className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus size={11} />
+                    <span>{showQuickAddCat ? 'Cancel' : '+ Add Head'}</span>
+                  </button>
+                </div>
+                <select
+                  value={expenseForm.categoryId}
+                  onChange={handleExpenseCategorySelect}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
+                >
+                  <option value="">-- Select Expense Sub-Head --</option>
+                  {expenseForm.propertyId ? (
+                    <>
+                      {selectedPropHeads.length > 0 && (
+                        <optgroup label={`🏢 ${selectedPropObj?.name || 'Property'} Sub-Heads (Electricity, Gas, Maintenance, etc.)`}>
+                          {selectedPropHeads.map((c) => (
+                            <option key={c._id} value={c._id}>
+                              {c.name} {c.code ? `(${c.code})` : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {generalExpenseCategories.length > 0 && (
+                        <optgroup label="🌐 General Portfolio Expense Heads">
+                          {generalExpenseCategories.map((c) => (
+                            <option key={c._id} value={c._id}>
+                              {c.name} {c.code ? `(${c.code})` : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {generalExpenseCategories.length > 0 && (
+                        <optgroup label="🌐 General Portfolio Expense Heads">
+                          {generalExpenseCategories.map((c) => (
+                            <option key={c._id} value={c._id}>
+                              {c.name} {c.code ? `(${c.code})` : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {properties.map((p) => {
+                        const heads = expenseCategories.filter(
+                          (c) => (c.propertyId?._id || c.propertyId)?.toString() === p._id.toString()
+                        );
+                        if (heads.length === 0) return null;
+                        return (
+                          <optgroup key={p._id} label={`🏢 ${p.name} Sub-Heads`}>
+                            {heads.map((c) => (
+                              <option key={c._id} value={c._id}>
+                                {c.name} {c.code ? `(${c.code})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Amount (£) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 180.00"
+                  value={expenseForm.amount}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Quick Add Sub-Head Drawer */}
+              {showQuickAddCat && (
+                <div className="lg:col-span-3 p-3.5 bg-slate-950/80 border border-rose-500/30 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                      <Plus size={13} />
+                      <span>Create New Sub-Head {expenseForm.propertyId ? `under ${selectedPropObj?.name || 'Property'}` : '(General Portfolio)'}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickAddCat(false)}
+                      className="text-slate-500 hover:text-white text-xs font-bold cursor-pointer"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. Electricity Bill, Gas & Heating, Gardening, Pest Control..."
+                      value={quickCatName}
+                      onChange={(e) => setQuickCatName(e.target.value)}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-rose-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleQuickAddCategory}
+                      disabled={savingQuickCat || !quickCatName.trim()}
+                      className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    >
+                      {savingQuickCat ? <RefreshCw size={12} className="animate-spin" /> : <Plus size={12} />}
+                      <span>Save &amp; Select</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Expense Narration / Description <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Boiler repair and gas safety certification by British Gas"
+                  value={expenseForm.narration}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, narration: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Invoice / Reference No.
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. INV-98412"
+                  value={expenseForm.reference}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, reference: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                <span>{submitting ? 'Recording Expense...' : 'Record Expense Voucher'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 3: INTERNAL TRANSFER */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'transfer' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
+          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
+            <div className="p-2 rounded-xl bg-sky-500/15 text-sky-400">
+              <ArrowLeftRight className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white">
+                Execute Internal Bank Transfer
+              </h2>
+              <p className="text-xs text-slate-400">
+                Move cash funds between UK bank accounts with double-entry balance updates.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleTransferSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Source Account (Credit Outflow) <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={transferForm.fromAccountId}
+                  onChange={(e) => setTransferForm({ ...transferForm, fromAccountId: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="">-- Choose Paying Account --</option>
+                  {accounts.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.name} ({formatGBP(a.currentBalance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Destination Account (Debit Inflow) <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={transferForm.toAccountId}
+                  onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="">-- Choose Receiving Account --</option>
+                  {accounts.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.name} ({formatGBP(a.currentBalance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Transfer Amount (£) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 5000.00"
+                  value={transferForm.amount}
+                  onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Transfer Date <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={transferForm.transferDate}
+                  onChange={(e) => setTransferForm({ ...transferForm, transferDate: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Transfer Reference / Note
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. TRF-OCT-RESERVE"
+                  value={transferForm.reference}
+                  onChange={(e) => setTransferForm({ ...transferForm, reference: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Reason / Purpose
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Transfer to Mortgage Reserve Account"
+                  value={transferForm.narration}
+                  onChange={(e) => setTransferForm({ ...transferForm, narration: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+                <span>{submitting ? 'Transferring...' : 'Execute Internal Transfer'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 4: OTHER INCOME */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'other' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
+          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
+            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white">
+                Record Other Income / Non-Rent Receipts
+              </h2>
+              <p className="text-xs text-slate-400">
+                Deposit miscellaneous revenue, parking fees, insurance payouts, or director equity into bank account.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleOtherIncomeSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Receipt Date <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={otherIncomeForm.transactionDate}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, transactionDate: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Receiving Bank Account <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={otherIncomeForm.accountId}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, accountId: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="">-- Choose Bank Account --</option>
+                  {accounts.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.name} ({formatGBP(a.currentBalance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Income Category Head <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={otherIncomeForm.categoryId}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, categoryId: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="">-- Select Income Category --</option>
+                  {incomeCategories.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name} {c.code ? `(${c.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Amount Received (£) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 350.00"
+                  value={otherIncomeForm.amount}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, amount: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Received From (Payer / Party)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Parking space user, Insurance company"
+                  value={otherIncomeForm.receivedFrom}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, receivedFrom: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Property Allocation (Optional)
+                </label>
+                <select
+                  value={otherIncomeForm.propertyId}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, propertyId: e.target.value, unitId: '' })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="">-- General Company / Portfolio --</option>
+                  {properties.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Narration / Detail <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Garage space monthly rental fee received"
+                  value={otherIncomeForm.narration}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, narration: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Reference No.
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. REC-OTH-0042"
+                  value={otherIncomeForm.reference}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, reference: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>{submitting ? 'Posting Income...' : 'Post Other Income'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 5: MORTGAGE PAYMENT */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'mortgage' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
+          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
+            <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white">
+                Record Mortgage Servicing Payment
+              </h2>
+              <p className="text-xs text-slate-400">
+                Split payment between Interest expense (P&L) and Principal repayment (reduces mortgage liability).
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleMortgageSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Select Active Mortgage Facility <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={mortgageForm.mortgageId}
+                  onChange={(e) => {
+                    const mId = e.target.value;
+                    const mObj = mortgages.find((m) => m._id === mId);
+                    setMortgageForm((prev) => ({
+                      ...prev,
+                      mortgageId: mId,
+                      totalAmountPaid: mObj ? String(mObj.expectedRepaymentAmount || '') : '',
+                      interestAmount: mObj && mObj.repaymentType === 'INTEREST_ONLY' ? String(mObj.expectedRepaymentAmount || '') : '',
+                      principalAmount: mObj && mObj.repaymentType === 'INTEREST_ONLY' ? '0' : '',
+                      paymentReference: mObj ? mObj.accountReference : '',
+                    }));
+                  }}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-indigo-500 focus:outline-none"
+                >
+                  <option value="">-- Choose Mortgage Facility --</option>
+                  {mortgages.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {m.lenderName} &bull; {m.propertyId?.name || 'Property'} &bull; Balance: {formatGBP(m.outstandingPrincipalBalance)} &bull; Monthly: {formatGBP(m.expectedRepaymentAmount)} ({m.repaymentType})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Payment Date <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={mortgageForm.paymentDate}
+                  onChange={(e) => setMortgageForm({ ...mortgageForm, paymentDate: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Paying Bank Account <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={mortgageForm.paymentAccountId}
+                  onChange={(e) => setMortgageForm({ ...mortgageForm, paymentAccountId: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-indigo-500 focus:outline-none"
+                >
+                  <option value="">-- Choose Paying Bank --</option>
+                  {accounts.map((a) => (
+                    <option key={a._id} value={a._id}>
+                      {a.name} ({formatGBP(a.currentBalance)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Total Cash Deducted (£) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 1100.00"
+                  value={mortgageForm.totalAmountPaid}
+                  onChange={(e) => setMortgageForm({ ...mortgageForm, totalAmountPaid: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Interest Expense Split (£) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 850.00"
+                  value={mortgageForm.interestAmount}
+                  onChange={(e) => setMortgageForm({ ...mortgageForm, interestAmount: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Principal Reduction (£) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 250.00"
+                  value={mortgageForm.principalAmount}
+                  onChange={(e) => setMortgageForm({ ...mortgageForm, principalAmount: e.target.value })}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Lender Fees / Admin (£)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={mortgageForm.feeAmount}
+                  onChange={(e) => setMortgageForm({ ...mortgageForm, feeAmount: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-bold font-mono focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Lender Account Reference
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. MTG-NW-8492"
+                  value={mortgageForm.paymentReference}
+                  onChange={(e) => setMortgageForm({ ...mortgageForm, paymentReference: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-md transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              >
+                <Landmark className="w-4 h-4" />
+                <span>{submitting ? 'Recording Payment...' : 'Record Mortgage Payment'}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* TAB 6: RECENT ENTRIES JOURNAL */}
+      {/* ------------------------------------------------------------------ */}
+      {activeTab === 'recent' && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white">
+                Recent Operations Journal
+              </h2>
+              <p className="text-xs text-slate-400">
+                Audit feed of all posted vouchers, receipts, and internal bank transfers.
+              </p>
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search transactions..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Date</th>
+                  <th className="py-2.5 px-3">Voucher #</th>
+                  <th className="py-2.5 px-3">Type</th>
+                  <th className="py-2.5 px-3">Bank Account</th>
+                  <th className="py-2.5 px-3">Narration</th>
+                  <th className="py-2.5 px-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {filteredRecent.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-500 font-medium">
+                      No matching transaction entries found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRecent.map((tx) => {
+                    const isIncome = tx.direction === 'IN';
+                    const isTransfer = tx.transactionType === 'TRANSFER';
+                    const isMortgage = tx.transactionType === 'MORTGAGE_PAYMENT';
+                    return (
+                      <tr key={tx._id} className="hover:bg-slate-800/40 transition">
+                        <td className="py-2.5 px-3 text-slate-300 font-mono">
+                          {formatUKDate(tx.transactionDate)}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-300">
+                          {tx.voucherNo}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                              isTransfer
+                                ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
+                                : isMortgage
+                                ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
+                                : isIncome
+                                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                            }`}
+                          >
+                            {tx.transactionType}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-300">
+                          {tx.accountId?.name || 'Bank'}
+                          {tx.counterAccountId && (
+                            <span className="text-slate-500 text-[10px]">
+                              {' '}
+                              &rarr; {tx.counterAccountId?.name}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-300 max-w-xs truncate" title={tx.narration}>
+                          {tx.narration}
+                        </td>
+                        <td
+                          className={`py-2.5 px-3 text-right font-mono font-bold ${
+                            isIncome ? 'text-emerald-400' : 'text-slate-100'
+                          }`}
+                        >
+                          {isIncome ? '+' : '-'}
+                          {formatGBP(tx.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default DataEntryPage;
