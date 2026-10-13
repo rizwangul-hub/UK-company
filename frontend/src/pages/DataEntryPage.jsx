@@ -580,6 +580,22 @@ export function DataEntryPage({ selectedCompany }) {
   const otherIncomePropObj = properties.find((p) => p._id === otherIncomeForm.propertyId);
   const unitsForOtherIncome = otherIncomePropObj?.units || [];
 
+  // Selected property & tenant helpers for Rent Collection
+  const selectedRentProp =
+    properties.find((p) => p._id === rentForm.propertyId) ||
+    rentSchedules.find((s) => (s.propertyId?._id || s.propertyId) === rentForm.propertyId)?.propertyId;
+  const selectedRentSchedule = rentSchedules.find((s) => s._id === rentForm.scheduleId);
+  const currentRentPropertyName =
+    selectedRentProp?.name ||
+    selectedRentSchedule?.propertyId?.name ||
+    selectedRentSchedule?.propertyId?.addressLine1 ||
+    '';
+  const currentRentTenantName =
+    selectedRentSchedule?.tenantId?.fullName ||
+    selectedRentProp?.tenantName ||
+    (selectedRentSchedule?.notes && !selectedRentSchedule.notes.startsWith('Invoice') ? selectedRentSchedule.notes : '') ||
+    '';
+
   // Filter recent transactions
   const filteredRecent = recentTransactions.filter((tx) => {
     if (!searchTerm) return true;
@@ -813,11 +829,11 @@ export function DataEntryPage({ selectedCompany }) {
               <div className="lg:col-span-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Select Tenant & Billing Schedule <span className="text-rose-400">*</span>
+                    Select Property &amp; Billing Schedule <span className="text-rose-400">*</span>
                   </label>
                   {rentSchedules.length > 0 && (
                     <span className="text-[11px] text-emerald-400 font-medium">
-                      {rentSchedules.length} active invoice{rentSchedules.length > 1 ? 's' : ''} available
+                      {rentSchedules.length} active schedule{rentSchedules.length > 1 ? 's' : ''} available
                     </span>
                   )}
                 </div>
@@ -833,26 +849,68 @@ export function DataEntryPage({ selectedCompany }) {
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
                 >
-                  <option value="">-- Choose Tenant Invoice or Direct Property --</option>
+                  <option value="">-- Choose Property for Rent Collection --</option>
                   {rentSchedules.length > 0 && (
-                    <optgroup label="📋 Active Billing Invoices & Schedules">
-                      {rentSchedules.map((s) => (
-                        <option key={s._id} value={`schedule:${s._id}`}>
-                          {s.tenantId?.fullName || s.notes || 'Tenant'} &bull; {s.propertyId?.name || 'Property'} {s.unitId?.unitName ? `(Unit ${s.unitId.unitName})` : ''} &bull; Month: {s.billingMonth} &bull; Due: {formatGBP(s.outstandingAmount)} ({s.status})
-                        </option>
-                      ))}
+                    <optgroup label="📋 Active Billing Invoices &amp; Schedules (By Property)">
+                      {rentSchedules.map((s) => {
+                        const propName =
+                          s.propertyId?.name ||
+                          s.propertyId?.addressLine1 ||
+                          properties.find((p) => p._id === (s.propertyId?._id || s.propertyId))?.name ||
+                          'Property';
+                        const unitStr = s.unitId?.unitName ? ` (${s.unitId.unitName})` : '';
+                        const tenantStr = s.tenantId?.fullName
+                          ? ` • Tenant: ${s.tenantId.fullName}`
+                          : s.propertyId?.tenantName
+                          ? ` • Tenant: ${s.propertyId.tenantName}`
+                          : '';
+                        return (
+                          <option key={s._id} value={`schedule:${s._id}`}>
+                            🏠 {propName}{unitStr}{tenantStr} &bull; Month: {s.billingMonth} &bull; Due: {formatGBP(s.outstandingAmount)} ({s.status})
+                          </option>
+                        );
+                      })}
                     </optgroup>
                   )}
                   {properties.length > 0 && (
                     <optgroup label="🏢 Direct Company Properties (Contractual Rent)">
                       {properties.map((p) => (
                         <option key={p._id} value={`property:${p._id}`}>
-                          {p.name} {p.tenantName ? `(Tenant: ${p.tenantName})` : ''} &bull; Monthly Rent: {formatGBP(p.contractualRent || 0)}
+                          🏢 {p.name}{p.tenantName ? ` &bull; Tenant: ${p.tenantName}` : ''} &bull; Monthly Rent: {formatGBP(p.contractualRent || 0)}
                         </option>
                       ))}
                     </optgroup>
                   )}
                 </select>
+
+                {/* Selected Property Preview Badge */}
+                {currentRentPropertyName && (
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-slate-950 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <div>
+                        <span className="text-slate-400">Selected Property: </span>
+                        <span className="font-bold text-white text-sm">{currentRentPropertyName}</span>
+                        {currentRentTenantName && (
+                          <span className="text-slate-400 ml-2">
+                            (Tenant: <span className="text-emerald-300 font-medium">{currentRentTenantName}</span>)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        Period: {rentForm.billingMonth}
+                      </span>
+                      {rentForm.amount && (
+                        <span className="text-[11px] font-mono font-bold text-emerald-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                          Due: {formatGBP(Number(rentForm.amount))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {rentSchedules.length === 0 && properties.length > 0 && (
                   <p className="text-[11px] text-cyan-400 mt-1">
                     Select any company property from the dropdown above to record rent for {rentForm.billingMonth}.
