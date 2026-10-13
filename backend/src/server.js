@@ -62,13 +62,22 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Root welcome / status endpoint
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
+  let dbStatus = mongoose.connection.readyState === 1 ? 'CONNECTED' : 'CONNECTING';
+  if (mongoose.connection.readyState !== 1) {
+    try {
+      await connectDB();
+      dbStatus = 'CONNECTED';
+    } catch (err) {
+      dbStatus = 'DISCONNECTED: ' + err.message;
+    }
+  }
+
   res.status(200).json({
     success: true,
     service: 'PIXX Technologies UK Property Finance API',
     status: 'ONLINE',
-    environmentFile: UK_ENV_PATH,
-    database: mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED',
+    database: dbStatus,
     databaseName: mongoose.connection.name || 'uk_property_finance',
     currency: 'GBP (£)',
     healthEndpoint: '/api/health',
@@ -109,7 +118,6 @@ app.get('/api/health', async (req, res) => {
     success: true,
     service: 'PIXX Technologies UK Property Finance API',
     status: 'ONLINE',
-    environmentFile: UK_ENV_PATH,
     database: dbStatus,
     databaseName: mongoose.connection.name || 'uk_property_finance',
     currency: 'GBP (£)',
