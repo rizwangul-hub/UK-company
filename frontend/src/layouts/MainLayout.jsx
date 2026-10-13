@@ -304,27 +304,22 @@ export function MainLayout({
       <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto">
         {/* Top Header Bar for Desktop - Displays Company Brand, Admin Name & Email, Actions, Theme Toggle, Sign Out */}
         <header className="hidden md:flex items-center justify-between px-6 py-2.5 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
-          <div className="flex items-center gap-3">
-            <div className="animated-logo-box h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1 shadow-sm shrink-0">
-              <img src={displayLogo} alt={displayName} className="h-full w-full object-contain" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                {NAV_ITEMS.find((item) => item.id === currentView)?.label || 'System Portal'}
-              </span>
-              <span className="text-slate-400 dark:text-slate-600">/</span>
-              <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-                {displayName}
-              </span>
-              {selectedCompany?.legalName && (
-                <>
-                  <span className="text-slate-400 dark:text-slate-600 hidden xl:inline">/</span>
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 hidden xl:inline">
-                    {displayLegalName}
-                  </span>
-                </>
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              {NAV_ITEMS.find((item) => item.id === currentView)?.label || 'System Portal'}
+            </span>
+            <span className="text-slate-400 dark:text-slate-600">/</span>
+            <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+              {displayName}
+            </span>
+            {selectedCompany?.legalName && (
+              <>
+                <span className="text-slate-400 dark:text-slate-600 hidden xl:inline">/</span>
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400 hidden xl:inline">
+                  {displayLegalName}
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2.5">

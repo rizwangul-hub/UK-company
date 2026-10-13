@@ -21,14 +21,12 @@ import {
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
 import { reportsAPI } from '../services/api.js';
-import pixxLogo from '../assets/logo.png';
 
 export function DashboardPage({ onNavigate, selectedCompany }) {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const companyLogo = selectedCompany?.logo || pixxLogo;
   const companyName = selectedCompany?.name || 'Portfolio';
   const companyLegal = selectedCompany?.legalName || 'UK Property Finance';
 
@@ -83,9 +81,6 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
       {/* Executive Brand Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gradient-to-r dark:from-slate-900/90 dark:via-slate-900/80 dark:to-indigo-950/40 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm dashboard-header-banner">
         <div className="flex items-center gap-4">
-          <div className="animated-logo-box h-18 w-18 sm:h-20 sm:w-20 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-2 shadow-lg shrink-0">
-            <img src={companyLogo} alt={`${companyName} Logo`} className="h-full w-full object-contain" />
-          </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
