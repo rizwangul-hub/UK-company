@@ -27,7 +27,10 @@ api.interceptors.request.use((config) => {
     companyId = window.location.pathname.replace(/^\/company\//, '').split('/')[0];
   }
 
-  if (!config.headers['x-company-id'] && companyId) {
+  // If the request is for consolidated all-companies reports, skip single-company header
+  if (config.url && config.url.includes('/consolidated/')) {
+    delete config.headers['x-company-id'];
+  } else if (!config.headers['x-company-id'] && companyId && companyId !== 'all') {
     config.headers['x-company-id'] = companyId;
   }
 

@@ -13,7 +13,8 @@ import { requireCompanyContext } from '../middleware/companyContext.js';
 
 const router = express.Router();
 
-router.use(protect, requireCompanyContext);
+router.use('/tenants', protect, requireCompanyContext);
+router.use('/tenancies', protect, requireCompanyContext);
 
 router.get('/tenants', getTenants);
 router.get('/tenants/:id', getTenantById);
