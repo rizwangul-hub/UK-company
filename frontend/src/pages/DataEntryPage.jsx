@@ -195,8 +195,16 @@ export function DataEntryPage({ selectedCompany }) {
       const selected = rentSchedules.find((s) => s._id === sId);
       if (selected) {
         const propId = selected.propertyId?._id || selected.propertyId;
-        const tenantName = selected.tenantId?.fullName || selected.notes || 'Tenant';
-        const propName = selected.propertyId?.name || 'Property';
+        const propName =
+          selected.propertyId?.name ||
+          selected.propertyId?.addressLine1 ||
+          properties.find((p) => p._id === propId)?.name ||
+          'Property';
+        const tenantName =
+          selected.tenantId?.fullName ||
+          (selected.notes && !selected.notes.startsWith('Invoice') ? selected.notes : '') ||
+          selected.propertyId?.tenantName ||
+          'Tenant';
         const month = selected.billingMonth || rentForm.billingMonth;
         setRentForm((prev) => ({
           ...prev,
