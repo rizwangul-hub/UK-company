@@ -14,6 +14,80 @@ const api = axios.create({
   },
 });
 
+// --------------------------------------------------------------------------
+// In-Memory Request Deduplication & Response Caching
+// --------------------------------------------------------------------------
+const requestCache = new Map();
+const inFlightRequests = new Map();
+
+/**
+ * Invalidate the in-memory API response cache.
+ * Automatically triggered on data mutations (POST, PUT, PATCH, DELETE) or user sign-out.
+ */
+export const clearApiCache = () => {
+  requestCache.clear();
+};
+
+/**
+ * Generate a unique, deterministic cache key based on URL, company scope, and query parameters.
+ */
+const getCacheKey = (url, config = {}) => {
+  let companyId = config.headers?.['x-company-id'];
+  if (!companyId && typeof window !== 'undefined') {
+    companyId = localStorage.getItem('selected_company');
+    if (!companyId && window.location.pathname.startsWith('/company/')) {
+      companyId = window.location.pathname.replace(/^\/company\//, '').split('/')[0];
+    }
+  }
+  const paramsKey = config.params ? JSON.stringify(config.params) : '';
+  return `${url}::${companyId || 'global'}::${paramsKey}`;
+};
+
+/**
+ * Cached & Deduplicated GET Request:
+ * 1. Checks memory cache (returns in 0ms if within TTL and not force-refreshed).
+ * 2. Deduplicates simultaneous in-flight requests so only 1 HTTP network call is made.
+ * 3. Caches response upon resolution.
+ */
+export const cachedGet = async (url, config = {}, ttlMs = 15000) => {
+  const { forceRefresh = false, ...axiosConfig } = config;
+  const cacheKey = getCacheKey(url, axiosConfig);
+
+  // 1. Return fresh cached copy if available
+  if (!forceRefresh) {
+    const cached = requestCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < ttlMs) {
+      return cached.data;
+    }
+  }
+
+  // 2. Join existing pending in-flight request if identical request is underway
+  if (inFlightRequests.has(cacheKey)) {
+    return inFlightRequests.get(cacheKey);
+  }
+
+  // 3. Dispatch network request and track promise
+  const requestPromise = (async () => {
+    try {
+      const res = await api.get(url, axiosConfig);
+      requestCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: res.data,
+      });
+      return res.data;
+    } finally {
+      inFlightRequests.delete(cacheKey);
+    }
+  })();
+
+  inFlightRequests.set(cacheKey, requestPromise);
+  return requestPromise;
+};
+
+// --------------------------------------------------------------------------
+// Interceptors
+// --------------------------------------------------------------------------
+
 // Attach Authorization Token and Company Context to outgoing requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
@@ -37,11 +111,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor for automatic session handling
+// Response interceptor for automatic cache invalidation & session handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Invalidate cached read queries on any mutation
+    const method = response.config?.method?.toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      clearApiCache();
+    }
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401 && !error.config.url.includes('/auth/login')) {
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
+      clearApiCache();
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.dispatchEvent(new CustomEvent('auth:logout'));
@@ -54,9 +136,8 @@ api.interceptors.response.use(
 // Auth API
 // --------------------------------------------------------------------------
 export const authAPI = {
-  checkSetup: async () => {
-    const res = await api.get('/auth/setup-status');
-    return res.data;
+  checkSetup: async (config = {}) => {
+    return cachedGet('/auth/setup-status', config, 60000);
   },
   setupInitialUser: async (data) => {
     const res = await api.post('/auth/setup', data);
@@ -66,9 +147,8 @@ export const authAPI = {
     const res = await api.post('/auth/login', credentials);
     return res.data;
   },
-  getMe: async () => {
-    const res = await api.get('/auth/me');
-    return res.data;
+  getMe: async (config = {}) => {
+    return cachedGet('/auth/me', config, 30000);
   },
   updatePassword: async (passwords) => {
     const res = await api.put('/auth/password', passwords);
@@ -80,13 +160,11 @@ export const authAPI = {
 // Properties & Units API
 // --------------------------------------------------------------------------
 export const propertiesAPI = {
-  getAll: async (params) => {
-    const res = await api.get('/properties', { params });
-    return res.data;
+  getAll: async (params, config = {}) => {
+    return cachedGet('/properties', { params, ...config });
   },
-  getById: async (id) => {
-    const res = await api.get(`/properties/${id}`);
-    return res.data;
+  getById: async (id, config = {}) => {
+    return cachedGet(`/properties/${id}`, config);
   },
   create: async (data) => {
     const res = await api.post('/properties', data);
@@ -119,13 +197,11 @@ export const propertiesAPI = {
 // Tenants & Tenancies API
 // --------------------------------------------------------------------------
 export const tenantsAPI = {
-  getAll: async (params) => {
-    const res = await api.get('/tenants', { params });
-    return res.data;
+  getAll: async (params, config = {}) => {
+    return cachedGet('/tenants', { params, ...config });
   },
-  getById: async (id) => {
-    const res = await api.get(`/tenants/${id}`);
-    return res.data;
+  getById: async (id, config = {}) => {
+    return cachedGet(`/tenants/${id}`, config);
   },
   create: async (data) => {
     const res = await api.post('/tenants', data);
@@ -138,9 +214,8 @@ export const tenantsAPI = {
 };
 
 export const tenanciesAPI = {
-  getAll: async (params) => {
-    const res = await api.get('/tenancies', { params });
-    return res.data;
+  getAll: async (params, config = {}) => {
+    return cachedGet('/tenancies', { params, ...config });
   },
   create: async (data) => {
     const res = await api.post('/tenancies', data);
@@ -156,9 +231,8 @@ export const tenanciesAPI = {
 // Rent Billing & Collections API
 // --------------------------------------------------------------------------
 export const rentAPI = {
-  getSchedules: async (params) => {
-    const res = await api.get('/rent/schedules', { params });
-    return res.data;
+  getSchedules: async (params, config = {}) => {
+    return cachedGet('/rent/schedules', { params, ...config });
   },
   generateMonthlySchedules: async (month) => {
     const res = await api.post('/rent/generate-monthly', { month });
@@ -168,17 +242,15 @@ export const rentAPI = {
     const res = await api.put(`/rent/schedules/${id}`, data);
     return res.data;
   },
-  getPayments: async (params) => {
-    const res = await api.get('/rent/payments', { params });
-    return res.data;
+  getPayments: async (params, config = {}) => {
+    return cachedGet('/rent/payments', { params, ...config });
   },
   recordPayment: async (data) => {
     const res = await api.post('/rent/payments', data);
     return res.data;
   },
-  getArrearsSummary: async () => {
-    const res = await api.get('/rent/arrears');
-    return res.data;
+  getArrearsSummary: async (config = {}) => {
+    return cachedGet('/rent/arrears', config);
   },
 };
 
@@ -186,13 +258,11 @@ export const rentAPI = {
 // Mortgages API (New UK Feature)
 // --------------------------------------------------------------------------
 export const mortgagesAPI = {
-  getAll: async (params) => {
-    const res = await api.get('/mortgages', { params });
-    return res.data;
+  getAll: async (params, config = {}) => {
+    return cachedGet('/mortgages', { params, ...config });
   },
-  getById: async (id) => {
-    const res = await api.get(`/mortgages/${id}`);
-    return res.data;
+  getById: async (id, config = {}) => {
+    return cachedGet(`/mortgages/${id}`, config);
   },
   create: async (data) => {
     const res = await api.post('/mortgages', data);
@@ -206,9 +276,8 @@ export const mortgagesAPI = {
     const res = await api.post(`/mortgages/${mortgageId}/payments`, data);
     return res.data;
   },
-  getPayments: async (mortgageId, params) => {
-    const res = await api.get(`/mortgages/${mortgageId}/payments`, { params });
-    return res.data;
+  getPayments: async (mortgageId, params, config = {}) => {
+    return cachedGet(`/mortgages/${mortgageId}/payments`, { params, ...config });
   },
   reconcileBalance: async (mortgageId, data) => {
     const res = await api.post(`/mortgages/${mortgageId}/reconcile`, data);
@@ -220,13 +289,11 @@ export const mortgagesAPI = {
 // Bank & Cash Accounts API
 // --------------------------------------------------------------------------
 export const accountsAPI = {
-  getAll: async (params) => {
-    const res = await api.get('/accounts', { params });
-    return res.data;
+  getAll: async (params, config = {}) => {
+    return cachedGet('/accounts', { params, ...config });
   },
-  getById: async (id) => {
-    const res = await api.get(`/accounts/${id}`);
-    return res.data;
+  getById: async (id, config = {}) => {
+    return cachedGet(`/accounts/${id}`, config);
   },
   create: async (data) => {
     const res = await api.post('/accounts', data);
@@ -236,9 +303,8 @@ export const accountsAPI = {
     const res = await api.put(`/accounts/${id}`, data);
     return res.data;
   },
-  getStatement: async (id, params) => {
-    const res = await api.get(`/accounts/${id}/statement`, { params });
-    return res.data;
+  getStatement: async (id, params, config = {}) => {
+    return cachedGet(`/accounts/${id}/statement`, { params, ...config });
   },
   transfer: async (data) => {
     const res = await api.post('/accounts/transfer', data);
@@ -250,17 +316,14 @@ export const accountsAPI = {
 // Central Ledger & Expenses API
 // --------------------------------------------------------------------------
 export const ledgerAPI = {
-  getEntities: async (params) => {
-    const res = await api.get('/ledger/entities', { params });
-    return res.data;
+  getEntities: async (params, config = {}) => {
+    return cachedGet('/ledger/entities', { params, ...config });
   },
-  queryLedger: async (params) => {
-    const res = await api.get('/ledger/query', { params });
-    return res.data;
+  queryLedger: async (params, config = {}) => {
+    return cachedGet('/ledger/query', { params, ...config });
   },
-  getTransactions: async (params) => {
-    const res = await api.get('/ledger/transactions', { params });
-    return res.data;
+  getTransactions: async (params, config = {}) => {
+    return cachedGet('/ledger/transactions', { params, ...config });
   },
   updateTransaction: async (id, data) => {
     const res = await api.put(`/ledger/transactions/${id}`, data);
@@ -274,9 +337,8 @@ export const ledgerAPI = {
     const res = await api.post('/ledger/income', data);
     return res.data;
   },
-  getCategories: async (params) => {
-    const res = await api.get('/ledger/categories', { params });
-    return res.data;
+  getCategories: async (params, config = {}) => {
+    return cachedGet('/ledger/categories', { params, ...config });
   },
   createCategory: async (data) => {
     const res = await api.post('/ledger/categories', data);
@@ -310,17 +372,14 @@ export const triggerBlobDownload = (blob, filename) => {
 // Reports & Dashboard API
 // --------------------------------------------------------------------------
 export const reportsAPI = {
-  getDashboardStats: async (params) => {
-    const res = await api.get('/reports/dashboard', { params });
-    return res.data;
+  getDashboardStats: async (params, config = {}) => {
+    return cachedGet('/reports/dashboard', { params, ...config });
   },
-  getPropertyProfitability: async (params) => {
-    const res = await api.get('/reports/property-profitability', { params });
-    return res.data;
+  getPropertyProfitability: async (params, config = {}) => {
+    return cachedGet('/reports/property-profitability', { params, ...config });
   },
-  getFinancialYearReport: async (params) => {
-    const res = await api.get('/reports/financial-year', { params });
-    return res.data;
+  getFinancialYearReport: async (params, config = {}) => {
+    return cachedGet('/reports/financial-year', { params, ...config });
   },
   getLedgerPreview: async (params) => {
     const res = await api.post('/reports/ledger/preview', params);
@@ -369,9 +428,8 @@ export const reportsAPI = {
     triggerBlobDownload(res.data, customFilename || defaultFilename);
     return true;
   },
-  getConsolidatedOverview: async () => {
-    const res = await api.get('/reports/consolidated/overview');
-    return res.data;
+  getConsolidatedOverview: async (config = {}) => {
+    return cachedGet('/reports/consolidated/overview', config);
   },
   downloadConsolidatedExcel: async (customFilename) => {
     const res = await api.get('/reports/consolidated/excel', {

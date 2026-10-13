@@ -55,6 +55,7 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-company-id', 'X-Company-Id'],
+    maxAge: 86400,
   })
 );
 

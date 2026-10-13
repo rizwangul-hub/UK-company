@@ -15,18 +15,61 @@ import { SettingsPage } from './pages/SettingsPage.jsx';
 import { DataEntryPage } from './pages/DataEntryPage.jsx';
 import { ChartOfAccountsPage } from './pages/ChartOfAccountsPage.jsx';
 import { GroupPortfolioDashboard } from './pages/GroupPortfolioDashboard.jsx';
-import { authAPI } from './services/api.js';
+import { authAPI, clearApiCache } from './services/api.js';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { COMPANIES, getCompanyBySlug } from './config/companies.js';
 
-const MIN_SPLASH_DURATION_MS = 2000;
+// Synchronous initial state helpers for 0ms initial render
+const getInitialAuthState = () => {
+  try {
+    const token = localStorage.getItem('token');
+    const cachedUser = localStorage.getItem('user');
+    if (token && cachedUser) {
+      return JSON.parse(cachedUser);
+    }
+  } catch (e) {
+    // Ignore parse error
+  }
+  return null;
+};
+
+const getInitialCompanyState = () => {
+  if (typeof window === 'undefined') return null;
+  const path = window.location.pathname;
+  if (path.startsWith('/company/')) {
+    const slug = path.replace(/^\/company\//, '').split('/')[0];
+    return getCompanyBySlug(slug) || null;
+  }
+  const cachedCompanySlug = localStorage.getItem('selected_company');
+  if (cachedCompanySlug) {
+    return getCompanyBySlug(cachedCompanySlug) || null;
+  }
+  return null;
+};
+
+const getInitialViewState = () => {
+  if (typeof window === 'undefined') return 'dashboard';
+  const path = window.location.pathname;
+  if (path.startsWith('/company/')) {
+    const parts = path.replace(/^\/company\//, '').split('/');
+    return parts[1] || 'dashboard';
+  }
+  return 'dashboard';
+};
+
+const getInitialMasterDashboardState = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  return path === '/master-dashboard' || path === '/group-portfolio';
+};
 
 export function App() {
-  const [user, setUser] = useState(null);
-  const [selectedCompany, setSelectedCompany] = useState(null);
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [isMasterDashboard, setIsMasterDashboard] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+  const [user, setUser] = useState(getInitialAuthState);
+  const [selectedCompany, setSelectedCompany] = useState(getInitialCompanyState);
+  const [currentView, setCurrentView] = useState(getInitialViewState);
+  const [isMasterDashboard, setIsMasterDashboard] = useState(getInitialMasterDashboardState);
+  // Logged-in users load directly without artificial splash delay
+  const [showSplash, setShowSplash] = useState(() => !getInitialAuthState());
   const [isFading, setIsFading] = useState(false);
   const [splashError, setSplashError] = useState(null);
 
@@ -106,8 +149,7 @@ export function App() {
   // Initialize application and authentication state
   const initApp = useCallback(async () => {
     setSplashError(null);
-    const startTime = Date.now();
-    let authenticatedUser = null;
+    let authenticatedUser = user;
 
     try {
       const token = localStorage.getItem('token');
@@ -115,9 +157,10 @@ export function App() {
 
       if (token && cachedUser) {
         try {
-          authenticatedUser = JSON.parse(cachedUser);
-          setUser(authenticatedUser);
+          const parsedUser = authenticatedUser || JSON.parse(cachedUser);
+          if (!user) setUser(parsedUser);
 
+          // Silently verify or refresh session in the background
           const res = await authAPI.getMe();
           if (res?.success && res?.data?.user) {
             authenticatedUser = res.data.user;
@@ -125,36 +168,31 @@ export function App() {
             localStorage.setItem('user', JSON.stringify(authenticatedUser));
           }
         } catch (authErr) {
-          // If token verification failed, clear stale cache
           console.warn('Session verification notice:', authErr);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('selected_company');
-          authenticatedUser = null;
-          setUser(null);
+          if (authErr?.response?.status === 401) {
+            clearApiCache();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('selected_company');
+            authenticatedUser = null;
+            setUser(null);
+          }
         }
       }
 
       // Sync route based on authentication status
       syncRouteWithState(authenticatedUser);
 
-      // Ensure splash branding is visible for at least MIN_SPLASH_DURATION_MS
-      const elapsedTime = Date.now() - startTime;
-      const remainingTime = Math.max(0, MIN_SPLASH_DURATION_MS - elapsedTime);
-      if (remainingTime > 0) {
-        await new Promise((resolve) => setTimeout(resolve, remainingTime));
-      }
-
-      // Smooth fade-out transition
+      // Smooth fade-out of splash if it was active
       setIsFading(true);
       setTimeout(() => {
         setShowSplash(false);
-      }, 500);
+      }, 150);
     } catch (err) {
       console.error('App initialization error:', err);
       setSplashError(err?.message || 'Failed to initialize application.');
     }
-  }, [syncRouteWithState]);
+  }, [user, syncRouteWithState]);
 
   useEffect(() => {
     initApp();
@@ -181,6 +219,7 @@ export function App() {
     window.addEventListener('popstate', handlePopState);
 
     const handleLogoutEvent = () => {
+      clearApiCache();
       setUser(null);
       setSelectedCompany(null);
       setCurrentView('dashboard');
@@ -206,6 +245,7 @@ export function App() {
 
   // Action: Successful login
   const handleLoginSuccess = (authenticatedUser) => {
+    clearApiCache();
     setUser(authenticatedUser);
     setSelectedCompany(null);
     setIsMasterDashboard(false);
@@ -234,6 +274,7 @@ export function App() {
 
   // Action: Log out
   const handleLogout = () => {
+    clearApiCache();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('selected_company');
@@ -246,7 +287,7 @@ export function App() {
 
   return (
     <ThemeProvider>
-      {/* Splash screen displayed on initial app load & browser refresh */}
+      {/* Splash screen displayed on cold initial loads */}
       {showSplash && (
         <SplashScreen
           isFading={isFading}

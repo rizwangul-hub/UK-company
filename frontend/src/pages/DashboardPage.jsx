@@ -35,7 +35,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await reportsAPI.getDashboardStats({ month: selectedMonth });
+      const res = await reportsAPI.getDashboardStats({ month: selectedMonth }, { forceRefresh: true });
       if (res?.success) {
         setData(res.data);
       }
