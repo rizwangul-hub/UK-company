@@ -1,4 +1,4 @@
-const CACHE_NAME = 'uk-company-pwa-v2';
+const CACHE_NAME = 'uk-company-pwa-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
