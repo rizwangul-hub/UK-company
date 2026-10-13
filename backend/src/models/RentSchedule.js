@@ -86,8 +86,12 @@ rentScheduleSchema.pre('save', function () {
   } else if (this.paidAmount > 0) {
     this.status = 'PARTIAL';
   } else {
-    const isPastDue = new Date(this.dueDate) < new Date();
-    this.status = isPastDue ? 'OVERDUE' : 'PENDING';
+    // Current active month in YYYY-MM (e.g. 2026-10)
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    // A schedule is only OVERDUE if its billing month has completely passed (strictly < currentMonth)
+    // During the current month or future months, it is PENDING collection
+    const isPastMonth = (this.billingMonth || '') < currentMonth;
+    this.status = isPastMonth ? 'OVERDUE' : 'PENDING';
   }
 });
 

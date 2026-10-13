@@ -100,9 +100,13 @@ export const generateMonthlySchedules = async (req, res) => {
 
 export const getSchedules = async (req, res) => {
   try {
-    const { billingMonth, propertyId, status } = req.query;
+    const { billingMonth, propertyId, status, minMonth = '2026-10' } = req.query;
     const query = { companyId: req.companyId };
-    if (billingMonth) query.billingMonth = billingMonth;
+    if (billingMonth) {
+      query.billingMonth = billingMonth;
+    } else if (minMonth) {
+      query.billingMonth = { $gte: minMonth };
+    }
     if (propertyId) query.propertyId = propertyId;
     if (status) {
       if (status.includes(',')) {

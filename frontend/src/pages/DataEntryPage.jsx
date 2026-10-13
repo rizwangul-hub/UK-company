@@ -119,7 +119,7 @@ export function DataEntryPage({ selectedCompany }) {
         propertiesAPI.getAll(params).catch(() => ({ data: { properties: [] } })),
         ledgerAPI.getCategories().catch(() => ({ data: { categories: [] } })),
         mortgagesAPI.getAll({ ...params, status: 'ACTIVE' }).catch(() => ({ data: { mortgages: [] } })),
-        rentAPI.getSchedules({ ...params, status: 'PENDING,PARTIAL,OVERDUE' }).catch(() => ({ data: { schedules: [] } })),
+        rentAPI.getSchedules({ ...params, status: 'PENDING,PARTIAL,OVERDUE', minMonth: '2026-10' }).catch(() => ({ data: { schedules: [] } })),
         ledgerAPI.getTransactions({ ...params, limit: 50 }).catch(() => ({ data: { transactions: [] } })),
       ]);
 
@@ -211,8 +211,10 @@ export function DataEntryPage({ selectedCompany }) {
     const tenantName = prop?.tenantName || '';
 
     // Check if there is an active invoice schedule for this property and current billingMonth
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const monthToUse = rentForm.billingMonth || currentMonth;
     const matchingSchedule = rentSchedules.find(
-      (s) => String(s.propertyId?._id || s.propertyId) === String(pId) && s.billingMonth === rentForm.billingMonth
+      (s) => String(s.propertyId?._id || s.propertyId) === String(pId) && s.billingMonth === monthToUse
     );
 
     const amountToUse = matchingSchedule
@@ -222,9 +224,10 @@ export function DataEntryPage({ selectedCompany }) {
     setRentForm((prev) => ({
       ...prev,
       propertyId: pId,
+      billingMonth: monthToUse,
       scheduleId: matchingSchedule ? matchingSchedule._id : '',
       amount: amountToUse ? String(amountToUse) : '',
-      notes: `Rent for ${propName}${tenantName ? ` (Tenant: ${tenantName})` : ''} - Month: ${prev.billingMonth}`,
+      notes: `Rent for ${propName}${tenantName ? ` (Tenant: ${tenantName})` : ''} - Month: ${monthToUse}`,
     }));
   };
 
@@ -606,11 +609,18 @@ export function DataEntryPage({ selectedCompany }) {
     (selectedRentSchedule?.notes && !selectedRentSchedule.notes.startsWith('Invoice') ? selectedRentSchedule.notes : '') ||
     '';
 
-  // Get all unpaid schedules for the selected property
+  // Get all past overdue unpaid schedules for selected property (strictly from October 2026 onwards and strictly before current month)
   const unpaidSchedulesForSelectedProp = useMemo(() => {
     if (!rentForm.propertyId) return [];
+    const currentMonth = new Date().toISOString().slice(0, 7);
     return rentSchedules
-      .filter((s) => String(s.propertyId?._id || s.propertyId) === String(rentForm.propertyId) && s.status !== 'PAID')
+      .filter((s) => {
+        const matchesProp = String(s.propertyId?._id || s.propertyId) === String(rentForm.propertyId);
+        const isUnpaid = s.status !== 'PAID';
+        const isFromBaseline = (s.billingMonth || '') >= '2026-10';
+        const isPastMonth = (s.billingMonth || '') < currentMonth;
+        return matchesProp && isUnpaid && isFromBaseline && isPastMonth;
+      })
       .sort((a, b) => (a.billingMonth || '').localeCompare(b.billingMonth || ''));
   }, [rentForm.propertyId, rentSchedules]);
 
