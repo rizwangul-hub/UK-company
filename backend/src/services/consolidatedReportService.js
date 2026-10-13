@@ -758,8 +758,18 @@ export async function generateConsolidatedGroupExcelReport() {
 /**
  * Generate Attractive, Beautiful Master Group PDF Report using PDFKit
  */
-export async function generateConsolidatedGroupPdfReport() {
+export async function generateConsolidatedGroupPdfReport(options = {}) {
+  const { companyId } = options;
   const data = await getConsolidatedGroupOverviewData();
+
+  const isSingleCompany = Boolean(companyId && companyId !== 'all');
+  const targetCompany = isSingleCompany
+    ? COMPANIES.find((c) => c.id === companyId || c.slug === companyId) || COMPANIES[0]
+    : null;
+
+  const companiesToReport = isSingleCompany
+    ? [targetCompany]
+    : COMPANIES;
 
   return new Promise((resolve, reject) => {
     try {
@@ -781,463 +791,553 @@ export async function generateConsolidatedGroupPdfReport() {
       const contentWidth = pageWidth - margin * 2;
 
       // =====================================================================
-      // PAGE 1: Executive Cover, Group KPI Tiles & Company Matrix
+      // PAGE 1: If Master Report -> Group Overview & Comparison Matrix
       // =====================================================================
+      if (!isSingleCompany) {
+        // Corporate Header
+        const logoWidth = 44;
+        const logoHeight = 44;
+        if (fs.existsSync(LOGO_PATH)) {
+          doc.image(LOGO_PATH, margin, margin, { width: logoWidth, height: logoHeight });
+        }
 
-      // 1. Corporate Header
-      const logoWidth = 44;
-      const logoHeight = 44;
-      if (fs.existsSync(LOGO_PATH)) {
-        doc.image(LOGO_PATH, margin, margin, { width: logoWidth, height: logoHeight });
-      }
-
-      const textStartX = fs.existsSync(LOGO_PATH) ? margin + logoWidth + 12 : margin;
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(14)
-        .fillColor('#0F172A')
-        .text('PIXX TECHNOLOGIES UK — MASTER GROUP PORTFOLIO STATEMENT', textStartX, margin);
-
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .fillColor('#64748B')
-        .text('Consolidated Property Finance & Multi-Entity Investment Audit Register • United Kingdom', textStartX, margin + 17);
-
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(9)
-        .fillColor('#059669')
-        .text('ALL SIX REGISTERED CORPORATE ENTITIES • OFFICIAL EXECUTIVE SUMMARY', textStartX, margin + 30);
-
-      // Top Right Reference Box
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(8)
-        .fillColor('#475569')
-        .text(`REF: PIXX-GRP-Q3-2026`, contentWidth - 100, margin, { align: 'right' });
-
-      doc
-        .font('Helvetica')
-        .fontSize(7.5)
-        .fillColor('#64748B')
-        .text(`Generated: ${formatUKDate(data.generatedAt)} ${new Date(data.generatedAt).toLocaleTimeString('en-GB')}`, contentWidth - 100, margin + 14, { align: 'right' });
-
-      doc
-        .text(`Companies: 6 Legal Entities`, contentWidth - 100, margin + 26, { align: 'right' });
-
-      // Horizontal Divider
-      const headerDividerY = margin + 50;
-      doc
-        .strokeColor('#CBD5E1')
-        .lineWidth(1)
-        .moveTo(margin, headerDividerY)
-        .lineTo(pageWidth - margin, headerDividerY)
-        .stroke();
-
-      // 2. Executive KPI Cards Strip (6 tiles)
-      const kpiCards = [
-        { label: 'TOTAL DIRECT ASSETS', val: `${data.totals.totalProperties} Properties`, color: '#0F172A', bg: '#F8FAFC' },
-        { label: 'MONTHLY RENT ROLL', val: formatGBP(data.totals.totalMonthlyRent), color: '#059669', bg: '#ECFDF5' },
-        { label: 'ANNUAL RENT ROLL', val: formatGBP(data.totals.totalAnnualRent), color: '#047857', bg: '#E6F4EA' },
-        { label: 'PORTFOLIO VALUATION', val: formatGBP(data.totals.totalValuation), color: '#2563EB', bg: '#EFF6FF' },
-        { label: 'MORTGAGE LIABILITY', val: formatGBP(data.totals.totalMortgageDebt), color: '#DC2626', bg: '#FEF2F2' },
-        { label: 'NET GROUP EQUITY', val: formatGBP(data.totals.netEquity), color: '#4F46E5', bg: '#EEF2FF' },
-      ];
-
-      const kpiCardWidth = (contentWidth - 5 * 8) / 6;
-      const kpiCardHeight = 44;
-      const kpiY = headerDividerY + 10;
-
-      kpiCards.forEach((card, idx) => {
-        const cardX = margin + idx * (kpiCardWidth + 8);
+        const textStartX = fs.existsSync(LOGO_PATH) ? margin + logoWidth + 12 : margin;
         doc
-          .roundedRect(cardX, kpiY, kpiCardWidth, kpiCardHeight, 6)
-          .fillAndStroke(card.bg, '#E2E8F0');
+          .font('Helvetica-Bold')
+          .fontSize(14)
+          .fillColor('#0F172A')
+          .text('PIXX TECHNOLOGIES UK — MASTER GROUP PORTFOLIO STATEMENT', textStartX, margin);
+
+        doc
+          .font('Helvetica')
+          .fontSize(8)
+          .fillColor('#64748B')
+          .text('Consolidated Property Finance & Multi-Entity Investment Audit Register • United Kingdom', textStartX, margin + 17);
 
         doc
           .font('Helvetica-Bold')
-          .fontSize(6.5)
-          .fillColor('#64748B')
-          .text(card.label, cardX + 6, kpiY + 8, { width: kpiCardWidth - 12 });
+          .fontSize(9)
+          .fillColor('#059669')
+          .text('ALL SIX REGISTERED CORPORATE ENTITIES • INDIVIDUAL COMPANY AUDIT SECTIONS', textStartX, margin + 30);
 
+        // Top Right Reference Box
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(8)
+          .fillColor('#475569')
+          .text('REF: PIXX-GRP-Q3-2026', contentWidth - 100, margin, { align: 'right' });
+
+        doc
+          .font('Helvetica')
+          .fontSize(7.5)
+          .fillColor('#64748B')
+          .text(`Generated: ${formatUKDate(data.generatedAt)} ${new Date(data.generatedAt).toLocaleTimeString('en-GB')}`, contentWidth - 100, margin + 14, { align: 'right' });
+
+        doc
+          .text('Companies: 6 Legal Entities', contentWidth - 100, margin + 26, { align: 'right' });
+
+        // Horizontal Divider
+        const headerDividerY = margin + 50;
+        doc
+          .strokeColor('#CBD5E1')
+          .lineWidth(1)
+          .moveTo(margin, headerDividerY)
+          .lineTo(pageWidth - margin, headerDividerY)
+          .stroke();
+
+        // 2. Executive KPI Cards Strip (6 tiles)
+        const kpiCards = [
+          { label: 'TOTAL DIRECT ASSETS', val: `${data.totals.totalProperties} Properties`, color: '#0F172A', bg: '#F8FAFC' },
+          { label: 'MONTHLY RENT ROLL', val: formatGBP(data.totals.totalMonthlyRent), color: '#059669', bg: '#ECFDF5' },
+          { label: 'ANNUAL RENT ROLL', val: formatGBP(data.totals.totalAnnualRent), color: '#047857', bg: '#E6F4EA' },
+          { label: 'PORTFOLIO VALUATION', val: formatGBP(data.totals.totalValuation), color: '#2563EB', bg: '#EFF6FF' },
+          { label: 'MORTGAGE LIABILITY', val: formatGBP(data.totals.totalMortgageDebt), color: '#DC2626', bg: '#FEF2F2' },
+          { label: 'NET GROUP EQUITY', val: formatGBP(data.totals.netEquity), color: '#4F46E5', bg: '#EEF2FF' },
+        ];
+
+        const kpiCardWidth = (contentWidth - 5 * 8) / 6;
+        const kpiCardHeight = 44;
+        const kpiY = headerDividerY + 10;
+
+        kpiCards.forEach((card, idx) => {
+          const cardX = margin + idx * (kpiCardWidth + 8);
+          doc
+            .roundedRect(cardX, kpiY, kpiCardWidth, kpiCardHeight, 6)
+            .fillAndStroke(card.bg, '#E2E8F0');
+
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(6.5)
+            .fillColor('#64748B')
+            .text(card.label, cardX + 6, kpiY + 8, { width: kpiCardWidth - 12 });
+
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(9.5)
+            .fillColor(card.color)
+            .text(card.val, cardX + 6, kpiY + 22, { width: kpiCardWidth - 12 });
+        });
+
+        // 3. Consolidated Corporate Entities Comparison Table
+        const tableY = kpiY + kpiCardHeight + 14;
         doc
           .font('Helvetica-Bold')
           .fontSize(10)
-          .fillColor(card.color)
-          .text(card.val, cardX + 6, kpiY + 22, { width: kpiCardWidth - 12 });
-      });
+          .fillColor('#0F172A')
+          .text('CONSOLIDATED ENTITY BREAKDOWN & FINANCIAL METRICS', margin, tableY);
 
-      // 3. Consolidated Corporate Entities Comparison Table
-      const tableY = kpiY + kpiCardHeight + 14;
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(10)
-        .fillColor('#0F172A')
-        .text('CONSOLIDATED ENTITY BREAKDOWN & FINANCIAL METRICS', margin, tableY);
+        const compCols = [
+          { label: 'Company Entity', width: 140, align: 'left' },
+          { label: 'UK Reg No.', width: 80, align: 'center' },
+          { label: 'Direct Assets', width: 65, align: 'center' },
+          { label: 'Monthly Rent', width: 95, align: 'right' },
+          { label: 'Annual Rent Roll', width: 105, align: 'right' },
+          { label: 'Mortgages', width: 60, align: 'center' },
+          { label: 'Mortgage Debt', width: 105, align: 'right' },
+          { label: 'Monthly Debt Service', width: 100, align: 'right' },
+        ];
 
-      const compCols = [
-        { label: 'Company Entity', width: 140, align: 'left' },
-        { label: 'UK Reg No.', width: 80, align: 'center' },
-        { label: 'Direct Assets', width: 65, align: 'center' },
-        { label: 'Monthly Rent', width: 95, align: 'right' },
-        { label: 'Annual Rent Roll', width: 105, align: 'right' },
-        { label: 'Mortgages', width: 60, align: 'center' },
-        { label: 'Mortgage Debt', width: 105, align: 'right' },
-        { label: 'Monthly Debt Service', width: 100, align: 'right' },
-      ];
-
-      const compHeaderY = tableY + 16;
-      doc
-        .roundedRect(margin, compHeaderY, contentWidth, 20, 4)
-        .fill('#1E293B');
-
-      let colX = margin + 6;
-      compCols.forEach((c) => {
+        const compHeaderY = tableY + 16;
         doc
-          .font('Helvetica-Bold')
-          .fontSize(7.5)
-          .fillColor('#FFFFFF')
-          .text(c.label, colX, compHeaderY + 6, { width: c.width - 10, align: c.align });
-        colX += c.width;
-      });
+          .roundedRect(margin, compHeaderY, contentWidth, 20, 4)
+          .fill('#1E293B');
 
-      let compRowY = compHeaderY + 22;
-      data.companySummaries.forEach((comp, idx) => {
-        const isEven = idx % 2 === 0;
+        let colX = margin + 6;
+        compCols.forEach((c) => {
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(7.5)
+            .fillColor('#FFFFFF')
+            .text(c.label, colX, compHeaderY + 6, { width: c.width - 10, align: c.align });
+          colX += c.width;
+        });
+
+        let compRowY = compHeaderY + 22;
+        data.companySummaries.forEach((comp, idx) => {
+          const isEven = idx % 2 === 0;
+          doc
+            .rect(margin, compRowY, contentWidth, 18)
+            .fill(isEven ? '#FFFFFF' : '#F8FAFC');
+
+          colX = margin + 6;
+
+          // Name
+          doc.font('Helvetica-Bold').fontSize(8).fillColor('#0F172A')
+            .text(comp.name, colX, compRowY + 5, { width: compCols[0].width - 10, align: 'left' });
+          colX += compCols[0].width;
+
+          // Reg No
+          doc.font('Helvetica').fontSize(7.5).fillColor('#64748B')
+            .text(comp.registrationNo || 'N/A', colX, compRowY + 5, { width: compCols[1].width - 10, align: 'center' });
+          colX += compCols[1].width;
+
+          // Properties
+          doc.font('Helvetica-Bold').fontSize(8).fillColor('#0F172A')
+            .text(String(comp.propertyCount), colX, compRowY + 5, { width: compCols[2].width - 10, align: 'center' });
+          colX += compCols[2].width;
+
+          // Monthly Rent
+          doc.font('Helvetica-Bold').fontSize(8).fillColor('#059669')
+            .text(formatGBP(comp.monthlyRentRoll), colX, compRowY + 5, { width: compCols[3].width - 10, align: 'right' });
+          colX += compCols[3].width;
+
+          // Annual Rent
+          doc.font('Helvetica-Bold').fontSize(8).fillColor('#047857')
+            .text(formatGBP(comp.annualRentRoll), colX, compRowY + 5, { width: compCols[4].width - 10, align: 'right' });
+          colX += compCols[4].width;
+
+          // Mortgages
+          doc.font('Helvetica').fontSize(8).fillColor('#0F172A')
+            .text(String(comp.mortgageCount), colX, compRowY + 5, { width: compCols[5].width - 10, align: 'center' });
+          colX += compCols[5].width;
+
+          // Mortgage Debt
+          doc.font('Helvetica-Bold').fontSize(8).fillColor('#DC2626')
+            .text(formatGBP(comp.mortgageDebt), colX, compRowY + 5, { width: compCols[6].width - 10, align: 'right' });
+          colX += compCols[6].width;
+
+          // Monthly Payments
+          doc.font('Helvetica').fontSize(8).fillColor('#0F172A')
+            .text(formatGBP(comp.monthlyDebtService), colX, compRowY + 5, { width: compCols[7].width - 10, align: 'right' });
+
+          compRowY += 19;
+        });
+
+        // Total Row for Comparison Table
         doc
-          .rect(margin, compRowY, contentWidth, 18)
-          .fill(isEven ? '#FFFFFF' : '#F8FAFC');
+          .roundedRect(margin, compRowY, contentWidth, 22, 4)
+          .fill('#0F172A');
 
         colX = margin + 6;
-
-        // Name
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0F172A')
-          .text(comp.name, colX, compRowY + 5, { width: compCols[0].width - 10, align: 'left' });
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
+          .text('MASTER GROUP TOTAL', colX, compRowY + 6, { width: compCols[0].width - 10, align: 'left' });
         colX += compCols[0].width;
 
-        // Reg No
-        doc.font('Helvetica').fontSize(7.5).fillColor('#64748B')
-          .text(comp.registrationNo || 'N/A', colX, compRowY + 5, { width: compCols[1].width - 10, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#94A3B8')
+          .text('6 Entities', colX, compRowY + 6, { width: compCols[1].width - 10, align: 'center' });
         colX += compCols[1].width;
 
-        // Properties
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0F172A')
-          .text(String(comp.propertyCount), colX, compRowY + 5, { width: compCols[2].width - 10, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#FFFFFF')
+          .text(String(data.totals.totalProperties), colX, compRowY + 6, { width: compCols[2].width - 10, align: 'center' });
         colX += compCols[2].width;
 
-        // Monthly Rent
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#059669')
-          .text(formatGBP(comp.monthlyRentRoll), colX, compRowY + 5, { width: compCols[3].width - 10, align: 'right' });
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#34D399')
+          .text(formatGBP(data.totals.totalMonthlyRent), colX, compRowY + 6, { width: compCols[3].width - 10, align: 'right' });
         colX += compCols[3].width;
 
-        // Annual Rent
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#047857')
-          .text(formatGBP(comp.annualRentRoll), colX, compRowY + 5, { width: compCols[4].width - 10, align: 'right' });
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#34D399')
+          .text(formatGBP(data.totals.totalAnnualRent), colX, compRowY + 6, { width: compCols[4].width - 10, align: 'right' });
         colX += compCols[4].width;
 
-        // Mortgages
-        doc.font('Helvetica').fontSize(8).fillColor('#0F172A')
-          .text(String(comp.mortgageCount), colX, compRowY + 5, { width: compCols[5].width - 10, align: 'center' });
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
+          .text(String(data.allMortgages.length), colX, compRowY + 6, { width: compCols[5].width - 10, align: 'center' });
         colX += compCols[5].width;
 
-        // Mortgage Debt
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#DC2626')
-          .text(formatGBP(comp.mortgageDebt), colX, compRowY + 5, { width: compCols[6].width - 10, align: 'right' });
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#F87171')
+          .text(formatGBP(data.totals.totalMortgageDebt), colX, compRowY + 6, { width: compCols[6].width - 10, align: 'right' });
         colX += compCols[6].width;
 
-        // Monthly Payments
-        doc.font('Helvetica').fontSize(8).fillColor('#0F172A')
-          .text(formatGBP(comp.monthlyDebtService), colX, compRowY + 5, { width: compCols[7].width - 10, align: 'right' });
-
-        compRowY += 19;
-      });
-
-      // Total Row for Comparison Table
-      doc
-        .roundedRect(margin, compRowY, contentWidth, 22, 4)
-        .fill('#0F172A');
-
-      colX = margin + 6;
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
-        .text('MASTER GROUP TOTAL', colX, compRowY + 6, { width: compCols[0].width - 10, align: 'left' });
-      colX += compCols[0].width;
-
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#94A3B8')
-        .text('6 Entities', colX, compRowY + 6, { width: compCols[1].width - 10, align: 'center' });
-      colX += compCols[1].width;
-
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#FFFFFF')
-        .text(String(data.totals.totalProperties), colX, compRowY + 6, { width: compCols[2].width - 10, align: 'center' });
-      colX += compCols[2].width;
-
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#34D399')
-        .text(formatGBP(data.totals.totalMonthlyRent), colX, compRowY + 6, { width: compCols[3].width - 10, align: 'right' });
-      colX += compCols[3].width;
-
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#34D399')
-        .text(formatGBP(data.totals.totalAnnualRent), colX, compRowY + 6, { width: compCols[4].width - 10, align: 'right' });
-      colX += compCols[4].width;
-
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
-        .text(String(data.allMortgages.length), colX, compRowY + 6, { width: compCols[5].width - 10, align: 'center' });
-      colX += compCols[5].width;
-
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#F87171')
-        .text(formatGBP(data.totals.totalMortgageDebt), colX, compRowY + 6, { width: compCols[6].width - 10, align: 'right' });
-      colX += compCols[6].width;
-
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
-        .text(formatGBP(data.totals.totalMonthlyDebtService), colX, compRowY + 6, { width: compCols[7].width - 10, align: 'right' });
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
+          .text(formatGBP(data.totals.totalMonthlyDebtService), colX, compRowY + 6, { width: compCols[7].width - 10, align: 'right' });
+      }
 
       // =====================================================================
-      // PAGE 2+: Comprehensive Direct Property Inventory
+      // INDIVIDUAL DEDICATED COMPANY REPORTS (Single-Company Sections like Excel)
       // =====================================================================
-      doc.addPage();
-
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(12)
-        .fillColor('#0F172A')
-        .text('CONSOLIDATED DIRECT PROPERTY INVENTORY & RENT ROLL', margin, margin);
-
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .fillColor('#64748B')
-        .text('Detailed direct asset breakdown across all 48 UK property holdings (No inside units)', margin, margin + 15);
-
-      const propCols = [
-        { label: 'No', width: 28, align: 'center' },
-        { label: 'Owning Company', width: 120, align: 'left' },
-        { label: 'Property Address', width: 210, align: 'left' },
-        { label: 'Asset Type', width: 75, align: 'center' },
-        { label: 'Occupancy', width: 65, align: 'center' },
-        { label: 'Tenant Name', width: 140, align: 'left' },
-        { label: 'Monthly Rent', width: 75, align: 'right' },
-        { label: 'Annual Rent', width: 75, align: 'right' },
-      ];
-
-      let pTableY = margin + 32;
-
-      const drawPropHeader = (y) => {
-        doc.roundedRect(margin, y, contentWidth, 18, 4).fill('#1E293B');
-        let px = margin + 4;
-        propCols.forEach((col) => {
-          doc
-            .font('Helvetica-Bold')
-            .fontSize(7)
-            .fillColor('#FFFFFF')
-            .text(col.label, px, y + 5, { width: col.width - 6, align: col.align });
-          px += col.width;
-        });
-      };
-
-      drawPropHeader(pTableY);
-      pTableY += 20;
-
-      data.allProperties.forEach((p, idx) => {
-        if (pTableY > pageHeight - 50) {
+      companiesToReport.forEach((comp, compIdx) => {
+        // Add new page for each company section (unless single-company export on page 1)
+        if (!isSingleCompany || compIdx > 0) {
           doc.addPage();
-          pTableY = margin;
-          drawPropHeader(pTableY);
-          pTableY += 20;
         }
 
-        const comp = getCompanyById(p.companyId);
-        const isOccupied = p.currentStatus === 'Occupied' || !!p.tenantName;
+        const compSummary = data.companySummaries.find((s) => s.companyId === comp.id) || {
+          propertyCount: 0,
+          monthlyRentRoll: 0,
+          annualRentRoll: 0,
+          mortgageCount: 0,
+          mortgageDebt: 0,
+          monthlyDebtService: 0,
+          netEquity: 0,
+        };
 
-        doc.rect(margin, pTableY, contentWidth, 15).fill(idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC');
+        const compProps = comp.id === 'old-street'
+          ? OLD_STREET_PROPERTIES.map((p, i) => ({
+              _id: `old-street-prop-${i}`,
+              companyId: 'old-street',
+              name: p.name,
+              propertyType: 'Residential',
+              currentStatus: 'Occupied',
+              tenantName: p.tenantName || 'Active Tenancy',
+              contractualRent: p.rent,
+            }))
+          : data.allProperties.filter((p) => p.companyId === comp.id);
 
-        let px = margin + 4;
+        const compMorts = data.allMortgages.filter((m) => m.companyId === comp.id);
 
-        // No
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A')
-          .text(String(idx + 1), px, pTableY + 4, { width: propCols[0].width - 6, align: 'center' });
-        px += propCols[0].width;
-
-        // Company
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A')
-          .text(comp?.name || p.companyId || '-', px, pTableY + 4, { width: propCols[1].width - 6, align: 'left' });
-        px += propCols[1].width;
-
-        // Address
-        doc.font('Helvetica').fontSize(7).fillColor('#0F172A')
-          .text(p.name || p.address?.line1 || '-', px, pTableY + 4, { width: propCols[2].width - 6, align: 'left' });
-        px += propCols[2].width;
-
-        // Type
-        doc.font('Helvetica').fontSize(6.5).fillColor('#64748B')
-          .text(p.propertyType || 'Residential', px, pTableY + 4, { width: propCols[3].width - 6, align: 'center' });
-        px += propCols[3].width;
-
-        // Status
-        doc.font('Helvetica-Bold').fontSize(6.5).fillColor(isOccupied ? '#059669' : '#64748B')
-          .text(isOccupied ? 'Occupied' : 'Available', px, pTableY + 4, { width: propCols[4].width - 6, align: 'center' });
-        px += propCols[4].width;
-
-        // Tenant
-        doc.font(p.tenantName ? 'Helvetica' : 'Helvetica-Oblique').fontSize(7).fillColor(p.tenantName ? '#0F172A' : '#94A3B8')
-          .text(p.tenantName || '— (Direct Available)', px, pTableY + 4, { width: propCols[5].width - 6, align: 'left' });
-        px += propCols[5].width;
-
-        // Monthly Rent
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#059669')
-          .text(formatGBP(p.contractualRent || 0), px, pTableY + 4, { width: propCols[6].width - 6, align: 'right' });
-        px += propCols[6].width;
-
-        // Annual Rent
-        doc.font('Helvetica').fontSize(7).fillColor('#0F172A')
-          .text(formatGBP((p.contractualRent || 0) * 12), px, pTableY + 4, { width: propCols[7].width - 6, align: 'right' });
-
-        pTableY += 16;
-      });
-
-      // Total Row for Properties
-      if (pTableY > pageHeight - 50) {
-        doc.addPage();
-        pTableY = margin;
-      }
-      doc.roundedRect(margin, pTableY, contentWidth, 18, 4).fill('#0F172A');
-
-      let totPx = margin + 4;
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFFFFF')
-        .text(`PORTFOLIO TOTAL (${data.allProperties.length} DIRECT ASSETS)`, totPx, pTableY + 5, { width: propCols[0].width + propCols[1].width + propCols[2].width - 6, align: 'left' });
-
-      totPx += propCols[0].width + propCols[1].width + propCols[2].width + propCols[3].width + propCols[4].width + propCols[5].width;
-
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#34D399')
-        .text(formatGBP(data.totals.totalMonthlyRent), totPx, pTableY + 5, { width: propCols[6].width - 6, align: 'right' });
-      totPx += propCols[6].width;
-
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#34D399')
-        .text(formatGBP(data.totals.totalAnnualRent), totPx, pTableY + 5, { width: propCols[7].width - 6, align: 'right' });
-
-      // =====================================================================
-      // PAGE 3: Consolidated Mortgage Schedule (27 Facilities)
-      // =====================================================================
-      doc.addPage();
-
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(12)
-        .fillColor('#0F172A')
-        .text('CONSOLIDATED MORTGAGE LIABILITIES & SERVICING REGISTER', margin, margin);
-
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .fillColor('#64748B')
-        .text('Active commercial and buy-to-let mortgage facilities across all corporate portfolios', margin, margin + 15);
-
-      const mortCols = [
-        { label: 'No', width: 28, align: 'center' },
-        { label: 'Owning Company', width: 120, align: 'left' },
-        { label: 'Linked Property Asset', width: 220, align: 'left' },
-        { label: 'Mortgage Lender', width: 130, align: 'left' },
-        { label: 'Account Reference', width: 100, align: 'left' },
-        { label: 'Rate', width: 45, align: 'center' },
-        { label: 'Monthly Payment', width: 75, align: 'right' },
-        { label: 'Outstanding Balance', width: 70, align: 'right' },
-      ];
-
-      let mTableY = margin + 32;
-
-      const drawMortHeader = (y) => {
-        doc.roundedRect(margin, y, contentWidth, 18, 4).fill('#1E293B');
-        let mx = margin + 4;
-        mortCols.forEach((col) => {
-          doc
-            .font('Helvetica-Bold')
-            .fontSize(7)
-            .fillColor('#FFFFFF')
-            .text(col.label, mx, y + 5, { width: col.width - 6, align: col.align });
-          mx += col.width;
-        });
-      };
-
-      drawMortHeader(mTableY);
-      mTableY += 20;
-
-      data.allMortgages.forEach((mort, idx) => {
-        if (mTableY > pageHeight - 50) {
-          doc.addPage();
-          mTableY = margin;
-          drawMortHeader(mTableY);
-          mTableY += 20;
+        // 1. Company Corporate Header
+        const headerTopY = margin;
+        if (fs.existsSync(LOGO_PATH)) {
+          doc.image(LOGO_PATH, margin, headerTopY, { width: 38, height: 38 });
         }
 
-        const comp = getCompanyById(mort.companyId);
-        const matchedProp = data.allProperties.find((p) => String(p._id) === String(mort.propertyId));
+        const headTextX = fs.existsSync(LOGO_PATH) ? margin + 48 : margin;
+        const compSeq = !isSingleCompany ? `${compIdx + 1}. ` : '';
 
-        doc.rect(margin, mTableY, contentWidth, 15).fill(idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC');
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(13)
+          .fillColor('#0F172A')
+          .text(`${compSeq}${comp.name.toUpperCase()} — ${comp.legalName.toUpperCase()}`, headTextX, headerTopY);
 
-        let mx = margin + 4;
+        doc
+          .font('Helvetica')
+          .fontSize(7.5)
+          .fillColor('#64748B')
+          .text(`UK Company Registration: ${comp.registrationNo} • Jurisdiction: ${comp.jurisdiction} • Single Entity Audit`, headTextX, headerTopY + 16);
 
-        // No
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A')
-          .text(String(idx + 1), mx, mTableY + 4, { width: mortCols[0].width - 6, align: 'center' });
-        mx += mortCols[0].width;
+        // Right side badge
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(8)
+          .fillColor('#059669')
+          .text(isSingleCompany ? 'OFFICIAL SINGLE ENTITY AUDIT REPORT' : `CORPORATE ENTITY REPORT ${compIdx + 1} OF 6`, contentWidth - 100, headerTopY, { align: 'right' });
 
-        // Company
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A')
-          .text(comp?.name || mort.companyId, mx, mTableY + 4, { width: mortCols[1].width - 6, align: 'left' });
-        mx += mortCols[1].width;
+        doc
+          .font('Helvetica')
+          .fontSize(7)
+          .fillColor('#64748B')
+          .text('Statement Period: Q3-2026', contentWidth - 100, headerTopY + 14, { align: 'right' });
 
-        // Property
-        doc.font('Helvetica').fontSize(7).fillColor('#0F172A')
-          .text(matchedProp?.name || matchedProp?.address?.line1 || 'Property Asset', mx, mTableY + 4, { width: mortCols[2].width - 6, align: 'left' });
-        mx += mortCols[2].width;
+        // Divider
+        const divY = headerTopY + 42;
+        doc.strokeColor('#CBD5E1').lineWidth(1).moveTo(margin, divY).lineTo(pageWidth - margin, divY).stroke();
 
-        // Lender
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A')
-          .text(mort.lenderName, mx, mTableY + 4, { width: mortCols[3].width - 6, align: 'left' });
-        mx += mortCols[3].width;
+        // 2. Company 5-Tile KPI Banner
+        const compKpis = [
+          { label: 'DIRECT ASSETS', val: `${compSummary.propertyCount} Properties`, color: '#0F172A', bg: '#F8FAFC' },
+          { label: 'MONTHLY RENT ROLL', val: formatGBP(compSummary.monthlyRentRoll), color: '#059669', bg: '#ECFDF5' },
+          { label: 'ANNUAL RENT ROLL', val: formatGBP(compSummary.annualRentRoll), color: '#047857', bg: '#E6F4EA' },
+          { label: 'MORTGAGE LIABILITIES', val: `${compSummary.mortgageCount} Facilities (${formatGBP(compSummary.mortgageDebt)})`, color: '#DC2626', bg: '#FEF2F2' },
+          { label: 'NET ENTITY EQUITY', val: formatGBP(compSummary.netEquity), color: '#4F46E5', bg: '#EEF2FF' },
+        ];
 
-        // Account
-        doc.font('Helvetica').fontSize(7).fillColor('#64748B')
-          .text(mort.accountReference, mx, mTableY + 4, { width: mortCols[4].width - 6, align: 'left' });
-        mx += mortCols[4].width;
+        const cKpiW = (contentWidth - 4 * 6) / 5;
+        const cKpiH = 36;
+        const cKpiY = divY + 8;
 
-        // Rate
-        doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A')
-          .text(`${mort.interestRate || 0}%`, mx, mTableY + 4, { width: mortCols[5].width - 6, align: 'center' });
-        mx += mortCols[5].width;
+        compKpis.forEach((kpi, kIdx) => {
+          const kx = margin + kIdx * (cKpiW + 6);
+          doc.roundedRect(kx, cKpiY, cKpiW, cKpiH, 5).fillAndStroke(kpi.bg, '#E2E8F0');
+          doc.font('Helvetica-Bold').fontSize(6).fillColor('#64748B').text(kpi.label, kx + 6, cKpiY + 6, { width: cKpiW - 12 });
+          doc.font('Helvetica-Bold').fontSize(8.5).fillColor(kpi.color).text(kpi.val, kx + 6, cKpiY + 18, { width: cKpiW - 12 });
+        });
 
-        // Monthly Payment
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#059669')
-          .text(formatGBP(mort.expectedRepaymentAmount || 0), mx, mTableY + 4, { width: mortCols[6].width - 6, align: 'right' });
-        mx += mortCols[6].width;
+        // 3. Property Inventory & Rent Roll Table for this Single Company
+        let currentY = cKpiY + cKpiH + 12;
 
-        // Balance
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#DC2626')
-          .text(formatGBP(mort.outstandingPrincipalBalance || 0), mx, mTableY + 4, { width: mortCols[7].width - 6, align: 'right' });
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(9.5)
+          .fillColor('#0F172A')
+          .text(`${comp.name.toUpperCase()} — PROPERTY RENT ROLL & ASSET INVENTORY`, margin, currentY);
 
-        mTableY += 16;
+        currentY += 14;
+
+        const propCols = [
+          { label: 'No', width: 28, align: 'center' },
+          { label: 'Property Address', width: 235, align: 'left' },
+          { label: 'Asset Type', width: 85, align: 'center' },
+          { label: 'Status', width: 75, align: 'center' },
+          { label: 'Tenant Name', width: 175, align: 'left' },
+          { label: 'Monthly Rent', width: 95, align: 'right' },
+          { label: 'Annual Rent', width: 95, align: 'right' },
+        ];
+
+        const drawPropHeader = (y) => {
+          doc.roundedRect(margin, y, contentWidth, 16, 3).fill('#1E293B');
+          let px = margin + 4;
+          propCols.forEach((col) => {
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(7)
+              .fillColor('#FFFFFF')
+              .text(col.label, px, y + 4, { width: col.width - 6, align: col.align });
+            px += col.width;
+          });
+        };
+
+        drawPropHeader(currentY);
+        currentY += 18;
+
+        let compTotalMonthlyRent = 0;
+        let compTotalAnnualRent = 0;
+
+        compProps.forEach((p, idx) => {
+          if (currentY > pageHeight - 50) {
+            doc.addPage();
+            currentY = margin;
+            drawPropHeader(currentY);
+            currentY += 18;
+          }
+
+          const isOccupied = p.currentStatus === 'Occupied' || !!p.tenantName;
+          const monthlyRent = Number(p.contractualRent || p.rent || 0);
+          const annualRent = monthlyRent * 12;
+          compTotalMonthlyRent += monthlyRent;
+          compTotalAnnualRent += annualRent;
+
+          doc.rect(margin, currentY, contentWidth, 14).fill(idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC');
+
+          let px = margin + 4;
+
+          // No
+          doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#0F172A')
+            .text(String(idx + 1), px, currentY + 3, { width: propCols[0].width - 6, align: 'center' });
+          px += propCols[0].width;
+
+          // Address
+          doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A')
+            .text(p.name || p.address?.line1 || '-', px, currentY + 3, { width: propCols[1].width - 6, align: 'left' });
+          px += propCols[1].width;
+
+          // Type
+          doc.font('Helvetica').fontSize(6).fillColor('#64748B')
+            .text(p.propertyType || 'Residential', px, currentY + 3, { width: propCols[2].width - 6, align: 'center' });
+          px += propCols[2].width;
+
+          // Status
+          doc.font('Helvetica-Bold').fontSize(6).fillColor(isOccupied ? '#059669' : '#64748B')
+            .text(isOccupied ? 'Occupied' : 'Available', px, currentY + 3, { width: propCols[3].width - 6, align: 'center' });
+          px += propCols[3].width;
+
+          // Tenant
+          doc.font(p.tenantName ? 'Helvetica' : 'Helvetica-Oblique').fontSize(6.5).fillColor(p.tenantName ? '#0F172A' : '#94A3B8')
+            .text(p.tenantName || '— (Direct Available)', px, currentY + 3, { width: propCols[4].width - 6, align: 'left' });
+          px += propCols[4].width;
+
+          // Monthly Rent
+          doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#059669')
+            .text(formatGBP(monthlyRent), px, currentY + 3, { width: propCols[5].width - 6, align: 'right' });
+          px += propCols[5].width;
+
+          // Annual Rent
+          doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A')
+            .text(formatGBP(annualRent), px, currentY + 3, { width: propCols[6].width - 6, align: 'right' });
+
+          currentY += 15;
+        });
+
+        // Company Property Sub-Total Row
+        if (currentY > pageHeight - 50) {
+          doc.addPage();
+          currentY = margin;
+        }
+        doc.roundedRect(margin, currentY, contentWidth, 16, 3).fill('#0F172A');
+        let totPx = margin + 4;
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF')
+          .text(`${comp.name.toUpperCase()} — TOTAL (${compProps.length} PROPERTIES)`, totPx, currentY + 4, {
+            width: propCols[0].width + propCols[1].width + propCols[2].width + propCols[3].width + propCols[4].width - 6,
+            align: 'left',
+          });
+
+        totPx += propCols[0].width + propCols[1].width + propCols[2].width + propCols[3].width + propCols[4].width;
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#34D399')
+          .text(formatGBP(compTotalMonthlyRent), totPx, currentY + 4, { width: propCols[5].width - 6, align: 'right' });
+        totPx += propCols[5].width;
+
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#34D399')
+          .text(formatGBP(compTotalAnnualRent), totPx, currentY + 4, { width: propCols[6].width - 6, align: 'right' });
+
+        currentY += 22;
+
+        // 4. Company Mortgage Liabilities Schedule (if applicable)
+        if (compMorts.length > 0) {
+          if (currentY > pageHeight - 90) {
+            doc.addPage();
+            currentY = margin;
+          }
+
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(9.5)
+            .fillColor('#0F172A')
+            .text(`${comp.name.toUpperCase()} — ACTIVE MORTGAGE LIABILITIES & LOAN REGISTER`, margin, currentY);
+
+          currentY += 14;
+
+          const mortCols = [
+            { label: 'No', width: 28, align: 'center' },
+            { label: 'Linked Property Asset', width: 235, align: 'left' },
+            { label: 'Mortgage Lender', width: 145, align: 'left' },
+            { label: 'Account Reference', width: 115, align: 'left' },
+            { label: 'Rate', width: 55, align: 'center' },
+            { label: 'Monthly Payment', width: 105, align: 'right' },
+            { label: 'Outstanding Balance', width: 105, align: 'right' },
+          ];
+
+          const drawMortHeader = (y) => {
+            doc.roundedRect(margin, y, contentWidth, 16, 3).fill('#1E293B');
+            let mx = margin + 4;
+            mortCols.forEach((col) => {
+              doc
+                .font('Helvetica-Bold')
+                .fontSize(7)
+                .fillColor('#FFFFFF')
+                .text(col.label, mx, y + 4, { width: col.width - 6, align: col.align });
+              mx += col.width;
+            });
+          };
+
+          drawMortHeader(currentY);
+          currentY += 18;
+
+          let compTotalMortDebt = 0;
+          let compTotalMortService = 0;
+
+          compMorts.forEach((m, idx) => {
+            if (currentY > pageHeight - 50) {
+              doc.addPage();
+              currentY = margin;
+              drawMortHeader(currentY);
+              currentY += 18;
+            }
+
+            const matchedProp = data.allProperties.find((p) => String(p._id) === String(m.propertyId));
+            const payAmt = Number(m.expectedRepaymentAmount || 0);
+            const balAmt = Number(m.outstandingPrincipalBalance || 0);
+            compTotalMortService += payAmt;
+            compTotalMortDebt += balAmt;
+
+            doc.rect(margin, currentY, contentWidth, 14).fill(idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC');
+
+            let mx = margin + 4;
+            // No
+            doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#0F172A')
+              .text(String(idx + 1), mx, currentY + 3, { width: mortCols[0].width - 6, align: 'center' });
+            mx += mortCols[0].width;
+
+            // Property
+            doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A')
+              .text(matchedProp?.name || matchedProp?.address?.line1 || 'Property Asset', mx, currentY + 3, { width: mortCols[1].width - 6, align: 'left' });
+            mx += mortCols[1].width;
+
+            // Lender
+            doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#0F172A')
+              .text(m.lenderName || '-', mx, currentY + 3, { width: mortCols[2].width - 6, align: 'left' });
+            mx += mortCols[2].width;
+
+            // Ref
+            doc.font('Helvetica').fontSize(6.5).fillColor('#64748B')
+              .text(m.accountReference || '-', mx, currentY + 3, { width: mortCols[3].width - 6, align: 'left' });
+            mx += mortCols[3].width;
+
+            // Rate
+            doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A')
+              .text(`${m.interestRate || 0}%`, mx, currentY + 3, { width: mortCols[4].width - 6, align: 'center' });
+            mx += mortCols[4].width;
+
+            // Payment
+            doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#059669')
+              .text(formatGBP(payAmt), mx, currentY + 3, { width: mortCols[5].width - 6, align: 'right' });
+            mx += mortCols[5].width;
+
+            // Balance
+            doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#DC2626')
+              .text(formatGBP(balAmt), mx, currentY + 3, { width: mortCols[6].width - 6, align: 'right' });
+
+            currentY += 15;
+          });
+
+          // Company Mortgage Sub-Total Row
+          if (currentY > pageHeight - 50) {
+            doc.addPage();
+            currentY = margin;
+          }
+          doc.roundedRect(margin, currentY, contentWidth, 16, 3).fill('#0F172A');
+          let mTotPx = margin + 4;
+          doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF')
+            .text(`${comp.name.toUpperCase()} — MORTGAGE SUB-TOTAL (${compMorts.length} FACILITIES)`, mTotPx, currentY + 4, {
+              width: mortCols[0].width + mortCols[1].width + mortCols[2].width + mortCols[3].width + mortCols[4].width - 6,
+              align: 'left',
+            });
+
+          mTotPx += mortCols[0].width + mortCols[1].width + mortCols[2].width + mortCols[3].width + mortCols[4].width;
+          doc.font('Helvetica-Bold').fontSize(7).fillColor('#34D399')
+            .text(formatGBP(compTotalMortService), mTotPx, currentY + 4, { width: mortCols[5].width - 6, align: 'right' });
+          mTotPx += mortCols[5].width;
+
+          doc.font('Helvetica-Bold').fontSize(7).fillColor('#F87171')
+            .text(formatGBP(compTotalMortDebt), mTotPx, currentY + 4, { width: mortCols[6].width - 6, align: 'right' });
+        } else {
+          // Note if no mortgages
+          doc.roundedRect(margin, currentY, contentWidth, 18, 3).fill('#F8FAFC');
+          doc.font('Helvetica-Oblique').fontSize(7).fillColor('#64748B')
+            .text('No active mortgage facility liabilities encumbering this corporate entity portfolio (100% Unencumbered Equity).', margin + 8, currentY + 5);
+        }
       });
 
-      // Total Row for Mortgages
-      if (mTableY > pageHeight - 50) {
-        doc.addPage();
-        mTableY = margin;
-      }
-      doc.roundedRect(margin, mTableY, contentWidth, 18, 4).fill('#0F172A');
-
-      let mTotPx = margin + 4;
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFFFFF')
-        .text(`TOTAL MORTGAGES (${data.allMortgages.length} FACILITIES)`, mTotPx, mTableY + 5, { width: mortCols[0].width + mortCols[1].width + mortCols[2].width + mortCols[3].width + mortCols[4].width + mortCols[5].width - 6, align: 'left' });
-
-      mTotPx += mortCols[0].width + mortCols[1].width + mortCols[2].width + mortCols[3].width + mortCols[4].width + mortCols[5].width;
-
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#34D399')
-        .text(formatGBP(data.totals.totalMonthlyDebtService), mTotPx, mTableY + 5, { width: mortCols[6].width - 6, align: 'right' });
-      mTotPx += mortCols[6].width;
-
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#F87171')
-        .text(formatGBP(data.totals.totalMortgageDebt), mTotPx, mTableY + 5, { width: mortCols[7].width - 6, align: 'right' });
-
       // =====================================================================
-      // 4. Two-Pass Footers (Page X of Y & Confidentiality Disclaimer)
+      // 4. Two-Pass Running Footers (Page X of Y & Confidentiality Disclaimer)
       // =====================================================================
       const range = doc.bufferedPageRange();
       for (let i = range.start; i < range.start + range.count; i++) {
@@ -1251,16 +1351,15 @@ export async function generateConsolidatedGroupPdfReport() {
           .lineTo(pageWidth - margin, footerY - 4)
           .stroke();
 
+        const footerTitle = isSingleCompany
+          ? `${targetCompany.name.toUpperCase()} • SINGLE CORPORATE PORTFOLIO AUDIT REPORT • CONFIDENTIAL`
+          : 'PIXX TECHNOLOGIES UK • CONSOLIDATED GROUP PORTFOLIO AUDIT REGISTER • CONFIDENTIAL & PRIVILEGED';
+
         doc
           .font('Helvetica')
           .fontSize(6.5)
           .fillColor('#64748B')
-          .text(
-            'PIXX TECHNOLOGIES UK • CONSOLIDATED GROUP PORTFOLIO AUDIT REGISTER • CONFIDENTIAL & PRIVILEGED',
-            margin,
-            footerY,
-            { align: 'left', width: contentWidth / 2 }
-          );
+          .text(footerTitle, margin, footerY, { align: 'left', width: contentWidth / 2 });
 
         doc.text(
           `Page ${i + 1} of ${range.count} • Master Group Statement Ref: PIXX-GRP-Q3-2026`,

@@ -478,9 +478,12 @@ export const exportConsolidatedExcel = async (req, res) => {
  */
 export const exportConsolidatedPdf = async (req, res) => {
   try {
-    const buffer = await generateConsolidatedGroupPdfReport();
+    const companyId = req.query.companyId || req.headers['x-company-id'];
+    const buffer = await generateConsolidatedGroupPdfReport({ companyId });
     const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `Consolidated_Group_Portfolio_Report_${dateStr}.pdf`;
+    const filename = companyId && companyId !== 'all'
+      ? `${companyId.toUpperCase()}_Single_Company_Report_${dateStr}.pdf`
+      : `Consolidated_Group_Portfolio_Report_${dateStr}.pdf`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(

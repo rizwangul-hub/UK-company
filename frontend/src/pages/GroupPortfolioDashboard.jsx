@@ -31,6 +31,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
   const [error, setError] = useState(null);
   const [excelDownloading, setExcelDownloading] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [singlePdfDownloading, setSinglePdfDownloading] = useState({});
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'properties' | 'mortgages'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCompany, setFilterCompany] = useState('ALL');
@@ -98,6 +99,21 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
     }
   };
 
+  const handleDownloadSinglePdf = async (companyId, companyName) => {
+    setSinglePdfDownloading((prev) => ({ ...prev, [companyId]: true }));
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const safeName = (companyName || companyId).replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `${safeName}_Single_Company_Report_${dateStr}.pdf`;
+      await reportsAPI.downloadConsolidatedPdf({ companyId, filename });
+    } catch (err) {
+      console.error(`PDF download failed for ${companyId}:`, err);
+      alert(err.message || `Failed to download PDF report for ${companyName || companyId}`);
+    } finally {
+      setSinglePdfDownloading((prev) => ({ ...prev, [companyId]: false }));
+    }
+  };
+
   // Filtered properties for direct property inventory table
   const filteredProperties = (data?.allProperties || []).filter((p) => {
     const matchesSearch =
@@ -155,16 +171,39 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
             <span>Export Master Excel (.xlsx)</span>
           </button>
 
-          {/* Export Attractive PDF Report Button */}
+          {/* Export Master PDF Report Button (All Companies with Dedicated Single Sections) */}
           <button
             onClick={handleDownloadPdf}
             disabled={pdfDownloading || loading}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition cursor-pointer disabled:opacity-50"
-            title="Download executive corporate PDF report for all 6 companies"
+            title="Download executive corporate PDF report with dedicated single-company reports for all 6 companies (matching Excel report)"
           >
             {pdfDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
             <span>Export Master PDF Report</span>
           </button>
+
+          {/* Quick Single Company PDF Export Dropdown */}
+          <div className="relative">
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  const compObj = COMPANIES.find((c) => c.id === e.target.value);
+                  handleDownloadSinglePdf(e.target.value, compObj?.name);
+                }
+              }}
+              disabled={loading || Object.values(singlePdfDownloading).some(Boolean)}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-200 font-semibold text-xs transition cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+              title="Select a company to export its single individual PDF report"
+            >
+              <option value="" disabled>Single Company PDF...</option>
+              {COMPANIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Switch to Single Company View */}
           {onSwitchToSingleCompany && (
@@ -434,16 +473,32 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
                           </div>
                         </div>
 
-                        {/* Open Company Dashboard Button */}
-                        {onSelectCompany && compConfig && (
+                        {/* Company Card Actions: Export PDF & Open Dashboard */}
+                        <div className="flex items-center gap-2 pt-1">
                           <button
-                            onClick={() => onSelectCompany(compConfig)}
-                            className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                            onClick={() => handleDownloadSinglePdf(comp.companyId, comp.name)}
+                            disabled={singlePdfDownloading[comp.companyId]}
+                            className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-indigo-300 hover:text-white border border-slate-700/80 text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
+                            title={`Download single company PDF report for ${comp.name}`}
                           >
-                            <span>Open {comp.name} Dashboard</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
+                            {singlePdfDownloading[comp.companyId] ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                            ) : (
+                              <FileText className="w-3.5 h-3.5" />
+                            )}
+                            <span>Export PDF</span>
                           </button>
-                        )}
+
+                          {onSelectCompany && compConfig && (
+                            <button
+                              onClick={() => onSelectCompany(compConfig)}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                            >
+                              <span>Open Dashboard</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

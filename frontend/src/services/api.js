@@ -444,8 +444,24 @@ export const reportsAPI = {
     triggerBlobDownload(res.data, customFilename || defaultFilename);
     return true;
   },
-  downloadConsolidatedPdf: async (customFilename) => {
-    const res = await api.get('/reports/consolidated/pdf', {
+  downloadConsolidatedPdf: async (optionsOrFilename, customFilename) => {
+    let companyId = null;
+    let finalFilename = null;
+
+    if (typeof optionsOrFilename === 'object' && optionsOrFilename !== null) {
+      companyId = optionsOrFilename.companyId;
+      finalFilename = optionsOrFilename.filename;
+    } else if (typeof optionsOrFilename === 'string') {
+      finalFilename = optionsOrFilename;
+    } else if (typeof customFilename === 'string') {
+      finalFilename = customFilename;
+    }
+
+    const url = companyId && companyId !== 'all'
+      ? `/reports/consolidated/pdf?companyId=${encodeURIComponent(companyId)}`
+      : '/reports/consolidated/pdf';
+
+    const res = await api.get(url, {
       responseType: 'blob',
     });
     if (res.data?.type === 'application/json') {
@@ -453,8 +469,12 @@ export const reportsAPI = {
       const err = JSON.parse(text);
       throw new Error(err.message || 'Consolidated PDF export failed');
     }
-    const defaultFilename = `Consolidated_Group_Portfolio_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
-    triggerBlobDownload(res.data, customFilename || defaultFilename);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const defaultFilename = companyId && companyId !== 'all'
+      ? `${companyId.toUpperCase()}_Single_Company_Report_${dateStr}.pdf`
+      : `Consolidated_Group_Portfolio_Report_${dateStr}.pdf`;
+
+    triggerBlobDownload(res.data, finalFilename || defaultFilename);
     return true;
   },
 };

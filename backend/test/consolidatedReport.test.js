@@ -60,3 +60,11 @@ test('CONSOLIDATED PDF: Generates valid, attractive corporate vector PDF', async
   const header = buffer.subarray(0, 5).toString('ascii');
   assert.strictEqual(header, '%PDF-', 'Buffer should have valid PDF magic bytes');
 });
+
+test('CONSOLIDATED PDF: Generates valid single-company PDF report when companyId is provided', async () => {
+  const buffer = await generateConsolidatedGroupPdfReport({ companyId: 'old-street' });
+
+  assert.ok(buffer && buffer.length > 5000, 'Single-company PDF buffer should be non-empty and >5KB');
+  const header = buffer.subarray(0, 5).toString('ascii');
+  assert.strictEqual(header, '%PDF-', 'Single-company buffer should have valid PDF magic bytes');
+});
