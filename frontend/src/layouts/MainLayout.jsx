@@ -281,18 +281,18 @@ export function MainLayout({
 
           {/* Software Developer Credits - Inside scroll flow with safe area padding */}
           <div className="p-3.5 border-t border-slate-800/80 mt-auto shrink-0 pb-mobile-safe">
-            <div className="p-3 rounded-2xl developer-credit-card bg-slate-100 dark:bg-gradient-to-br dark:from-slate-950 dark:via-indigo-950/20 dark:to-slate-950 border border-slate-200 dark:border-indigo-500/20 shadow-sm flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 shadow-sm">
+            <div className="p-3 rounded-2xl developer-credit-card flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl developer-icon flex items-center justify-center shrink-0 shadow-sm">
                 <Code2 className="w-5 h-5" />
               </div>
               <div className="truncate min-w-0">
-                <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                <div className="text-[11px] font-bold developer-title uppercase tracking-wider">
                   Software Developer
                 </div>
-                <div className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight truncate">
+                <div className="text-sm font-extrabold developer-name tracking-tight truncate">
                   Rizwan Ullah
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                <div className="text-[10px] developer-org font-medium truncate">
                   PIXX Technologies UK
                 </div>
               </div>
@@ -363,8 +363,28 @@ export function MainLayout({
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 pb-page-safe">
-          {children}
+        <div className="flex-1 pb-page-safe flex flex-col justify-between">
+          <div>{children}</div>
+
+          {/* Software Developer Credits for Mobile & Responsive Screens */}
+          <div className="md:hidden mt-10 mb-4 px-4 flex justify-center">
+            <div className="p-3 rounded-2xl developer-credit-card flex items-center gap-3 w-full max-w-sm">
+              <div className="w-10 h-10 rounded-xl developer-icon flex items-center justify-center shrink-0 shadow-sm">
+                <Code2 className="w-5 h-5" />
+              </div>
+              <div className="truncate min-w-0">
+                <div className="text-[11px] font-bold developer-title uppercase tracking-wider">
+                  Software Developer
+                </div>
+                <div className="text-sm font-extrabold developer-name tracking-tight truncate">
+                  Rizwan Ullah
+                </div>
+                <div className="text-[10px] developer-org font-medium truncate">
+                  PIXX Technologies UK
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@variant dark (&:where(.dark, .dark *));
+
 @layer base {
   html, body, #root {
     margin: 0;
@@ -81,10 +83,55 @@ html.light .dashboard-header-banner {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
+/* Software Developer Credit Card - High-Contrast Styling */
+.developer-credit-card {
+  background-color: #020617 !important;
+  background-image: linear-gradient(135deg, rgba(2, 6, 23, 0.95), rgba(30, 27, 75, 0.35)) !important;
+  border: 1px solid rgba(99, 102, 241, 0.35) !important;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4) !important;
+}
+
+.developer-credit-card .developer-title {
+  color: #818cf8 !important;
+}
+
+.developer-credit-card .developer-name {
+  color: #ffffff !important;
+}
+
+.developer-credit-card .developer-org {
+  color: #94a3b8 !important;
+}
+
+.developer-credit-card .developer-icon {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border: 1px solid rgba(99, 102, 241, 0.35) !important;
+  color: #818cf8 !important;
+}
+
 html.light .developer-credit-card {
-  background: #f1f5f9 !important;
-  background-image: none !important;
-  border-color: #e2e8f0 !important;
+  background-color: #f1f5f9 !important;
+  background-image: linear-gradient(135deg, #ffffff, #f1f5f9) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.08) !important;
+}
+
+html.light .developer-credit-card .developer-title {
+  color: #4f46e5 !important;
+}
+
+html.light .developer-credit-card .developer-name {
+  color: #0f172a !important;
+}
+
+html.light .developer-credit-card .developer-org {
+  color: #475569 !important;
+}
+
+html.light .developer-credit-card .developer-icon {
+  background-color: #e0e7ff !important;
+  border: 1px solid #c7d2fe !important;
+  color: #4338ca !important;
 }
 
 html.light .bg-indigo-500\/10 {
