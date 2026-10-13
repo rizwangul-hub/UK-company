@@ -445,3 +445,75 @@ html.light ::-webkit-scrollbar-thumb {
 html.light ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.8);
 }
+
+/* ========================================================================= */
+/* ATTRACTIVE CONTINUOUS ANIMATED LOGO BOX                                   */
+/* ========================================================================= */
+
+@keyframes attractive-logo-float {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+    box-shadow: 0 4px 14px -1px rgba(99, 102, 241, 0.25), 0 0 12px rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.45);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 10px 25px -2px rgba(99, 102, 241, 0.45), 0 0 22px rgba(129, 140, 248, 0.35);
+    border-color: rgba(129, 140, 248, 0.85);
+  }
+}
+
+@keyframes attractive-logo-shine {
+  0% {
+    transform: translateX(-150%) rotate(25deg);
+  }
+  25%, 100% {
+    transform: translateX(250%) rotate(25deg);
+  }
+}
+
+@keyframes attractive-logo-inner {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
+  }
+  50% {
+    transform: scale(1.06);
+    filter: drop-shadow(0 4px 10px rgba(99, 102, 241, 0.35));
+  }
+}
+
+.animated-logo-box {
+  position: relative;
+  overflow: hidden;
+  background-color: #ffffff !important;
+  animation: attractive-logo-float 3.5s ease-in-out infinite;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, box-shadow;
+}
+
+.animated-logo-box::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.65) 50%,
+    rgba(255, 255, 255, 0) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: attractive-logo-shine 4s ease-in-out infinite;
+}
+
+.animated-logo-box img {
+  animation: attractive-logo-inner 3.5s ease-in-out infinite;
+  transition: transform 0.3s ease;
+  object-fit: contain;
+}
+

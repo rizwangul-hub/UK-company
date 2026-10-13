@@ -68,7 +68,7 @@ export function MainLayout({
       {/* Mobile Top Header - Displays Company Brand & Admin Info on Top */}
       <div className="md:hidden flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center p-1 shadow-sm shrink-0 overflow-hidden">
+          <div className="animated-logo-box w-12 h-12 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1 shadow-md shrink-0">
             <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
           </div>
           <div className="truncate min-w-0">
@@ -138,8 +138,8 @@ export function MainLayout({
       >
         {/* Mobile Drawer Header with Close Button */}
         <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/90 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="animated-logo-box w-14 h-14 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1.5 shadow-md shrink-0">
               <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
@@ -163,7 +163,7 @@ export function MainLayout({
         {/* Brand Area for Desktop */}
         <div className="p-4 lg:p-5 border-b border-slate-200 dark:border-slate-800/80 hidden md:flex flex-col gap-2.5 shrink-0 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200/90 flex items-center justify-center p-1.5 shadow-md shrink-0 overflow-hidden">
+            <div className="animated-logo-box w-16 h-16 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1.5 shadow-lg shrink-0">
               <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
@@ -305,7 +305,7 @@ export function MainLayout({
         {/* Top Header Bar for Desktop - Displays Company Brand, Admin Name & Email, Actions, Theme Toggle, Sign Out */}
         <header className="hidden md:flex items-center justify-between px-6 py-2.5 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-white border border-slate-200/80 flex items-center justify-center p-1 shadow-xs overflow-hidden">
+            <div className="animated-logo-box h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1 shadow-sm shrink-0">
               <img src={displayLogo} alt={displayName} className="h-full w-full object-contain" />
             </div>
             <div className="flex items-center gap-2">

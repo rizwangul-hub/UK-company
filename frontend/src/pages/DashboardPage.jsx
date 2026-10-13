@@ -83,7 +83,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
       {/* Executive Brand Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gradient-to-r dark:from-slate-900/90 dark:via-slate-900/80 dark:to-indigo-950/40 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm dashboard-header-banner">
         <div className="flex items-center gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-white border border-slate-200/90 dark:bg-slate-950/90 dark:border-slate-800/80 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden">
+          <div className="animated-logo-box h-18 w-18 sm:h-20 sm:w-20 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-2 shadow-lg shrink-0">
             <img src={companyLogo} alt={`${companyName} Logo`} className="h-full w-full object-contain" />
           </div>
           <div>
