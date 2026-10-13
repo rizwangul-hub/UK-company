@@ -197,7 +197,10 @@ export function PropertyAppliancesSection({
             const valetBadge = getValetBadge(item.squeakyCleanValet);
             const iconEmoji = APPLIANCE_ICONS[item.applianceType] || '🔌';
             const docsCount = item.documents?.length || 0;
-            const hasCarePlan = item.currysCareAndRepair?.hasPlan;
+            const hasServicePlan = Boolean(item.serviceAgreement?.hasAgreement || item.currysCareAndRepair?.hasPlan);
+            const servicePlanRef = item.serviceAgreement?.agreementReference || item.currysCareAndRepair?.planReferenceNumber;
+            const serviceProvider = item.serviceAgreement?.provider || item.supplier || 'Currys';
+            const mfgWarranty = item.manufacturerWarranty;
 
             return (
               <div
@@ -219,6 +222,7 @@ export function PropertyAppliancesSection({
                           <span>{item.brand || 'Unbranded'}</span>
                           {item.modelNumber && <span>· Mod: {item.modelNumber}</span>}
                           <span>· {item.supplier || 'Currys'}</span>
+                          {item.itemCode && <span>· #{item.itemCode}</span>}
                         </div>
                       </div>
                     </div>
@@ -264,6 +268,11 @@ export function PropertyAppliancesSection({
                         Cost: {formatGBP(item.purchasePrice)}
                       </div>
                     )}
+                    {item.careServicesChargeGBP > 0 && (
+                      <div className="p-1.5 px-2 rounded-lg bg-slate-900 border border-slate-800 text-indigo-300 font-semibold tabular-nums">
+                        Care: {formatGBP(item.careServicesChargeGBP)}
+                      </div>
+                    )}
                     {item.purchaseDate && (
                       <div className="p-1.5 px-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400">
                         Bought: {formatUKDate(item.purchaseDate)}
@@ -272,13 +281,14 @@ export function PropertyAppliancesSection({
                   </div>
                 </div>
 
-                {/* Card Middle: Care & Repair + Squeaky Clean Valet Status */}
+                {/* Card Middle: Decoupled Warranties, Care & Repair + Squeaky Clean Valet Status */}
                 <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800/80 space-y-2 text-xs">
+                  {/* Service Plan */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-400 font-medium">Currys Care &amp; Repair:</span>
-                    {hasCarePlan ? (
+                    <span className="text-[11px] text-slate-400 font-medium">Service Agreement:</span>
+                    {hasServicePlan ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                        Covered ({item.currysCareAndRepair?.planType?.replace(/_/g, ' ') || 'Plan'})
+                        {serviceProvider} {servicePlanRef ? `#${servicePlanRef}` : 'Active'}
                       </span>
                     ) : (
                       <span className="text-[10px] text-slate-500 font-medium">
@@ -287,6 +297,18 @@ export function PropertyAppliancesSection({
                     )}
                   </div>
 
+                  {/* Manufacturer Warranty */}
+                  {mfgWarranty && (mfgWarranty.expiryDate || mfgWarranty.provider) && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-slate-400 font-medium">Mfg Warranty:</span>
+                      <span className="text-[10px] font-semibold text-slate-300">
+                        {mfgWarranty.provider || item.brand || 'Standard'}
+                        {mfgWarranty.expiryDate ? ` (exp ${formatUKDate(mfgWarranty.expiryDate)})` : ''}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Squeaky Clean Valet */}
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] text-slate-400 font-medium">Squeaky Clean Valet:</span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${valetBadge.cls}`}>
