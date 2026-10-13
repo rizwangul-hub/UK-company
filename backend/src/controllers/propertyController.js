@@ -4,6 +4,7 @@ import Mortgage from '../models/Mortgage.js';
 import TenancyAgreement from '../models/TenancyAgreement.js';
 import RentSchedule from '../models/RentSchedule.js';
 import Transaction from '../models/Transaction.js';
+import Appliance from '../models/Appliance.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
 
 export const getProperties = async (req, res) => {
@@ -82,12 +83,13 @@ export const getPropertyById = async (req, res) => {
     const property = await Property.findOne({ _id: req.params.id, companyId: req.companyId }).lean();
     if (!property) return apiError(res, 'Property not found', 404);
 
-    const [units, mortgages, tenancy, schedules, recentTx] = await Promise.all([
+    const [units, mortgages, tenancy, schedules, recentTx, appliances] = await Promise.all([
       Unit.find({ companyId: req.companyId, propertyId: property._id, isActive: true }).sort({ unitName: 1 }).lean(),
       Mortgage.find({ companyId: req.companyId, propertyId: property._id }).populate('paymentAccountId', 'name sortCode accountNumber').lean(),
       TenancyAgreement.findOne({ companyId: req.companyId, propertyId: property._id, status: 'ACTIVE' }).populate('tenantId', 'fullName email phone').lean(),
       RentSchedule.find({ companyId: req.companyId, propertyId: property._id }).sort({ billingMonth: -1 }).limit(12).lean(),
       Transaction.find({ companyId: req.companyId, propertyId: property._id }).populate('accountId', 'name').populate('categoryId', 'name code').sort({ transactionDate: -1 }).limit(10).lean(),
+      Appliance.find({ companyId: req.companyId, propertyId: property._id }).sort({ createdAt: -1 }).lean(),
     ]);
 
     const totalDebt = mortgages
@@ -107,6 +109,7 @@ export const getPropertyById = async (req, res) => {
       tenancy,
       schedules,
       recentTransactions: recentTx,
+      appliances: appliances || [],
       totalMortgageDebt: totalDebt,
       equity,
       ltv,

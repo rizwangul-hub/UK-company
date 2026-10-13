@@ -5,6 +5,7 @@ import { SplashScreen } from './components/SplashScreen.jsx';
 import { CompanySelectionPage } from './pages/CompanySelectionPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { PropertiesPage } from './pages/PropertiesPage.jsx';
+import { AppliancesPage } from './pages/AppliancesPage.jsx';
 import { TenantsPage } from './pages/TenantsPage.jsx';
 import { RentManagerPage } from './pages/RentManagerPage.jsx';
 import { MortgagesPage } from './pages/MortgagesPage.jsx';
@@ -360,6 +361,7 @@ export function App() {
           )}
           {currentView === 'data-entry' && <DataEntryPage selectedCompany={selectedCompany} />}
           {currentView === 'properties' && <PropertiesPage selectedCompany={selectedCompany} />}
+          {currentView === 'appliances' && <AppliancesPage selectedCompany={selectedCompany} />}
           {currentView === 'tenants' && <TenantsPage selectedCompany={selectedCompany} />}
           {currentView === 'rent' && <RentManagerPage selectedCompany={selectedCompany} />}
           {currentView === 'mortgages' && <MortgagesPage selectedCompany={selectedCompany} />}

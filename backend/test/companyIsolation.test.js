@@ -29,6 +29,8 @@ import Account from '../src/models/Account.js';
 import Category from '../src/models/Category.js';
 import Transaction from '../src/models/Transaction.js';
 import Voucher from '../src/models/Voucher.js';
+import Appliance from '../src/models/Appliance.js';
+import MaintenanceTask from '../src/models/MaintenanceTask.js';
 
 // -----------------------------------------------------------------------------
 // 1. COMPANY REGISTRY & IDENTIFIER VALIDATION
@@ -246,7 +248,7 @@ test('MIDDLEWARE: Restricts non-admin user when company is not in allowedCompani
 // -----------------------------------------------------------------------------
 // 3. MONGOOSE SCHEMA & INDEX ISOLATION
 // -----------------------------------------------------------------------------
-test('SCHEMAS: All 12 operational models have required companyId in schema', () => {
+test('SCHEMAS: All 14 operational models have required companyId in schema', () => {
   const models = [
     { name: 'Property', schema: Property.schema },
     { name: 'Unit', schema: Unit.schema },
@@ -260,6 +262,8 @@ test('SCHEMAS: All 12 operational models have required companyId in schema', () 
     { name: 'Category', schema: Category.schema },
     { name: 'Transaction', schema: Transaction.schema },
     { name: 'Voucher', schema: Voucher.schema },
+    { name: 'Appliance', schema: Appliance.schema },
+    { name: 'MaintenanceTask', schema: MaintenanceTask.schema },
   ];
 
   models.forEach(({ name, schema }) => {
@@ -924,6 +928,20 @@ test('PHASE 4 AUDIT (13/13): First-run setup guard rejects secondary operator cr
   const userCount = 1; // Operator already exists
   const isSetupAllowed = userCount === 0;
   assert.equal(isSetupAllowed, false, 'Setup must be disabled when operator already exists');
+});
+
+test('APPLIANCES: Appliance schema requires companyId and validates against 6 UK entities', () => {
+  const applianceSchema = Appliance.schema;
+  const companyIdPath = applianceSchema.path('companyId');
+  assert.ok(companyIdPath.isRequired, 'companyId must be required on Appliance');
+  assert.deepEqual(companyIdPath.enumValues, VALID_COMPANY_IDS);
+});
+
+test('MAINTENANCE: MaintenanceTask schema requires companyId and defaults to Khurshid', () => {
+  const taskSchema = MaintenanceTask.schema;
+  const companyIdPath = taskSchema.path('companyId');
+  assert.ok(companyIdPath.isRequired, 'companyId must be required on MaintenanceTask');
+  assert.equal(taskSchema.path('assignedTo').defaultValue, 'Khurshid');
 });
 
 

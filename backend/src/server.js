@@ -16,6 +16,7 @@ import mortgageRoutes from './routes/mortgageRoutes.js';
 import accountRoutes from './routes/accountRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import applianceRoutes from './routes/applianceRoutes.js';
 
 // Configure UK Cloudinary if credentials are present in UK .env
 configureCloudinary();
@@ -136,6 +137,7 @@ app.use('/api/rent', rentRoutes);
 app.use('/api/mortgages', mortgageRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/ledger', ledgerRoutes);
+app.use('/api/appliances', applianceRoutes);
 app.use('/api', tenancyRoutes); // exposes /api/tenants and /api/tenancies
 
 // 404 Handler

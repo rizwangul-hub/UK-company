@@ -260,6 +260,54 @@ export const tenanciesAPI = {
 };
 
 // --------------------------------------------------------------------------
+// Appliances, Warranties & Currys Care API
+// --------------------------------------------------------------------------
+export const appliancesAPI = {
+  getAll: async (params, config = {}) => {
+    return cachedGet('/appliances', { params, ...config });
+  },
+  getById: async (id, config = {}) => {
+    return cachedGet(`/appliances/${id}`, config);
+  },
+  create: async (data) => {
+    const res = await api.post('/appliances', data);
+    return res.data;
+  },
+  update: async (id, data) => {
+    const res = await api.put(`/appliances/${id}`, data);
+    return res.data;
+  },
+  delete: async (id) => {
+    const res = await api.delete(`/appliances/${id}`);
+    return res.data;
+  },
+  uploadDocument: async (id, formData) => {
+    const res = await api.post(`/appliances/${id}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  deleteDocument: async (id, documentId) => {
+    const res = await api.delete(`/appliances/${id}/documents/${documentId}`);
+    return res.data;
+  },
+  getCurrysContacts: async (config = {}) => {
+    return cachedGet('/appliances/currys-contacts', config);
+  },
+  getTasks: async (config = {}) => {
+    return cachedGet('/appliances/tasks', config);
+  },
+  createTask: async (data) => {
+    const res = await api.post('/appliances/tasks', data);
+    return res.data;
+  },
+  updateTask: async (id, data) => {
+    const res = await api.put(`/appliances/tasks/${id}`, data);
+    return res.data;
+  },
+};
+
+// --------------------------------------------------------------------------
 // Rent Billing & Collections API
 // --------------------------------------------------------------------------
 export const rentAPI = {

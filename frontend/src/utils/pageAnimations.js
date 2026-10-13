@@ -17,6 +17,7 @@ export const PAGE_ANIMATION_CLASSES = {
   'dashboard': 'page-anim-zoom-3d',
   'data-entry': 'page-anim-slide-bottom',
   'properties': 'page-anim-book-flip',
+  'appliances': 'page-anim-scale-pop',
   'tenants': 'page-anim-slide-right',
   'rent': 'page-anim-slide-top',
   'mortgages': 'page-anim-flip-x',

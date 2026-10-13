@@ -18,6 +18,7 @@ import {
   FileEdit,
   Code2,
   ListTree,
+  Sparkles,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import pixxLogo from '../assets/logo.png';
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'data-entry', label: 'Data Entry', icon: FileEdit, badge: 'OPS' },
   { id: 'properties', label: 'Properties', icon: Building2 },
+  { id: 'appliances', label: 'Appliances & Valet', icon: Sparkles, badge: 'CARE' },
   { id: 'tenants', label: 'Tenants & Leases', icon: Users },
   { id: 'rent', label: 'Rent Invoicing', icon: Receipt },
   { id: 'mortgages', label: 'Mortgage Facilities', icon: Landmark, badge: 'UK' },
