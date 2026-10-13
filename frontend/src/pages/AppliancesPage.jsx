@@ -1551,6 +1551,76 @@ export function AppliancesPage({ selectedCompany }) {
                 </a>
               </div>
             </div>
+
+            {/* Official Care & Repair Key Inclusions from Leaflet */}
+            <div className="mt-4 pt-4 border-t border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Brochure Policy Benefits &amp; Key Inclusions</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>7 Day Fix Promise</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    If repair takes more than 7 calendar days from engineer visit, request an immediate replacement.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Replacement Guarantee</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    If unrepairable, receive a Currys gift card for equivalent spec product. If &gt;2 breakdowns, request a replacement regardless of whether faults are related.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>£0 Parts, Labour &amp; Call Outs</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    100% covered. Zero repair bills, no charges even if no fault found. Free delivery, installation &amp; recycling if replacement needed.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>Annual Squeaky Clean Valet</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Annual deep clean included for eligible household appliances (washing machines, dryers, dishwashers, cookers, fridges/freezers).
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>24/7 Tech &amp; Fault Support</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Call 0800 0121 909 anytime for technical assistance, fault logging, or replacement authorization.
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    <span>Official Portal &amp; Post</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    currys.co.uk/careandrepair · Postal: Currys Care Services, PO Box 194, Cramlington, NE23 0DA.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
