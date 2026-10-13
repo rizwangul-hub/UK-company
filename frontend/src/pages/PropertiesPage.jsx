@@ -283,7 +283,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
     const eicrStatus = getComplianceStatus(propDetail?.compliance?.eicrExpiryDate);
 
     return (
-      <div key={`property-detail-${selectedProperty._id || 'view'}`} className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 book-page-turn">
+      <div key={`property-detail-${selectedProperty._id || 'view'}`} className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 page-anim-slide-right">
         {/* Navigation Breadcrumb Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
           <div className="flex items-center gap-3">
@@ -874,7 +874,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   // VIEW 2: PORTFOLIO PROPERTIES GRID (DEFAULT LIST VIEW)
   // =========================================================================
   return (
-    <div key="properties-grid-list" className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 book-page-turn">
+    <div key="properties-grid-list" className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 page-anim-book-flip">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import pixxLogo from '../assets/logo.png';
+import { getPageAnimationClass } from '../utils/pageAnimations.js';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -371,9 +372,9 @@ export function MainLayout({
           </div>
         </header>
 
-        {/* Page Content with 3D Book Page Flip Animation */}
+        {/* Dynamic Page Content with View-Specific 3D Animations */}
         <div className="flex-1 pb-page-safe flex flex-col justify-between book-page-perspective">
-          <div key={currentView} className="book-page-turn min-h-full flex flex-col justify-between flex-1">
+          <div key={currentView} className={`${getPageAnimationClass(currentView)} min-h-full flex flex-col justify-between flex-1`}>
             <div>{children}</div>
 
             {/* Software Developer Credits for Mobile & Responsive Screens */}

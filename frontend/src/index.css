@@ -518,20 +518,21 @@ html.light ::-webkit-scrollbar-thumb:hover {
 }
 
 /* ========================================================================= */
-/* 3D BOOK PAGE TURN & ROTATION TRANSITIONS                                  */
+/* DYNAMIC 3D MULTI-DIRECTIONAL PAGE TRANSFER ANIMATIONS                    */
 /* ========================================================================= */
 
 .book-page-perspective {
   perspective: 1800px;
-  perspective-origin: 0% 50%;
+  perspective-origin: 50% 50%;
   transform-style: preserve-3d;
   overflow-x: hidden;
 }
 
-@keyframes bookPageTurnDark {
+/* 1. Book Page Turn from Left Spine (Properties) */
+@keyframes bookPageTurnIn {
   0% {
     opacity: 0;
-    transform: perspective(1800px) rotateY(-25deg) translateZ(-35px) scale(0.965);
+    transform: perspective(1800px) rotateY(-24deg) translateZ(-35px) scale(0.965);
     transform-origin: 0% 50%;
     box-shadow: -22px 0 40px -8px rgba(0, 0, 0, 0.6), inset 35px 0 50px -15px rgba(0, 0, 0, 0.45);
     filter: brightness(0.88);
@@ -551,83 +552,296 @@ html.light ::-webkit-scrollbar-thumb:hover {
     filter: brightness(1);
   }
 }
-
-@keyframes bookPageTurnLight {
-  0% {
-    opacity: 0;
-    transform: perspective(1800px) rotateY(-25deg) translateZ(-35px) scale(0.965);
-    transform-origin: 0% 50%;
-    box-shadow: -22px 0 35px -8px rgba(15, 23, 42, 0.22), inset 35px 0 45px -15px rgba(15, 23, 42, 0.16);
-    filter: brightness(0.93);
-  }
-  50% {
-    opacity: 0.92;
-    transform: perspective(1800px) rotateY(-6deg) translateZ(-8px) scale(0.992);
-    transform-origin: 0% 50%;
-    box-shadow: -10px 0 18px -5px rgba(15, 23, 42, 0.1), inset 14px 0 20px -10px rgba(15, 23, 42, 0.08);
-    filter: brightness(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: perspective(1800px) rotateY(0deg) translateZ(0) scale(1);
-    transform-origin: 0% 50%;
-    box-shadow: 0 0 0 0 transparent, inset 0 0 0 0 transparent;
-    filter: brightness(1);
-  }
-}
-
+.page-anim-book-flip,
 .book-page-turn {
-  animation: bookPageTurnDark 0.44s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: bookPageTurnIn 0.44s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transform-origin: 0% 50%;
   backface-visibility: hidden;
   will-change: transform, opacity, box-shadow;
   border-radius: 0.5rem;
 }
 
-html.light .book-page-turn {
-  animation-name: bookPageTurnLight;
+/* 2. Slide Down from Top with 3D Drop (Rent Invoicing, Financial Reports) */
+@keyframes pageSlideFromTop {
+  0% {
+    opacity: 0;
+    transform: perspective(1600px) translateY(-45px) rotateX(-12deg) scale(0.97);
+    transform-origin: 50% 0%;
+    box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.5);
+  }
+  60% {
+    opacity: 0.95;
+    transform: perspective(1600px) translateY(-6px) rotateX(-2deg) scale(0.995);
+    transform-origin: 50% 0%;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1600px) translateY(0) rotateX(0deg) scale(1);
+    transform-origin: 50% 0%;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.page-anim-slide-top {
+  animation: pageSlideFromTop 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 50% 0%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
 }
 
+/* 3. Slide & Rise from Bottom (Data Entry, Company Selection) */
+@keyframes pageSlideFromBottom {
+  0% {
+    opacity: 0;
+    transform: perspective(1600px) translateY(48px) rotateX(12deg) scale(0.97);
+    transform-origin: 50% 100%;
+    box-shadow: 0 -15px 35px -10px rgba(0, 0, 0, 0.5);
+  }
+  60% {
+    opacity: 0.95;
+    transform: perspective(1600px) translateY(6px) rotateX(2deg) scale(0.995);
+    transform-origin: 50% 100%;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1600px) translateY(0) rotateX(0deg) scale(1);
+    transform-origin: 50% 100%;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.page-anim-slide-bottom {
+  animation: pageSlideFromBottom 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 50% 100%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* 4. Slide & Rotate from Right (Tenants & Leases) */
+@keyframes pageSlideFromRight {
+  0% {
+    opacity: 0;
+    transform: perspective(1800px) translateX(55px) rotateY(14deg) scale(0.97);
+    transform-origin: 100% 50%;
+    box-shadow: 15px 0 35px -8px rgba(0, 0, 0, 0.45);
+  }
+  60% {
+    opacity: 0.95;
+    transform: perspective(1800px) translateX(6px) rotateY(2deg) scale(0.995);
+    transform-origin: 100% 50%;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1800px) translateX(0) rotateY(0deg) scale(1);
+    transform-origin: 100% 50%;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.page-anim-slide-right {
+  animation: pageSlideFromRight 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 100% 50%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* 5. Slide & Rotate from Left (Bank Accounts) */
+@keyframes pageSlideFromLeft {
+  0% {
+    opacity: 0;
+    transform: perspective(1800px) translateX(-55px) rotateY(-14deg) scale(0.97);
+    transform-origin: 0% 50%;
+    box-shadow: -15px 0 35px -8px rgba(0, 0, 0, 0.45);
+  }
+  60% {
+    opacity: 0.95;
+    transform: perspective(1800px) translateX(-6px) rotateY(-2deg) scale(0.995);
+    transform-origin: 0% 50%;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1800px) translateX(0) rotateY(0deg) scale(1);
+    transform-origin: 0% 50%;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.page-anim-slide-left {
+  animation: pageSlideFromLeft 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 0% 50%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* 6. Center 3D Depth Zoom & Float (Dashboard, Master Group Dashboard) */
+@keyframes pageZoom3D {
+  0% {
+    opacity: 0;
+    transform: perspective(1600px) translateZ(-80px) scale(0.92);
+    transform-origin: 50% 50%;
+    filter: brightness(0.92);
+  }
+  60% {
+    opacity: 0.95;
+    transform: perspective(1600px) translateZ(-10px) scale(0.99);
+    transform-origin: 50% 50%;
+    filter: brightness(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1600px) translateZ(0) scale(1);
+    transform-origin: 50% 50%;
+    filter: brightness(1);
+  }
+}
+.page-anim-zoom-3d {
+  animation: pageZoom3D 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* 7. Vertical 3D Vault / Folder Unfold (Mortgage Facilities) */
+@keyframes pageFlipX {
+  0% {
+    opacity: 0;
+    transform: perspective(1800px) rotateX(-20deg) translateY(-20px) scale(0.965);
+    transform-origin: 50% 0%;
+    box-shadow: 0 25px 40px -10px rgba(0, 0, 0, 0.55);
+  }
+  60% {
+    opacity: 0.95;
+    transform: perspective(1800px) rotateX(-3deg) translateY(-3px) scale(0.995);
+    transform-origin: 50% 0%;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1800px) rotateX(0deg) translateY(0) scale(1);
+    transform-origin: 50% 0%;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.page-anim-flip-x {
+  animation: pageFlipX 0.44s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 50% 0%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* 8. Isometric Diagonal Glide (Chart of Accounts) */
+@keyframes pageDiagonalGlide {
+  0% {
+    opacity: 0;
+    transform: perspective(1600px) translateX(40px) translateY(-30px) scale(0.96);
+    transform-origin: 75% 25%;
+  }
+  60% {
+    opacity: 0.95;
+    transform: perspective(1600px) translateX(5px) translateY(-4px) scale(0.995);
+    transform-origin: 75% 25%;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1600px) translateX(0) translateY(0) scale(1);
+    transform-origin: 75% 25%;
+  }
+}
+.page-anim-diagonal {
+  animation: pageDiagonalGlide 0.43s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 75% 25%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* 9. Deep Financial Ledger Turn (Central Ledger) */
+@keyframes pageLedgerTurn {
+  0% {
+    opacity: 0;
+    transform: perspective(2000px) rotateY(-28deg) translateZ(-50px) scale(0.96);
+    transform-origin: 0% 50%;
+    box-shadow: -25px 0 45px -8px rgba(0, 0, 0, 0.65), inset 40px 0 55px -15px rgba(0, 0, 0, 0.45);
+  }
+  55% {
+    opacity: 0.93;
+    transform: perspective(2000px) rotateY(-6deg) translateZ(-10px) scale(0.992);
+    transform-origin: 0% 50%;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(2000px) rotateY(0deg) translateZ(0) scale(1);
+    transform-origin: 0% 50%;
+    box-shadow: 0 0 0 0 transparent, inset 0 0 0 0 transparent;
+  }
+}
+.page-anim-ledger-flip {
+  animation: pageLedgerTurn 0.46s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 0% 50%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* 10. Modern Scale & Settle Pop (Settings) */
+@keyframes pageScalePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.93) rotate(0.8deg);
+    transform-origin: 50% 50%;
+  }
+  60% {
+    opacity: 0.95;
+    transform: scale(1.008) rotate(-0.2deg);
+    transform-origin: 50% 50%;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    transform-origin: 50% 50%;
+  }
+}
+.page-anim-scale-pop {
+  animation: pageScalePop 0.40s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  border-radius: 0.5rem;
+}
+
+/* Mobile responsive adjustments */
 @media (max-width: 640px) {
-  @keyframes bookPageTurnDarkMobile {
-    0% {
-      opacity: 0;
-      transform: perspective(1200px) rotateY(-18deg) scale(0.975);
-      transform-origin: 0% 50%;
-    }
-    100% {
-      opacity: 1;
-      transform: perspective(1200px) rotateY(0deg) scale(1);
-      transform-origin: 0% 50%;
-    }
+  .page-anim-book-flip,
+  .book-page-turn,
+  .page-anim-ledger-flip {
+    transform-origin: 0% 50%;
+    animation-duration: 0.36s;
   }
-
-  @keyframes bookPageTurnLightMobile {
-    0% {
-      opacity: 0;
-      transform: perspective(1200px) rotateY(-18deg) scale(0.975);
-      transform-origin: 0% 50%;
-    }
-    100% {
-      opacity: 1;
-      transform: perspective(1200px) rotateY(0deg) scale(1);
-      transform-origin: 0% 50%;
-    }
-  }
-
-  .book-page-turn {
-    animation-name: bookPageTurnDarkMobile;
-    animation-duration: 0.38s;
-  }
-
-  html.light .book-page-turn {
-    animation-name: bookPageTurnLightMobile;
-    animation-duration: 0.38s;
+  .page-anim-slide-top,
+  .page-anim-slide-bottom,
+  .page-anim-slide-right,
+  .page-anim-slide-left,
+  .page-anim-zoom-3d,
+  .page-anim-flip-x,
+  .page-anim-diagonal,
+  .page-anim-scale-pop {
+    animation-duration: 0.35s;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .book-page-turn {
+  .page-anim-book-flip,
+  .book-page-turn,
+  .page-anim-slide-top,
+  .page-anim-slide-bottom,
+  .page-anim-slide-right,
+  .page-anim-slide-left,
+  .page-anim-zoom-3d,
+  .page-anim-flip-x,
+  .page-anim-diagonal,
+  .page-anim-ledger-flip,
+  .page-anim-scale-pop {
     animation: none !important;
     transform: none !important;
   }
