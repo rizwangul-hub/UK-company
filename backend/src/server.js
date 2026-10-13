@@ -77,6 +77,7 @@ app.get('/', async (req, res) => {
     success: true,
     service: 'PIXX Technologies UK Property Finance API',
     status: 'ONLINE',
+    version: '1.0.3',
     database: dbStatus,
     databaseName: mongoose.connection.name || 'uk_property_finance',
     currency: 'GBP (£)',
@@ -118,6 +119,7 @@ app.get('/api/health', async (req, res) => {
     success: true,
     service: 'PIXX Technologies UK Property Finance API',
     status: 'ONLINE',
+    version: '1.0.3',
     database: dbStatus,
     databaseName: mongoose.connection.name || 'uk_property_finance',
     currency: 'GBP (£)',
@@ -127,13 +129,13 @@ app.get('/api/health', async (req, res) => {
 
 // Mount UK Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/reports', reportRoutes); // Mount reportRoutes first so it is never intercepted
 app.use('/api/properties', propertyRoutes);
-app.use('/api', tenancyRoutes); // exposes /api/tenants and /api/tenancies
 app.use('/api/rent', rentRoutes);
 app.use('/api/mortgages', mortgageRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/ledger', ledgerRoutes);
-app.use('/api/reports', reportRoutes);
+app.use('/api', tenancyRoutes); // exposes /api/tenants and /api/tenancies
 
 // 404 Handler
 app.use((req, res) => {

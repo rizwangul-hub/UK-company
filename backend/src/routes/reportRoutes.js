@@ -21,22 +21,20 @@ router.get('/consolidated/overview', protect, getConsolidatedOverview);
 router.get('/consolidated/excel', protect, exportConsolidatedExcel);
 router.get('/consolidated/pdf', protect, exportConsolidatedPdf);
 
-// Enforce Company Context for all single-company endpoints
-router.use(protect, requireCompanyContext);
-
-router.get('/dashboard', getDashboardStats);
-router.get('/property-profitability', getPropertyProfitability);
-router.get('/financial-year', getFinancialYearReport);
+// Single-company endpoints (Strictly isolated by authenticated company context)
+router.get('/dashboard', protect, requireCompanyContext, getDashboardStats);
+router.get('/property-profitability', protect, requireCompanyContext, getPropertyProfitability);
+router.get('/financial-year', protect, requireCompanyContext, getFinancialYearReport);
 
 // UK Ledger Advanced Reporting & Exports
-router.get('/ledger/preview', getLedgerReportPreview);
-router.post('/ledger/preview', getLedgerReportPreview);
-router.get('/ledger/export/excel', exportLedgerExcel);
-router.post('/ledger/export/excel', exportLedgerExcel);
-router.get('/ledger/export/pdf', exportLedgerPdf);
-router.post('/ledger/export/pdf', exportLedgerPdf);
+router.get('/ledger/preview', protect, requireCompanyContext, getLedgerReportPreview);
+router.post('/ledger/preview', protect, requireCompanyContext, getLedgerReportPreview);
+router.get('/ledger/export/excel', protect, requireCompanyContext, exportLedgerExcel);
+router.post('/ledger/export/excel', protect, requireCompanyContext, exportLedgerExcel);
+router.get('/ledger/export/pdf', protect, requireCompanyContext, exportLedgerPdf);
+router.post('/ledger/export/pdf', protect, requireCompanyContext, exportLedgerPdf);
 
 // Direct Property Landlord Rent Statement (No Inside Units)
-router.get('/landlord-statement/excel', exportLandlordRentStatementExcel);
+router.get('/landlord-statement/excel', protect, requireCompanyContext, exportLandlordRentStatementExcel);
 
 export default router;
