@@ -2,6 +2,8 @@ import Property from '../models/Property.js';
 import Unit from '../models/Unit.js';
 import Mortgage from '../models/Mortgage.js';
 import TenancyAgreement from '../models/TenancyAgreement.js';
+import RentSchedule from '../models/RentSchedule.js';
+import Transaction from '../models/Transaction.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
 
 export const getProperties = async (req, res) => {
@@ -80,21 +82,36 @@ export const getPropertyById = async (req, res) => {
     const property = await Property.findOne({ _id: req.params.id, companyId: req.companyId }).lean();
     if (!property) return apiError(res, 'Property not found', 404);
 
-    const [units, mortgages] = await Promise.all([
+    const [units, mortgages, tenancy, schedules, recentTx] = await Promise.all([
       Unit.find({ companyId: req.companyId, propertyId: property._id, isActive: true }).sort({ unitName: 1 }).lean(),
       Mortgage.find({ companyId: req.companyId, propertyId: property._id }).populate('paymentAccountId', 'name sortCode accountNumber').lean(),
+      TenancyAgreement.findOne({ companyId: req.companyId, propertyId: property._id, status: 'ACTIVE' }).populate('tenantId', 'fullName email phone').lean(),
+      RentSchedule.find({ companyId: req.companyId, propertyId: property._id }).sort({ billingMonth: -1 }).limit(12).lean(),
+      Transaction.find({ companyId: req.companyId, propertyId: property._id }).populate('accountId', 'name').populate('categoryId', 'name code').sort({ transactionDate: -1 }).limit(10).lean(),
     ]);
 
     const totalDebt = mortgages
       .filter((m) => m.status === 'ACTIVE')
       .reduce((sum, m) => sum + (m.outstandingPrincipalBalance || 0), 0);
 
+    const assetVal = property.currentValuation || property.purchasePrice || 0;
+    const equity = Math.max(0, assetVal - totalDebt);
+    const ltv = assetVal > 0 ? Number(((totalDebt / assetVal) * 100).toFixed(1)) : 0;
+    const annualRent = (property.contractualRent || 0) * (property.rentFrequency === 'ANNUALLY' ? 1 : 12);
+    const grossYield = assetVal > 0 ? Number(((annualRent / assetVal) * 100).toFixed(2)) : 0;
+
     return apiSuccess(res, {
       ...property,
       units,
       mortgages,
+      tenancy,
+      schedules,
+      recentTransactions: recentTx,
       totalMortgageDebt: totalDebt,
-      equity: Math.max(0, (property.currentValuation || property.purchasePrice || 0) - totalDebt),
+      equity,
+      ltv,
+      annualRent,
+      grossYield,
     });
   } catch (error) {
     return apiError(res, 'Failed to fetch property details', 500, error);

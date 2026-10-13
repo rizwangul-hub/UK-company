@@ -25,7 +25,7 @@ import pixxLogo from '../assets/logo.png';
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'data-entry', label: 'Data Entry', icon: FileEdit, badge: 'OPS' },
-  { id: 'properties', label: 'Properties & Units', icon: Building2 },
+  { id: 'properties', label: 'Properties', icon: Building2 },
   { id: 'tenants', label: 'Tenants & Leases', icon: Users },
   { id: 'rent', label: 'Rent Invoicing', icon: Receipt },
   { id: 'mortgages', label: 'Mortgage Facilities', icon: Landmark, badge: 'UK' },
