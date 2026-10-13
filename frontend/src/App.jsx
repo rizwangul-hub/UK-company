@@ -17,6 +17,7 @@ import { ChartOfAccountsPage } from './pages/ChartOfAccountsPage.jsx';
 import { GroupPortfolioDashboard } from './pages/GroupPortfolioDashboard.jsx';
 import { authAPI, clearApiCache } from './services/api.js';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { PWAInstallBanner } from './components/PWAInstallBanner.jsx';
 import { COMPANIES, getCompanyBySlug } from './config/companies.js';
 
 // Synchronous initial state helpers for 0ms initial render
@@ -369,6 +370,9 @@ export function App() {
           {currentView === 'settings' && <SettingsPage user={user} selectedCompany={selectedCompany} />}
         </MainLayout>
       )}
+
+      {/* Progressive Web App (PWA) Native Installation Prompt Banner */}
+      <PWAInstallBanner />
     </ThemeProvider>
   );
 }
