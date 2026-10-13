@@ -17,12 +17,13 @@ import {
   Clock,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
-import { mortgagesAPI, propertiesAPI, accountsAPI } from '../services/api.js';
+import { mortgagesAPI, propertiesAPI, accountsAPI, getApiCache } from '../services/api.js';
 
 export function MortgagesPage({ selectedCompany }) {
-  const [mortgages, setMortgages] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const cachedMortgages = getApiCache('/mortgages');
+  const [mortgages, setMortgages] = useState(cachedMortgages?.data?.mortgages || []);
+  const [summary, setSummary] = useState(cachedMortgages?.data?.summary || null);
+  const [loading, setLoading] = useState(!cachedMortgages?.data?.mortgages);
 
   // Reference data for modals
   const [properties, setProperties] = useState([]);
@@ -77,10 +78,12 @@ export function MortgagesPage({ selectedCompany }) {
     notes: '',
   });
 
-  const loadMortgages = async () => {
-    setLoading(true);
+  const loadMortgages = async (force = false) => {
+    if (mortgages.length === 0 || force) {
+      setLoading(true);
+    }
     try {
-      const res = await mortgagesAPI.getAll();
+      const res = await mortgagesAPI.getAll({}, { forceRefresh: force });
       if (res?.success) {
         setMortgages(res.data.mortgages || []);
         setSummary(res.data.summary);

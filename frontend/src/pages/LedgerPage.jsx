@@ -30,7 +30,7 @@ import {
   Square,
   Check,
 } from 'lucide-react';
-import { ledgerAPI, accountsAPI, reportsAPI } from '../services/api.js';
+import { ledgerAPI, accountsAPI, reportsAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import SingleVoucherPrintModal from '../components/SingleVoucherPrintModal.jsx';
 import ReportExportModal from '../components/ReportExportModal.jsx';
@@ -49,8 +49,9 @@ const LEDGER_TYPES = [
 ];
 
 export function LedgerPage({ selectedCompany }) {
+  const cachedEntities = getApiCache('/ledger/entities');
   const [ledgerType, setLedgerType] = useState('BANK');
-  const [entitiesMap, setEntitiesMap] = useState({
+  const [entitiesMap, setEntitiesMap] = useState(cachedEntities?.data || {
     bankAccounts: [],
     cashAccounts: [],
     properties: [],
@@ -68,7 +69,7 @@ export function LedgerPage({ selectedCompany }) {
 
   const [ledgerData, setLedgerData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [loadingEntities, setLoadingEntities] = useState(true);
+  const [loadingEntities, setLoadingEntities] = useState(!cachedEntities?.data);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Active Voucher Modal
@@ -92,11 +93,13 @@ export function LedgerPage({ selectedCompany }) {
   });
 
   // Load all entities
-  const loadEntities = async () => {
+  const loadEntities = async (force = false) => {
     try {
-      setLoadingEntities(true);
+      if (!cachedEntities?.data || force) {
+        setLoadingEntities(true);
+      }
       setErrorMsg('');
-      const res = await ledgerAPI.getEntities();
+      const res = await ledgerAPI.getEntities({}, { forceRefresh: force });
       if (res?.success && res.data) {
         setEntitiesMap(res.data);
       }

@@ -14,20 +14,22 @@ import {
   Printer,
 } from 'lucide-react';
 import { formatGBP } from '../utils/formatters.js';
-import { reportsAPI } from '../services/api.js';
+import { reportsAPI, getApiCache } from '../services/api.js';
 import ReportExportModal from '../components/ReportExportModal.jsx';
 
 export function ReportsPage({ selectedCompany }) {
   const [activeTab, setActiveTab] = useState('tax'); // 'tax' | 'profitability'
 
   // Tax Report State
+  const cachedTax = getApiCache('/reports/financial-year', { params: { taxYear: '2026-2027' } });
   const [taxYear, setTaxYear] = useState('2026-2027');
-  const [taxData, setTaxData] = useState(null);
-  const [taxLoading, setTaxLoading] = useState(true);
+  const [taxData, setTaxData] = useState(cachedTax?.data || null);
+  const [taxLoading, setTaxLoading] = useState(!cachedTax?.data);
 
   // Profitability State
-  const [profitabilityData, setProfitabilityData] = useState([]);
-  const [profitabilityLoading, setProfitabilityLoading] = useState(false);
+  const cachedProf = getApiCache('/reports/property-profitability');
+  const [profitabilityData, setProfitabilityData] = useState(cachedProf?.data?.properties || []);
+  const [profitabilityLoading, setProfitabilityLoading] = useState(!cachedProf?.data?.properties);
 
   // Central Ledger Report Modal State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -37,10 +39,12 @@ export function ReportsPage({ selectedCompany }) {
   const companyLegal = selectedCompany?.legalName || 'UK Property Finance Ltd';
   const companySlug = selectedCompany?.slug || 'company';
 
-  const loadTaxReport = async () => {
-    setTaxLoading(true);
+  const loadTaxReport = async (force = false) => {
+    if (!taxData || force) {
+      setTaxLoading(true);
+    }
     try {
-      const res = await reportsAPI.getFinancialYearReport({ taxYear });
+      const res = await reportsAPI.getFinancialYearReport({ taxYear }, { forceRefresh: force });
       if (res?.success) setTaxData(res.data);
     } catch (err) {
       console.error('Failed to load UK tax report:', err);
@@ -49,10 +53,12 @@ export function ReportsPage({ selectedCompany }) {
     }
   };
 
-  const loadProfitability = async () => {
-    setProfitabilityLoading(true);
+  const loadProfitability = async (force = false) => {
+    if (profitabilityData.length === 0 || force) {
+      setProfitabilityLoading(true);
+    }
     try {
-      const res = await reportsAPI.getPropertyProfitability();
+      const res = await reportsAPI.getPropertyProfitability({}, { forceRefresh: force });
       if (res?.success) setProfitabilityData(res.data.properties || []);
     } catch (err) {
       console.error('Failed to load property profitability:', err);

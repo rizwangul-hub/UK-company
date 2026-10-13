@@ -17,13 +17,15 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
-import { rentAPI, accountsAPI, reportsAPI } from '../services/api.js';
+import { rentAPI, accountsAPI, reportsAPI, getApiCache } from '../services/api.js';
 
 export function RentManagerPage({ selectedCompany }) {
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth);
-  const [schedules, setSchedules] = useState([]);
-  const [totals, setTotals] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const currentMonthVal = getCurrentMonth();
+  const cachedSchedules = getApiCache('/rent/schedules', { params: { billingMonth: currentMonthVal } });
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthVal);
+  const [schedules, setSchedules] = useState(cachedSchedules?.data?.schedules || []);
+  const [totals, setTotals] = useState(cachedSchedules?.data?.totals || null);
+  const [loading, setLoading] = useState(!cachedSchedules?.data?.schedules);
   const [landlordLoading, setLandlordLoading] = useState(false);
 
   // Generate schedules state
@@ -56,10 +58,12 @@ export function RentManagerPage({ selectedCompany }) {
     notes: '',
   });
 
-  const loadSchedules = async () => {
-    setLoading(true);
+  const loadSchedules = async (force = false) => {
+    if (schedules.length === 0 || force) {
+      setLoading(true);
+    }
     try {
-      const res = await rentAPI.getSchedules({ billingMonth: selectedMonth });
+      const res = await rentAPI.getSchedules({ billingMonth: selectedMonth }, { forceRefresh: force });
       if (res?.success) {
         setSchedules(res.data.schedules || []);
         setTotals(res.data.totals);

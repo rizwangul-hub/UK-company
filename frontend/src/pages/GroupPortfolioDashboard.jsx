@@ -21,13 +21,23 @@ import {
   ArrowRightLeft,
 } from 'lucide-react';
 import { formatGBP } from '../utils/formatters.js';
-import { reportsAPI } from '../services/api.js';
+import { reportsAPI, getApiCache } from '../services/api.js';
 import { COMPANIES } from '../config/companies.js';
 import pixxLogo from '../assets/logo.png';
 
 export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingleCompany }) {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState(null);
+  const cachedOverview = getApiCache('/reports/consolidated/overview');
+  const initialPayload =
+    cachedOverview?.data && typeof cachedOverview.data === 'object' && cachedOverview.data.totals
+      ? cachedOverview.data
+      : cachedOverview?.message && typeof cachedOverview.message === 'object' && cachedOverview.message.totals
+      ? cachedOverview.message
+      : cachedOverview?.totals
+      ? cachedOverview
+      : null;
+
+  const [loading, setLoading] = useState(!initialPayload);
+  const [data, setData] = useState(initialPayload);
   const [error, setError] = useState(null);
   const [excelDownloading, setExcelDownloading] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
@@ -36,11 +46,13 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCompany, setFilterCompany] = useState('ALL');
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (force = false) => {
+    if (!data || force) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      const res = await reportsAPI.getConsolidatedOverview();
+      const res = await reportsAPI.getConsolidatedOverview({ forceRefresh: force });
       if (res?.success) {
         // Robust extraction: handles res.data, res.message, or res itself
         const payload =

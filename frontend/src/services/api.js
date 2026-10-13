@@ -29,6 +29,24 @@ export const clearApiCache = () => {
 };
 
 /**
+ * Normalize query params so redundant companyId or empty filters share the exact same cache key
+ */
+const normalizeParams = (params) => {
+  if (!params || typeof params !== 'object') return '';
+  const cleaned = {};
+  const keys = Object.keys(params).sort();
+  for (const k of keys) {
+    const val = params[k];
+    // Ignore redundant companyId query param as it is already enforced via x-company-id header
+    if (k === 'companyId') continue;
+    // Ignore empty strings, null, undefined
+    if (val === '' || val === null || val === undefined) continue;
+    cleaned[k] = val;
+  }
+  return Object.keys(cleaned).length > 0 ? JSON.stringify(cleaned) : '';
+};
+
+/**
  * Generate a unique, deterministic cache key based on URL, company scope, and query parameters.
  */
 const getCacheKey = (url, config = {}) => {
@@ -39,17 +57,31 @@ const getCacheKey = (url, config = {}) => {
       companyId = window.location.pathname.replace(/^\/company\//, '').split('/')[0];
     }
   }
-  const paramsKey = config.params ? JSON.stringify(config.params) : '';
+  const paramsKey = normalizeParams(config.params);
   return `${url}::${companyId || 'global'}::${paramsKey}`;
+};
+
+/**
+ * Synchronously retrieves cached API response data from memory if valid within TTL.
+ * Allows components to mount instantly without displaying unnecessary loading spinners.
+ */
+export const getApiCache = (url, config = {}, ttlMs = 300000) => {
+  const cacheKey = getCacheKey(url, config);
+  const cached = requestCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < ttlMs) {
+    return cached.data;
+  }
+  return null;
 };
 
 /**
  * Cached & Deduplicated GET Request:
  * 1. Checks memory cache (returns in 0ms if within TTL and not force-refreshed).
  * 2. Deduplicates simultaneous in-flight requests so only 1 HTTP network call is made.
- * 3. Caches response upon resolution.
+ * 3. Caches response upon resolution with a 5-minute default TTL.
+ * 4. Automatically purged whenever a mutation (POST/PUT/PATCH/DELETE) occurs.
  */
-export const cachedGet = async (url, config = {}, ttlMs = 15000) => {
+export const cachedGet = async (url, config = {}, ttlMs = 300000) => {
   const { forceRefresh = false, ...axiosConfig } = config;
   const cacheKey = getCacheKey(url, axiosConfig);
 

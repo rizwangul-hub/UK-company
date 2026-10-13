@@ -1,4 +1,4 @@
-const CACHE_NAME = 'uk-company-pwa-v3';
+const CACHE_NAME = 'uk-company-pwa-v4';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -67,10 +67,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Static assets: Network-first with cache fallback
+  // 3. Static assets: Cache-First for instant 0ms local response without network round-trips
   event.respondWith(
-    fetch(request)
-      .then((networkResponse) => {
+    caches.match(request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(request).then((networkResponse) => {
         // Cache successful responses for same-origin static assets
         if (
           networkResponse &&
@@ -83,9 +86,7 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      })
-      .catch(() => {
-        return caches.match(request);
-      })
+      });
+    })
   );
 });

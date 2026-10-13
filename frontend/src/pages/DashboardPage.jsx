@@ -20,12 +20,14 @@ import {
   Clock,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
-import { reportsAPI } from '../services/api.js';
+import { reportsAPI, getApiCache } from '../services/api.js';
 
 export function DashboardPage({ onNavigate, selectedCompany }) {
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const currentMonthVal = getCurrentMonth();
+  const initialCache = getApiCache('/reports/dashboard', { params: { month: currentMonthVal } });
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthVal);
+  const [data, setData] = useState(initialCache?.data || null);
+  const [loading, setLoading] = useState(!initialCache?.data);
 
   const companyName = selectedCompany?.name || 'Portfolio';
   const companyLegal = selectedCompany?.legalName || 'UK Property Finance';
@@ -46,8 +48,13 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
   useEffect(() => {
     let isCurrent = true;
-    setData(null);
-    setLoading(true);
+    const cached = getApiCache('/reports/dashboard', { params: { month: selectedMonth } });
+    if (cached?.data) {
+      setData(cached.data);
+      setLoading(false);
+    } else if (!data) {
+      setLoading(true);
+    }
 
     const loadStats = async () => {
       try {

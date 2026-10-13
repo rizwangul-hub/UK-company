@@ -13,14 +13,19 @@ import {
   Edit3,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
-import { tenantsAPI, tenanciesAPI, propertiesAPI } from '../services/api.js';
+import { tenantsAPI, tenanciesAPI, propertiesAPI, getApiCache } from '../services/api.js';
 
 export function TenantsPage({ selectedCompany }) {
   const [activeTab, setActiveTab] = useState('agreements'); // 'agreements' | 'directory'
-  const [tenants, setTenants] = useState([]);
-  const [tenancies, setTenancies] = useState([]);
-  const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const cachedTenants = getApiCache('/tenants', { params: { search: '' } });
+  const cachedTenancies = getApiCache('/tenancies');
+  const cachedProps = getApiCache('/properties');
+
+  const [tenants, setTenants] = useState(cachedTenants?.data?.tenants || []);
+  const [tenancies, setTenancies] = useState(cachedTenancies?.data?.tenancies || []);
+  const [properties, setProperties] = useState(cachedProps?.data?.properties || []);
+  const [loading, setLoading] = useState(!cachedTenants?.data?.tenants?.length);
   const [search, setSearch] = useState('');
 
   // Add Tenant Modal
@@ -81,13 +86,15 @@ export function TenantsPage({ selectedCompany }) {
     leaseType: 'AST',
   });
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (force = false) => {
+    if ((tenants.length === 0 && tenancies.length === 0) || force) {
+      setLoading(true);
+    }
     try {
       const [tenantsRes, tenanciesRes, propsRes] = await Promise.all([
-        tenantsAPI.getAll({ search }),
-        tenanciesAPI.getAll(),
-        propertiesAPI.getAll(),
+        tenantsAPI.getAll({ search }, { forceRefresh: force }),
+        tenanciesAPI.getAll({}, { forceRefresh: force }),
+        propertiesAPI.getAll({}, { forceRefresh: force }),
       ]);
       if (tenantsRes?.success) setTenants(tenantsRes.data.tenants || []);
       if (tenanciesRes?.success) setTenancies(tenanciesRes.data.tenancies || []);

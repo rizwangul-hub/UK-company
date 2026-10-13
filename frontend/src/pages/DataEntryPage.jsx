@@ -26,6 +26,7 @@ import {
   ledgerAPI,
   rentAPI,
   mortgagesAPI,
+  getApiCache,
 } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import pixxLogo from '../assets/logo.png';
@@ -33,15 +34,19 @@ import pixxLogo from '../assets/logo.png';
 export function DataEntryPage({ selectedCompany }) {
   const [activeTab, setActiveTab] = useState('rent'); // 'rent' | 'expense' | 'transfer' | 'other' | 'mortgage' | 'recent'
 
+  const cachedAccs = getApiCache('/accounts');
+  const cachedProps = getApiCache('/properties');
+  const cachedCats = getApiCache('/ledger/categories');
+
   // Master Data
-  const [accounts, setAccounts] = useState([]);
-  const [properties, setProperties] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [accounts, setAccounts] = useState(cachedAccs?.data?.accounts || []);
+  const [properties, setProperties] = useState(cachedProps?.data?.properties || []);
+  const [categories, setCategories] = useState(cachedCats?.data?.categories || []);
   const [mortgages, setMortgages] = useState([]);
   const [rentSchedules, setRentSchedules] = useState([]);
   const [recentTransactions, setRecentTransactions] = useState([]);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedAccs?.data?.accounts?.length);
   const [submitting, setSubmitting] = useState(false);
   const [generatingSchedules, setGeneratingSchedules] = useState(false);
   const [feedback, setFeedback] = useState({ text: '', type: '' });
@@ -108,9 +113,11 @@ export function DataEntryPage({ selectedCompany }) {
   });
 
   // Load All System Master Data
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (force = false) => {
     try {
-      setLoading(true);
+      if ((!accounts.length && !cachedAccs?.data?.accounts?.length) || force) {
+        setLoading(true);
+      }
       const companyId = selectedCompany?.slug || selectedCompany?.id || localStorage.getItem('selected_company');
       const params = companyId && companyId !== 'all' ? { companyId } : {};
 

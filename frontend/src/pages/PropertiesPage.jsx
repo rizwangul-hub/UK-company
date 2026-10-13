@@ -29,12 +29,18 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
-import { propertiesAPI } from '../services/api.js';
+import { propertiesAPI, getApiCache } from '../services/api.js';
 
 export function PropertiesPage({ onSelectProperty, selectedCompany }) {
-  const [properties, setProperties] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const initialCache = getApiCache('/properties', {
+    params: {
+      search: '',
+      tenure: undefined,
+    },
+  });
+  const [properties, setProperties] = useState(initialCache?.data?.properties || []);
+  const [summary, setSummary] = useState(initialCache?.data?.summary || null);
+  const [loading, setLoading] = useState(!initialCache?.data?.properties);
   const [search, setSearch] = useState('');
   const [tenureFilter, setTenureFilter] = useState('');
 
@@ -70,13 +76,15 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
     notes: '',
   });
 
-  const loadProperties = async () => {
-    setLoading(true);
+  const loadProperties = async (forceRefresh = false) => {
+    if (properties.length === 0 || forceRefresh) {
+      setLoading(true);
+    }
     try {
       const res = await propertiesAPI.getAll({
         search,
         tenure: tenureFilter || undefined,
-      });
+      }, { forceRefresh });
       if (res?.success) {
         setProperties(res.data.properties || []);
         setSummary(res.data.summary || null);

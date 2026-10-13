@@ -34,7 +34,7 @@ import {
   Droplets,
   Tag,
 } from 'lucide-react';
-import { ledgerAPI, accountsAPI, mortgagesAPI, propertiesAPI } from '../services/api.js';
+import { ledgerAPI, accountsAPI, mortgagesAPI, propertiesAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import pixxLogo from '../assets/logo.png';
 
@@ -62,12 +62,17 @@ function getHeadIcon(name = '') {
 }
 
 export function ChartOfAccountsPage({ selectedCompany }) {
-  const [categories, setCategories] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-  const [mortgages, setMortgages] = useState([]);
-  const [properties, setProperties] = useState([]);
+  const cachedCats = getApiCache('/ledger/categories', { params: { includeInactive: 'true' } });
+  const cachedAccs = getApiCache('/accounts');
+  const cachedMtgs = getApiCache('/mortgages');
+  const cachedProps = getApiCache('/properties');
 
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState(cachedCats?.data?.categories || []);
+  const [accounts, setAccounts] = useState(cachedAccs?.data?.accounts || []);
+  const [mortgages, setMortgages] = useState(cachedMtgs?.data?.mortgages || []);
+  const [properties, setProperties] = useState(cachedProps?.data?.properties || []);
+
+  const [loading, setLoading] = useState(!cachedCats?.data?.categories?.length && !cachedAccs?.data?.accounts?.length);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -133,16 +138,18 @@ export function ChartOfAccountsPage({ selectedCompany }) {
   const [editForm, setEditForm] = useState({});
 
   // Load all master data records from backend
-  const loadAllData = async () => {
+  const loadAllData = async (force = false) => {
     try {
-      setLoading(true);
+      if ((!categories.length && !accounts.length) || force) {
+        setLoading(true);
+      }
       setErrorMsg('');
 
       const [catsRes, accsRes, mtgsRes, propsRes] = await Promise.all([
-        ledgerAPI.getCategories({ includeInactive: 'true' }),
-        accountsAPI.getAll(),
-        mortgagesAPI.getAll(),
-        propertiesAPI.getAll(),
+        ledgerAPI.getCategories({ includeInactive: 'true' }, { forceRefresh: force }),
+        accountsAPI.getAll({}, { forceRefresh: force }),
+        mortgagesAPI.getAll({}, { forceRefresh: force }),
+        propertiesAPI.getAll({}, { forceRefresh: force }),
       ]);
 
       if (catsRes?.success) setCategories(catsRes.data?.categories || []);

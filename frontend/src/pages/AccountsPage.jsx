@@ -13,12 +13,13 @@ import {
   Edit3,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
-import { accountsAPI } from '../services/api.js';
+import { accountsAPI, getApiCache } from '../services/api.js';
 
 export function AccountsPage({ selectedCompany }) {
-  const [accounts, setAccounts] = useState([]);
-  const [totals, setTotals] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const cachedAccounts = getApiCache('/accounts');
+  const [accounts, setAccounts] = useState(cachedAccounts?.data?.accounts || []);
+  const [totals, setTotals] = useState(cachedAccounts?.data?.totals || null);
+  const [loading, setLoading] = useState(!cachedAccounts?.data?.accounts);
 
   // New Account Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -68,10 +69,12 @@ export function AccountsPage({ selectedCompany }) {
   const [statementData, setStatementData] = useState(null);
   const [statementLoading, setStatementLoading] = useState(false);
 
-  const loadAccounts = async () => {
-    setLoading(true);
+  const loadAccounts = async (force = false) => {
+    if (accounts.length === 0 || force) {
+      setLoading(true);
+    }
     try {
-      const res = await accountsAPI.getAll();
+      const res = await accountsAPI.getAll({}, { forceRefresh: force });
       if (res?.success) {
         setAccounts(res.data.accounts || []);
         setTotals(res.data.totals);
