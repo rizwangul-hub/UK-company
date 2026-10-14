@@ -1,6 +1,7 @@
 import Category from '../models/Category.js';
 import Account from '../models/Account.js';
 import { VALID_COMPANY_IDS, isValidCompanyId } from '../config/companies.js';
+import { seedDefaultPayees } from '../services/propertyChargeService.js';
 
 export const STANDARD_UK_CATEGORIES = [
   // Rental & General Income
@@ -75,6 +76,9 @@ export const seedCompanyDefaults = async (companyId) => {
     ];
     await Account.insertMany(defaultAccounts);
   }
+
+  // Seed default payees (e.g. Zircon Holdings Limited)
+  await seedDefaultPayees(companyId).catch(() => {});
 };
 
 /**

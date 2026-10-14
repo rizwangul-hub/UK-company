@@ -24,7 +24,7 @@ import {
   Download,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
-import { reportsAPI, complianceAPI, getApiCache } from '../services/api.js';
+import { reportsAPI, complianceAPI, propertyChargesAPI, getApiCache } from '../services/api.js';
 
 export function DashboardPage({ onNavigate, selectedCompany }) {
   const currentMonthVal = getCurrentMonth();
@@ -33,6 +33,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const [data, setData] = useState(initialCache?.data || null);
   const [loading, setLoading] = useState(!initialCache?.data);
   const [complianceData, setComplianceData] = useState(null);
+  const [chargesOverview, setChargesOverview] = useState(null);
   const [exportingReport, setExportingReport] = useState(false);
 
   const companyName = selectedCompany?.name || 'Portfolio';
@@ -41,15 +42,19 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [res, compRes] = await Promise.all([
+      const [res, compRes, chargesRes] = await Promise.all([
         reportsAPI.getDashboardStats({ month: selectedMonth }, { forceRefresh: true }),
         complianceAPI.getOverview({ forceRefresh: true }).catch(() => null),
+        propertyChargesAPI.getOverview({ forceRefresh: true }).catch(() => null),
       ]);
       if (res?.success) {
         setData(res.data);
       }
       if (compRes?.success) {
         setComplianceData(compRes.data);
+      }
+      if (chargesRes?.success) {
+        setChargesOverview(chargesRes.data);
       }
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);
@@ -70,15 +75,19 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
     const loadStats = async () => {
       try {
-        const [res, compRes] = await Promise.all([
+        const [res, compRes, chargesRes] = await Promise.all([
           reportsAPI.getDashboardStats({ month: selectedMonth }),
           complianceAPI.getOverview().catch(() => null),
+          propertyChargesAPI.getOverview().catch(() => null),
         ]);
         if (isCurrent && res?.success) {
           setData(res.data);
         }
         if (isCurrent && compRes?.success) {
           setComplianceData(compRes.data);
+        }
+        if (isCurrent && chargesRes?.success) {
+          setChargesOverview(chargesRes.data);
         }
       } catch (err) {
         if (isCurrent) console.error('Failed to load dashboard stats:', err);
@@ -570,6 +579,73 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Service Charges & Ground Rent Overview Card */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Service Charges & Ground Rent Ledger</span>
+                    {chargesOverview?.pendingCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        {chargesOverview.pendingCount} Pending Demands
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Managing company demands, partial payment reconciliation & banking audit trail
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('properties')}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition cursor-pointer self-start sm:self-auto"
+              >
+                <span>Open Property Ledgers</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Demanded Total</span>
+                <div className="text-lg font-extrabold text-white mt-1 tabular-nums">
+                  {formatGBP(chargesOverview?.totalDemanded || 0)}
+                </div>
+                <span className="text-[10px] text-slate-500">All raised notices</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-emerald-500/20">
+                <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">Reconciled Paid</span>
+                <div className="text-lg font-extrabold text-emerald-400 mt-1 tabular-nums">
+                  {formatGBP(chargesOverview?.totalPaid || 0)}
+                </div>
+                <span className="text-[10px] text-slate-500">Deducted from bank</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-amber-500/20">
+                <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider block">Balance Due</span>
+                <div className={`text-lg font-extrabold mt-1 tabular-nums ${(chargesOverview?.currentOutstanding || 0) > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+                  {formatGBP(chargesOverview?.currentOutstanding || 0)}
+                </div>
+                <span className="text-[10px] text-slate-500">Unsettled balance</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-rose-500/20">
+                <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider block">Overdue Demands</span>
+                <div className={`text-lg font-extrabold mt-1 tabular-nums ${(chargesOverview?.overdueAmount || 0) > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                  {formatGBP(chargesOverview?.overdueAmount || 0)}
+                </div>
+                <span className="text-[10px] text-slate-500">Exceeded due date</span>
+              </div>
+            </div>
           </div>
 
           {/* Recent Activity & Monthly Comparison Grid */}

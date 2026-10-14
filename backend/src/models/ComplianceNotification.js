@@ -12,6 +12,13 @@ export const NOTIFICATION_TYPES = [
   'COUNCIL_DEADLINE_APPROACHING',
   'COUNCIL_DEADLINE_OVERDUE',
   'RENEWAL_REQUIRED',
+  'DEMAND_DUE_60',
+  'DEMAND_DUE_45',
+  'DEMAND_DUE_30',
+  'DEMAND_DUE_14',
+  'DEMAND_DUE_7',
+  'DEMAND_OVERDUE',
+  'EXPECTED_DEMAND_DUE',
 ];
 
 export const NOTIFICATION_URGENCIES = ['INFO', 'WARNING', 'PRIORITY', 'URGENT', 'CRITICAL'];
@@ -39,6 +46,12 @@ const complianceNotificationSchema = new mongoose.Schema(
     councilApplicationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CouncilApplication',
+      default: null,
+      index: true,
+    },
+    demandId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PropertyDemand',
       default: null,
       index: true,
     },

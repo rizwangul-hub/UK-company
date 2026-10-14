@@ -677,5 +677,64 @@ export const complianceAPI = {
   },
 };
 
+export const propertyChargesAPI = {
+  getPayees: async (config = {}) => {
+    return cachedGet('/property-charges/payees', config);
+  },
+  createPayee: async (data) => {
+    const res = await api.post('/property-charges/payees', data);
+    return res.data;
+  },
+  updatePayee: async (id, data) => {
+    const res = await api.put(`/property-charges/payees/${id}`, data);
+    return res.data;
+  },
+  getPropertyConfigs: async (propertyId, config = {}) => {
+    return cachedGet(`/property-charges/properties/${propertyId}/configs`, config);
+  },
+  updatePropertyConfig: async (propertyId, chargeType, data) => {
+    const res = await api.put(`/property-charges/properties/${propertyId}/configs/${chargeType}`, data);
+    return res.data;
+  },
+  getDemands: async (params, config = {}) => {
+    return cachedGet('/property-charges/demands', { params, ...config });
+  },
+  getDemandById: async (id, config = {}) => {
+    return cachedGet(`/property-charges/demands/${id}`, config);
+  },
+  createDemand: async (formData) => {
+    const isFormData = formData instanceof FormData;
+    const res = await api.post('/property-charges/demands', formData, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    });
+    return res.data;
+  },
+  updateDemandStatus: async (id, data) => {
+    const res = await api.patch(`/property-charges/demands/${id}/status`, data);
+    return res.data;
+  },
+  getPayments: async (params, config = {}) => {
+    return cachedGet('/property-charges/payments', { params, ...config });
+  },
+  recordPayment: async (formData) => {
+    const isFormData = formData instanceof FormData;
+    const res = await api.post('/property-charges/payments', formData, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    });
+    return res.data;
+  },
+  getPropertyLedger: async (propertyId, params, config = {}) => {
+    return cachedGet(`/property-charges/properties/${propertyId}/ledger`, { params, ...config });
+  },
+  getOverview: async (config = {}) => {
+    return cachedGet('/property-charges/overview', config);
+  },
+  checkReminders: async () => {
+    const res = await api.post('/property-charges/reminders/check');
+    return res.data;
+  },
+};
+
 export default api;
+
 

@@ -18,6 +18,7 @@ import ledgerRoutes from './routes/ledgerRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import applianceRoutes from './routes/applianceRoutes.js';
 import complianceRoutes from './routes/complianceRoutes.js';
+import propertyChargeRoutes from './routes/propertyChargeRoutes.js';
 
 // Configure UK Cloudinary if credentials are present in UK .env
 configureCloudinary();
@@ -185,6 +186,7 @@ app.use('/api/accounts', accountRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/appliances', applianceRoutes);
 app.use('/api/compliance', complianceRoutes);
+app.use('/api/property-charges', propertyChargeRoutes);
 app.use('/api', tenancyRoutes); // exposes /api/tenants and /api/tenancies
 
 // 404 Handler
@@ -221,8 +223,13 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
       await checkAndGenerateComplianceReminders().catch((remErr) => {
         console.warn('  [Compliance Reminders Check Notice]:', remErr.message);
       });
+      const { checkAndGenerateDemandReminders } = await import('./services/propertyChargeReminderService.js');
+      await checkAndGenerateDemandReminders().catch((remErr) => {
+        console.warn('  [Demand Reminders Check Notice]:', remErr.message);
+      });
       setInterval(() => {
         checkAndGenerateComplianceReminders().catch(() => {});
+        checkAndGenerateDemandReminders().catch(() => {});
       }, 12 * 60 * 60 * 1000);
     } catch (dbErr) {
       console.error(`  [Database Connection Failed]: ${dbErr.message}`);

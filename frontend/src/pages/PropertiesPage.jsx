@@ -32,6 +32,7 @@ import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { propertiesAPI, getApiCache } from '../services/api.js';
 import PropertyAppliancesSection from '../components/PropertyAppliancesSection.jsx';
 import PropertyComplianceSection from '../components/PropertyComplianceSection.jsx';
+import PropertyChargesSection from '../components/PropertyChargesSection.jsx';
 
 export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   const initialCache = getApiCache('/properties', {
@@ -886,7 +887,15 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
           )}
         </div>
 
-        {/* Module 7: Complete Property Documents, Safety Certificates & Council Records */}
+        {/* Module 7: Service Charges & Ground Rent Ledger */}
+        <PropertyChargesSection
+          propertyId={propDetail?._id}
+          propertyName={propDetail?.name}
+          companyId={selectedCompany}
+          onRefreshParent={handleRefreshDetails}
+        />
+
+        {/* Module 8: Complete Property Documents, Safety Certificates & Council Records */}
         <PropertyComplianceSection
           propertyId={propDetail?._id}
           propertyName={propDetail?.name}

@@ -35,6 +35,10 @@ import SupplierReceipt from '../src/models/SupplierReceipt.js';
 import PropertyDocument from '../src/models/PropertyDocument.js';
 import CouncilApplication from '../src/models/CouncilApplication.js';
 import ComplianceNotification from '../src/models/ComplianceNotification.js';
+import ServiceChargePayee from '../src/models/ServiceChargePayee.js';
+import PropertyChargeConfig from '../src/models/PropertyChargeConfig.js';
+import PropertyDemand from '../src/models/PropertyDemand.js';
+import PropertyChargePayment from '../src/models/PropertyChargePayment.js';
 
 // -----------------------------------------------------------------------------
 // 1. COMPANY REGISTRY & IDENTIFIER VALIDATION
@@ -252,7 +256,7 @@ test('MIDDLEWARE: Restricts non-admin user when company is not in allowedCompani
 // -----------------------------------------------------------------------------
 // 3. MONGOOSE SCHEMA & INDEX ISOLATION
 // -----------------------------------------------------------------------------
-test('SCHEMAS: All 17 operational models have required companyId in schema', () => {
+test('SCHEMAS: All 21 operational models have required companyId in schema', () => {
   const models = [
     { name: 'Property', schema: Property.schema },
     { name: 'Unit', schema: Unit.schema },
@@ -271,6 +275,10 @@ test('SCHEMAS: All 17 operational models have required companyId in schema', () 
     { name: 'PropertyDocument', schema: PropertyDocument.schema },
     { name: 'CouncilApplication', schema: CouncilApplication.schema },
     { name: 'ComplianceNotification', schema: ComplianceNotification.schema },
+    { name: 'ServiceChargePayee', schema: ServiceChargePayee.schema },
+    { name: 'PropertyChargeConfig', schema: PropertyChargeConfig.schema },
+    { name: 'PropertyDemand', schema: PropertyDemand.schema },
+    { name: 'PropertyChargePayment', schema: PropertyChargePayment.schema },
   ];
 
   models.forEach(({ name, schema }) => {
