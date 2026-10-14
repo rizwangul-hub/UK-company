@@ -30,6 +30,7 @@ import {
   Square,
   Check,
   Paperclip,
+  Sparkles,
 } from 'lucide-react';
 import { ledgerAPI, accountsAPI, reportsAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';

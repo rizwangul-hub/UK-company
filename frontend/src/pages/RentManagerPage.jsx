@@ -18,6 +18,7 @@ import {
   Paperclip,
   Upload,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
 import { rentAPI, accountsAPI, ledgerAPI, reportsAPI, getApiCache } from '../services/api.js';

@@ -195,14 +195,14 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           {/* Primary Portfolio Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {/* Total Property Value */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
-              <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Portfolio Valuation</span>
-                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+                <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
                   <Building2 className="w-4 h-4" />
                 </div>
               </div>
-              <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
+              <div className="font-display text-lg sm:text-xl font-bold text-white tracking-tight tabular-nums">
                 {formatGBP(p.totalPortfolioValue)}
               </div>
               <div className="text-[11px] text-slate-500 mt-1">
@@ -211,14 +211,14 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
 
             {/* Total Mortgage Liabilities */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
-              <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Mortgage Liabilities</span>
-                <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400">
+                <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
                   <Landmark className="w-4 h-4" />
                 </div>
               </div>
-              <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
+              <div className="font-display text-lg sm:text-xl font-bold text-white tracking-tight tabular-nums">
                 {formatGBP(p.totalMortgageDebt)}
               </div>
               <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
@@ -228,14 +228,14 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
 
             {/* Net Equity */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
-              <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Net Portfolio Equity</span>
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
                   <TrendingUp className="w-4 h-4" />
                 </div>
               </div>
-              <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
+              <div className="font-display text-lg sm:text-xl font-bold text-white tracking-tight tabular-nums">
                 {formatGBP(p.netEquity)}
               </div>
               <div className="text-[11px] text-emerald-400/90 mt-1">
@@ -244,14 +244,14 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
 
             {/* Total Bank Liquidity */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
-              <div className="flex items-center justify-between text-slate-400 mb-2">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 relative overflow-hidden">
+              <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Bank Cash Liquidity</span>
-                <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
+                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
                   <Wallet className="w-4 h-4" />
                 </div>
               </div>
-              <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
+              <div className="font-display text-lg sm:text-xl font-bold text-white tracking-tight tabular-nums">
                 {formatGBP(p.totalLiquidity)}
               </div>
               <div className="text-[11px] text-slate-500 mt-1">
@@ -261,17 +261,17 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
 
           {/* Monthly Performance Panel */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
               <div>
-                <h2 className="text-base font-bold text-white">
+                <h2 className="text-sm sm:text-base font-bold text-white">
                   Monthly Cash Performance: {formatMonthLabel(selectedMonth)}
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Cash-inflows from rent vs operational expenses and mortgage servicing for {companyName}.
                 </p>
               </div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs">
                 <span className="text-slate-400">Collection Rate:</span>
                 <span className={`font-bold ${m.collectionRate >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
                   {m.collectionRate || 0}%
@@ -279,95 +279,95 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* 1. Expected Rent Roll */}
-              <div className="metric-card-neutral min-w-0 p-4 sm:p-5 rounded-2xl flex flex-col justify-between transition hover:border-slate-500">
+              <div className="metric-card-neutral min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:border-slate-500">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="metric-title text-xs sm:text-[13px] font-bold uppercase tracking-wider">
+                  <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Expected Rent
                   </span>
-                  <Receipt className="w-4 h-4 text-slate-500 shrink-0" />
+                  <Receipt className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 </div>
-                <div className="metric-value min-w-0 whitespace-nowrap font-display text-lg sm:text-xl lg:text-2xl xl:text-[clamp(1.125rem,1.8vw,1.75rem)] 2xl:text-[28px] leading-tight font-extrabold mt-2.5 tracking-tight tabular-nums">
+                <div className="metric-value min-w-0 whitespace-nowrap font-display text-sm sm:text-base font-bold mt-1.5 tracking-tight tabular-nums">
                   {formatGBP(m.expectedRent)}
                 </div>
-                <div className="metric-subtext min-w-0 break-words text-xs font-semibold mt-1">Scheduled roll</div>
+                <div className="metric-subtext min-w-0 break-words text-[10px] font-medium mt-1">Scheduled roll</div>
               </div>
 
               {/* 2. Rent Collected */}
-              <div className="metric-card-rent-collected min-w-0 p-4 sm:p-5 rounded-2xl flex flex-col justify-between transition hover:shadow-md">
+              <div className="metric-card-rent-collected min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="metric-title text-xs sm:text-[13px] font-extrabold uppercase tracking-wider">
+                  <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Rent Collected
                   </span>
-                  <TrendingUp className="w-4 h-4 shrink-0" />
+                  <TrendingUp className="w-3.5 h-3.5 shrink-0" />
                 </div>
-                <div className="metric-value min-w-0 whitespace-nowrap font-display text-lg sm:text-xl lg:text-2xl xl:text-[clamp(1.125rem,1.8vw,1.75rem)] 2xl:text-[28px] leading-tight font-extrabold mt-2.5 tracking-tight tabular-nums">
+                <div className="metric-value min-w-0 whitespace-nowrap font-display text-sm sm:text-base font-bold mt-1.5 tracking-tight tabular-nums">
                   {formatGBP(m.rentCollected)}
                 </div>
-                <div className="metric-subtext min-w-0 break-words text-xs font-bold mt-1">Bank receipts</div>
+                <div className="metric-subtext min-w-0 break-words text-[10px] font-medium mt-1">Bank receipts</div>
               </div>
 
               {/* 3. Arrears / Uncollected */}
-              <div className="metric-card-arrears min-w-0 p-4 sm:p-5 rounded-2xl flex flex-col justify-between transition hover:shadow-md">
+              <div className="metric-card-arrears min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="metric-title text-xs sm:text-[13px] font-extrabold uppercase tracking-wider">
-                    Arrears / Uncollected
+                  <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
+                    Arrears / Due
                   </span>
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 </div>
-                <div className="metric-value min-w-0 whitespace-nowrap font-display text-lg sm:text-xl lg:text-2xl xl:text-[clamp(1.125rem,1.8vw,1.75rem)] 2xl:text-[28px] leading-tight font-extrabold mt-2.5 tracking-tight tabular-nums">
+                <div className="metric-value min-w-0 whitespace-nowrap font-display text-sm sm:text-base font-bold mt-1.5 tracking-tight tabular-nums">
                   {formatGBP(m.rentOutstanding)}
                 </div>
-                <div className="metric-subtext min-w-0 break-words text-xs font-bold mt-1">Uncollected rent</div>
+                <div className="metric-subtext min-w-0 break-words text-[10px] font-medium mt-1">Uncollected rent</div>
               </div>
 
               {/* 4. Operating Expenses */}
-              <div className="metric-card-neutral min-w-0 p-4 sm:p-5 rounded-2xl flex flex-col justify-between transition hover:border-slate-500">
+              <div className="metric-card-neutral min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:border-slate-500">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="metric-title text-xs sm:text-[13px] font-bold uppercase tracking-wider">
+                  <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Operating Exp
                   </span>
-                  <Receipt className="w-4 h-4 text-slate-500 shrink-0" />
+                  <Receipt className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 </div>
-                <div className="metric-value min-w-0 whitespace-nowrap font-display text-lg sm:text-xl lg:text-2xl xl:text-[clamp(1.125rem,1.8vw,1.75rem)] 2xl:text-[28px] leading-tight font-extrabold mt-2.5 tracking-tight tabular-nums">
+                <div className="metric-value min-w-0 whitespace-nowrap font-display text-sm sm:text-base font-bold mt-1.5 tracking-tight tabular-nums">
                   {formatGBP(m.operatingExpenses)}
                 </div>
-                <div className="metric-subtext min-w-0 break-words text-xs font-semibold mt-1">Repairs & fees</div>
+                <div className="metric-subtext min-w-0 break-words text-[10px] font-medium mt-1">Repairs & fees</div>
               </div>
 
               {/* 5. Mortgage Payments */}
-              <div className="metric-card-mortgage-payments min-w-0 p-4 sm:p-5 rounded-2xl flex flex-col justify-between transition hover:shadow-md">
+              <div className="metric-card-mortgage-payments min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="metric-title text-xs sm:text-[13px] font-extrabold uppercase tracking-wider">
-                    Mortgage Payments
+                  <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
+                    Mortgages
                   </span>
-                  <Landmark className="w-4 h-4 shrink-0" />
+                  <Landmark className="w-3.5 h-3.5 shrink-0" />
                 </div>
-                <div className="metric-value min-w-0 whitespace-nowrap font-display text-lg sm:text-xl lg:text-2xl xl:text-[clamp(1.125rem,1.8vw,1.75rem)] 2xl:text-[28px] leading-tight font-extrabold mt-2.5 tracking-tight tabular-nums">
+                <div className="metric-value min-w-0 whitespace-nowrap font-display text-sm sm:text-base font-bold mt-1.5 tracking-tight tabular-nums">
                   {formatGBP(m.totalMortgagePaid)}
                 </div>
-                <div className="metric-subtext text-xs font-bold mt-1 truncate">
+                <div className="metric-subtext text-[10px] font-medium mt-1 truncate">
                   Int: {formatGBP(m.mortgageInterestPaid)} · Prin: {formatGBP(m.mortgagePrincipalPaid)}
                 </div>
               </div>
 
               {/* 6. Net Cash Flow */}
               <div
-                className={`min-w-0 p-4 sm:p-5 rounded-2xl flex flex-col justify-between transition hover:shadow-md ${
+                className={`min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md ${
                   (m.netCashFlow || 0) >= 0 ? 'metric-card-net-cash-flow' : 'metric-card-mortgage-payments'
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <span className="metric-title text-xs sm:text-[13px] font-extrabold uppercase tracking-wider">
+                  <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Net Cash Flow
                   </span>
-                  <Wallet className="w-4 h-4 shrink-0" />
+                  <Wallet className="w-3.5 h-3.5 shrink-0" />
                 </div>
-                <div className="metric-value min-w-0 whitespace-nowrap font-display text-lg sm:text-xl lg:text-2xl xl:text-[clamp(1.125rem,1.8vw,1.75rem)] 2xl:text-[28px] leading-tight font-extrabold mt-2.5 tracking-tight tabular-nums">
+                <div className="metric-value min-w-0 whitespace-nowrap font-display text-sm sm:text-base font-bold mt-1.5 tracking-tight tabular-nums">
                   {formatGBP(m.netCashFlow)}
                 </div>
-                <div className="metric-subtext min-w-0 break-words text-xs font-bold mt-1">
+                <div className="metric-subtext min-w-0 break-words text-[10px] font-medium mt-1">
                   Rent + Inflow − Exp − Mortgages
                 </div>
               </div>

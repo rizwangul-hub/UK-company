@@ -11,6 +11,8 @@ import {
   History,
   CheckCircle2,
   Edit3,
+  Wallet,
+  Banknote,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { accountsAPI, getApiCache } from '../services/api.js';

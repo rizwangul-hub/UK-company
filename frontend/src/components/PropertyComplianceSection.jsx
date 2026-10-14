@@ -27,6 +27,7 @@ import {
   Send,
   Mail,
   Eye,
+  Loader2,
 } from 'lucide-react';
 import { formatUKDate } from '../utils/formatters.js';
 import { complianceAPI } from '../services/api.js';

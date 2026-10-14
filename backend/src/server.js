@@ -27,17 +27,37 @@ const PORT = process.env.PORT || 5001;
 
 // Security & Logging
 app.disable('x-powered-by');
-app.use(helmet());
 
-if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('dev'));
-}
-
-// CORS setup
-const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
+// CORS setup - Allow local, configured, and all Vercel domains
+const configuredOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173,https://uk-companies.vercel.app')
   .split(',')
   .map((o) => o.trim().replace(/\/+$/, ''));
 
+// 1. Direct Preflight & Header Middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    const cleanOrigin = origin.replace(/\/+$/, '');
+    if (
+      cleanOrigin.endsWith('.vercel.app') ||
+      cleanOrigin.includes('localhost') ||
+      cleanOrigin.includes('127.0.0.1') ||
+      configuredOrigins.includes('*') ||
+      configuredOrigins.includes(cleanOrigin)
+    ) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, x-company-id, X-Company-Id, Accept, Cache-Control, Pragma, Origin');
+    }
+  }
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
+// 2. Standard CORS package
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -45,24 +65,51 @@ app.use(
         return callback(null, true);
       }
       const cleanOrigin = origin.replace(/\/+$/, '');
-      if (configuredOrigins.includes('*') || configuredOrigins.includes(cleanOrigin)) {
-        return callback(null, true);
-      }
-      // Allow Vercel preview and production app domains
-      if (cleanOrigin.endsWith('.vercel.app')) {
+      if (
+        configuredOrigins.includes('*') ||
+        configuredOrigins.includes(cleanOrigin) ||
+        cleanOrigin.endsWith('.vercel.app') ||
+        cleanOrigin.includes('localhost') ||
+        cleanOrigin.includes('127.0.0.1')
+      ) {
         return callback(null, true);
       }
       return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-company-id', 'X-Company-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-company-id', 'X-Company-Id', 'Accept', 'Cache-Control', 'Pragma', 'Origin'],
     maxAge: 86400,
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.options('*', cors());
+
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('dev'));
+}
+
+// Ensure DB is connected for serverless environments (e.g. Vercel)
+app.use(async (req, res, next) => {
+  if (req.method === 'OPTIONS' || req.path === '/api/health') {
+    return next();
+  }
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('[Database Middleware Notice]:', err.message);
+    if (req.path === '/') {
+      return next();
+    }
+    return res.status(500).json({ success: false, message: 'Database connection failed: ' + err.message });
+  }
+});
+
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Root welcome / status endpoint
 app.get('/', async (req, res) => {
