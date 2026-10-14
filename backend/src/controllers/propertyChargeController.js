@@ -7,12 +7,12 @@ import ServiceChargePayee from '../models/ServiceChargePayee.js';
 import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 import {
   seedDefaultPayees,
-  getOrCreatePropertyConfigs,
+  getPropertyChargeConfigs,
   updatePropertyChargeConfig,
-  recordDemandNotice,
-  recordChargePayment,
-  calculatePropertyLedger,
-  getCompanyPropertyChargesOverview,
+  createPropertyDemand,
+  recordDemandPayment,
+  getPropertyChargeLedger,
+  getCompanyChargesOverview,
 } from '../services/propertyChargeService.js';
 import { checkAndGenerateDemandReminders } from '../services/propertyChargeReminderService.js';
 
@@ -106,7 +106,7 @@ export const getPropertyConfigs = async (req, res) => {
       return apiError(res, 'Property not found for this company', 404);
     }
 
-    const configs = await getOrCreatePropertyConfigs(propertyId, req.companyId, req.user?._id || req.user?.id);
+    const configs = await getPropertyChargeConfigs(req.companyId, propertyId);
     return apiSuccess(res, configs);
   } catch (err) {
     return apiError(res, err.message, 500);
@@ -117,11 +117,10 @@ export const updatePropertyConfig = async (req, res) => {
   try {
     const { propertyId, chargeType } = req.params;
     const config = await updatePropertyChargeConfig(
+      req.companyId,
       propertyId,
       chargeType.toUpperCase(),
-      req.companyId,
-      req.body,
-      req.user?._id || req.user?.id
+      req.body
     );
 
     return apiSuccess(res, config);
@@ -177,11 +176,10 @@ export const createDemand = async (req, res) => {
       };
     }
 
-    const demand = await recordDemandNotice(
-      req.body,
-      documentData,
+    const demand = await createPropertyDemand(
       req.companyId,
-      req.user?._id || req.user?.id
+      req.body.propertyId,
+      { ...req.body, ...documentData }
     );
 
     return apiSuccess(res, demand, 201);
@@ -320,11 +318,15 @@ export const recordPayment = async (req, res) => {
       };
     }
 
-    const result = await recordChargePayment(
-      req.body,
-      proofData,
+    const result = await recordDemandPayment(
       req.companyId,
-      req.user?._id || req.user?.id
+      req.body.propertyId,
+      req.body.demandId,
+      {
+        ...req.body,
+        proofFileUrl: proofData?.fileUrl || '',
+        proofFileName: proofData?.fileName || '',
+      }
     );
 
     return apiSuccess(res, result, 201);
@@ -362,12 +364,14 @@ export const getPropertyLedger = async (req, res) => {
     const { propertyId } = req.params;
     const { chargeType = 'ALL', fromDate, toDate } = req.query;
 
-    const ledger = await calculatePropertyLedger(
-      propertyId,
+    const ledger = await getPropertyChargeLedger(
       req.companyId,
-      chargeType,
-      fromDate ? new Date(fromDate) : null,
-      toDate ? new Date(toDate) : null
+      propertyId,
+      {
+        chargeType,
+        startDate: fromDate ? new Date(fromDate) : undefined,
+        endDate: toDate ? new Date(toDate) : undefined,
+      }
     );
 
     return apiSuccess(res, ledger);
@@ -381,7 +385,7 @@ export const getPropertyLedger = async (req, res) => {
  */
 export const getDashboardOverview = async (req, res) => {
   try {
-    const overview = await getCompanyPropertyChargesOverview(req.companyId);
+    const overview = await getCompanyChargesOverview(req.companyId);
     return apiSuccess(res, overview);
   } catch (err) {
     return apiError(res, err.message, 500);
