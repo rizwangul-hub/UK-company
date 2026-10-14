@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   FileText,
   CreditCard,
+  Upload,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { propertiesAPI, getApiCache } from '../services/api.js';
@@ -325,6 +326,14 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
             >
               <RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${loadingDetails ? 'animate-spin text-indigo-400' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={() => setDetailTab('documents')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition cursor-pointer"
+              title="Upload document, safety certificate or legal deed"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Document</span>
             </button>
             <button
               onClick={(e) => handleOpenEdit(propDetail, e)}
@@ -686,6 +695,18 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                 <p className="text-slate-300 text-xs whitespace-pre-wrap">{propDetail.notes}</p>
               </div>
             )}
+
+            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Compliance records &amp; certificates</span>
+              <button
+                type="button"
+                onClick={() => setDetailTab('documents')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload / View Documents</span>
+              </button>
+            </div>
           </div>
 
           {/* Module 3: Mortgages & Financing */}
@@ -1233,271 +1254,320 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   // Helper function to render modal in both views
   function renderEditModal() {
     return (
-      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 sm:p-6 shadow-2xl my-8">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <h2 className="text-base font-bold text-white">
-              {editingProperty ? 'Edit Property Particulars' : 'Add New Property'}
-            </h2>
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+        <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+          {/* Sticky Header */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-white">
+                  {editingProperty ? 'Edit Property Particulars' : 'Add New Property'}
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  {editingProperty ? `Updating: ${editingProperty.name}` : 'Register a new property asset into the company portfolio'}
+                </p>
+              </div>
+            </div>
             <button
+              type="button"
               onClick={() => setShowModal(false)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {formError && (
-            <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
-              {formError}
-            </div>
-          )}
+          {/* Scrollable Form Body */}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+            <div className="p-5 sm:p-6 space-y-4 text-xs flex-1 custom-scrollbar">
+              {formError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                  {formError}
+                </div>
+              )}
 
-          <form onSubmit={handleSubmit} className="mt-4 space-y-3.5 text-xs">
-            <div>
-              <label className="block text-slate-300 font-medium mb-1">Property Name / Title</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Richmond Court Apartments"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Property Type</label>
-                <select
-                  value={formData.propertyType}
-                  onChange={(e) => setFormData({ ...formData, propertyType: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="Residential">Residential</option>
-                  <option value="Commercial">Commercial</option>
-                  <option value="Shop">Shop / Retail</option>
-                  <option value="Flat">Flat / Apartment</option>
-                  <option value="FLAT_APARTMENT">Flat (AST)</option>
-                  <option value="RESIDENTIAL_TERRACED">Terraced House</option>
-                  <option value="RESIDENTIAL_SEMI_DETACHED">Semi-Detached House</option>
-                  <option value="RESIDENTIAL_DETACHED">Detached House</option>
-                  <option value="COMMERCIAL_RETAIL">Commercial Retail</option>
-                  <option value="COMMERCIAL_OFFICE">Office Building</option>
-                  <option value="HMO">HMO (Multi Occupancy)</option>
-                  <option value="MIXED_USE">Mixed Use</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Tenure</label>
-                <select
-                  value={formData.tenure}
-                  onChange={(e) => setFormData({ ...formData, tenure: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="FREEHOLD">Freehold</option>
-                  <option value="LEASEHOLD">Leasehold</option>
-                  <option value="SHARE_OF_FREEHOLD">Share of Freehold</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Direct Contractual Rent & Tenancy */}
-            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
-              <div className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
-                Direct Contractual Rent &amp; Tenancy
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Contractual Rent (£)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.contractualRent}
-                    onChange={(e) => setFormData({ ...formData, contractualRent: e.target.value })}
-                    placeholder="e.g. 1550.00"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-semibold focus:outline-none focus:border-indigo-500"
-                  />
+              {/* Section 1: Property Identity & Type */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                  1. Property Particulars &amp; Ownership
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Rent Frequency</label>
-                  <select
-                    value={formData.rentFrequency}
-                    onChange={(e) => setFormData({ ...formData, rentFrequency: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  >
-                    <option value="MONTHLY">Monthly</option>
-                    <option value="WEEKLY">Weekly</option>
-                    <option value="QUARTERLY">Quarterly</option>
-                    <option value="ANNUALLY">Annually</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Tenancy Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  >
-                    <option value="Available">Available (Vacant)</option>
-                    <option value="Occupied">Occupied (Tenanted)</option>
-                    <option value="Active">Active Asset</option>
-                    <option value="Under Offer">Under Offer</option>
-                    <option value="Maintenance">Under Maintenance</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Tenant Name (if let)</label>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Property Name / Title <span className="text-rose-400">*</span>
+                  </label>
                   <input
                     type="text"
-                    value={formData.tenantName}
-                    onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
-                    placeholder="e.g. John Doe"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Flat 4, 304 Brixton Road"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Property Type</label>
+                    <select
+                      value={formData.propertyType}
+                      onChange={(e) => setFormData({ ...formData, propertyType: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="Residential">Residential</option>
+                      <option value="Commercial">Commercial</option>
+                      <option value="Shop">Shop / Retail</option>
+                      <option value="Flat">Flat / Apartment</option>
+                      <option value="FLAT_APARTMENT">Flat (AST)</option>
+                      <option value="RESIDENTIAL_TERRACED">Terraced House</option>
+                      <option value="RESIDENTIAL_SEMI_DETACHED">Semi-Detached House</option>
+                      <option value="RESIDENTIAL_DETACHED">Detached House</option>
+                      <option value="COMMERCIAL_RETAIL">Commercial Retail</option>
+                      <option value="COMMERCIAL_OFFICE">Office Building</option>
+                      <option value="HMO">HMO (Multi Occupancy)</option>
+                      <option value="MIXED_USE">Mixed Use</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Tenure</label>
+                    <select
+                      value={formData.tenure}
+                      onChange={(e) => setFormData({ ...formData, tenure: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="FREEHOLD">Freehold</option>
+                      <option value="LEASEHOLD">Leasehold</option>
+                      <option value="SHARE_OF_FREEHOLD">Share of Freehold</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Ownership Entity</label>
+                    <input
+                      type="text"
+                      value={formData.ownershipEntity}
+                      onChange={(e) => setFormData({ ...formData, ownershipEntity: e.target.value })}
+                      placeholder="e.g. Suavida Properties Ltd"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-slate-300 font-medium mb-1">Address Line 1</label>
-              <input
-                type="text"
-                value={formData.addressLine1}
-                onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
-                placeholder="e.g. 14 High Street"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
+              {/* Section 2: Direct Contractual Rent & Tenancy */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
+                <div className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                  2. Direct Contractual Rent &amp; Tenancy
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Contractual Rent (£)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.contractualRent}
+                      onChange={(e) => setFormData({ ...formData, contractualRent: e.target.value })}
+                      placeholder="e.g. 1550.00"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-semibold focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Rent Frequency</label>
+                    <select
+                      value={formData.rentFrequency}
+                      onChange={(e) => setFormData({ ...formData, rentFrequency: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="MONTHLY">Monthly</option>
+                      <option value="WEEKLY">Weekly</option>
+                      <option value="QUARTERLY">Quarterly</option>
+                      <option value="ANNUALLY">Annually</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Tenancy Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="Available">Available (Vacant)</option>
+                      <option value="Occupied">Occupied (Tenanted)</option>
+                      <option value="Active">Active Asset</option>
+                      <option value="Under Offer">Under Offer</option>
+                      <option value="Maintenance">Under Maintenance</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Tenant Name (if let)</label>
+                    <input
+                      type="text"
+                      value={formData.tenantName}
+                      onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
+                      placeholder="e.g. John Doe"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: UK Location & Postal Address */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                  3. Location &amp; Address
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Address Line 1</label>
+                    <input
+                      type="text"
+                      value={formData.addressLine1}
+                      onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                      placeholder="e.g. 14 High Street"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Address Line 2 (Optional)</label>
+                    <input
+                      type="text"
+                      value={formData.addressLine2}
+                      onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                      placeholder="e.g. Flat B"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">City / Town</label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="London"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">UK Postcode</label>
+                    <input
+                      type="text"
+                      value={formData.postcode}
+                      onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
+                      placeholder="e.g. SW1A 1AA"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 uppercase focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Valuation & Statutory Expiries */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                  4. Valuation &amp; Statutory Compliance
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Purchase Price (£)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.purchasePrice}
+                      onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
+                      placeholder="250000"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Current Valuation (£)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.currentValuation}
+                      onChange={(e) => setFormData({ ...formData, currentValuation: e.target.value })}
+                      placeholder="280000"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">EPC Rating</label>
+                    <select
+                      value={formData.epcRating}
+                      onChange={(e) => setFormData({ ...formData, epcRating: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                      <option value="E">E</option>
+                      <option value="F">F</option>
+                      <option value="G">G</option>
+                      <option value="PENDING">Pending</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Gas Safety Expiry</label>
+                    <input
+                      type="date"
+                      value={formData.gasSafetyExpiryDate}
+                      onChange={(e) => setFormData({ ...formData, gasSafetyExpiryDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">EICR Expiry</label>
+                    <input
+                      type="date"
+                      value={formData.eicrExpiryDate}
+                      onChange={(e) => setFormData({ ...formData, eicrExpiryDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 5: Notes */}
               <div>
-                <label className="block text-slate-300 font-medium mb-1">City / Town</label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="London"
+                <label className="block text-slate-300 font-medium mb-1">Notes / Description</label>
+                <textarea
+                  rows={2}
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Any special property notes, access codes, or reminders..."
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">UK Postcode</label>
-                <input
-                  type="text"
-                  value={formData.postcode}
-                  onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
-                  placeholder="e.g. SW1A 1AA"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 uppercase focus:outline-none focus:border-indigo-500"
-                />
-              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Purchase Price (£)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.purchasePrice}
-                  onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
-                  placeholder="250000"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Current Valuation (£)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.currentValuation}
-                  onChange={(e) => setFormData({ ...formData, currentValuation: e.target.value })}
-                  placeholder="280000"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">EPC Rating</label>
-                <select
-                  value={formData.epcRating}
-                  onChange={(e) => setFormData({ ...formData, epcRating: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
-                  <option value="D">D</option>
-                  <option value="E">E</option>
-                  <option value="F">F</option>
-                  <option value="G">G</option>
-                  <option value="PENDING">Pending</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Gas Safety Expiry</label>
-                <input
-                  type="date"
-                  value={formData.gasSafetyExpiryDate}
-                  onChange={(e) => setFormData({ ...formData, gasSafetyExpiryDate: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">EICR Expiry</label>
-                <input
-                  type="date"
-                  value={formData.eicrExpiryDate}
-                  onChange={(e) => setFormData({ ...formData, eicrExpiryDate: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-300 font-medium mb-1">Ownership Entity</label>
-              <input
-                type="text"
-                value={formData.ownershipEntity}
-                onChange={(e) => setFormData({ ...formData, ownershipEntity: e.target.value })}
-                placeholder="e.g. Suavida Properties Ltd"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-300 font-medium mb-1">Notes / Description</label>
-              <textarea
-                rows={2}
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Any special notes or description..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-
-            <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+            {/* Sticky Footer */}
+            <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>{editingProperty ? 'Save Changes' : 'Create Property'}</span>

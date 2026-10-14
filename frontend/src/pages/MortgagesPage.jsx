@@ -455,213 +455,227 @@ export function MortgagesPage({ selectedCompany }) {
 
       {/* Modal: New Mortgage Facility */}
       {showFacilityModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 sm:p-6 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h2 className="text-base font-bold text-white">New UK Mortgage Facility</h2>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Sticky Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400">
+                  <Landmark className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white">New UK Mortgage Facility</h2>
+                  <p className="text-[11px] text-slate-400">Attach loan terms, interest rates, and lender particulars</p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowFacilityModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {facilityError && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
-                {facilityError}
-              </div>
-            )}
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleFacilitySubmit} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-5 sm:p-6 space-y-3.5 text-xs flex-1 custom-scrollbar">
+                {facilityError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                    {facilityError}
+                  </div>
+                )}
 
-            <form onSubmit={handleFacilitySubmit} className="mt-4 space-y-3.5 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Linked Property</label>
-                <select
-                  required
-                  value={facilityForm.propertyId}
-                  onChange={(e) => setFacilityForm({ ...facilityForm, propertyId: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Select Property --</option>
-                  {properties.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name} ({p.postcode})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Lender / Provider Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={facilityForm.lenderName}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, lenderName: e.target.value })}
-                    placeholder="e.g. Paragon Bank"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Mortgage Account Reference</label>
-                  <input
-                    type="text"
-                    required
-                    value={facilityForm.accountReference}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, accountReference: e.target.value })}
-                    placeholder="e.g. 789456123"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Original Loan Amount (£)</label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    step="0.01"
-                    value={facilityForm.originalLoanAmount}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, originalLoanAmount: e.target.value })}
-                    placeholder="180000"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Current Principal Balance (£)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={facilityForm.outstandingPrincipalBalance}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, outstandingPrincipalBalance: e.target.value })}
-                    placeholder="180000"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Interest Rate (%)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={facilityForm.interestRate}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, interestRate: e.target.value })}
-                    placeholder="4.85"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Rate Type</label>
+                  <label className="block text-slate-300 font-medium mb-1">Linked Property</label>
                   <select
-                    value={facilityForm.rateType}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, rateType: e.target.value })}
+                    required
+                    value={facilityForm.propertyId}
+                    onChange={(e) => setFacilityForm({ ...facilityForm, propertyId: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
                   >
-                    <option value="FIXED">Fixed</option>
-                    <option value="VARIABLE">Variable</option>
-                    <option value="TRACKER">Tracker</option>
-                    <option value="STANDARD_VARIABLE">Standard Variable</option>
+                    <option value="">-- Select Property --</option>
+                    {properties.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {p.name} ({p.postcode})
+                      </option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Fixed Rate Expiry</label>
-                  <input
-                    type="date"
-                    value={facilityForm.fixedRateExpiryDate}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, fixedRateExpiryDate: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Lender / Provider Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={facilityForm.lenderName}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, lenderName: e.target.value })}
+                      placeholder="e.g. Paragon Bank"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Mortgage Account Reference</label>
+                    <input
+                      type="text"
+                      required
+                      value={facilityForm.accountReference}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, accountReference: e.target.value })}
+                      placeholder="e.g. 789456123"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Original Loan Amount (£)</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      step="0.01"
+                      value={facilityForm.originalLoanAmount}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, originalLoanAmount: e.target.value })}
+                      placeholder="180000"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Current Principal Balance (£)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={facilityForm.outstandingPrincipalBalance}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, outstandingPrincipalBalance: e.target.value })}
+                      placeholder="180000"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Interest Rate (%)</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      value={facilityForm.interestRate}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, interestRate: e.target.value })}
+                      placeholder="4.85"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Rate Type</label>
+                    <select
+                      value={facilityForm.rateType}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, rateType: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="FIXED">Fixed</option>
+                      <option value="VARIABLE">Variable</option>
+                      <option value="TRACKER">Tracker</option>
+                      <option value="STANDARD_VARIABLE">Standard Variable</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Fixed Rate Expiry</label>
+                    <input
+                      type="date"
+                      value={facilityForm.fixedRateExpiryDate}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, fixedRateExpiryDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Repayment Arrangement</label>
+                    <select
+                      value={facilityForm.repaymentType}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, repaymentType: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="INTEREST_ONLY">Interest-Only</option>
+                      <option value="CAPITAL_REPAYMENT">Capital Repayment</option>
+                      <option value="PART_AND_PART">Part and Part</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Monthly Repayment (£)</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      value={facilityForm.expectedRepaymentAmount}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, expectedRepaymentAmount: e.target.value })}
+                      placeholder="750.00"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Mortgage Start Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={facilityForm.startDate}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, startDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Maturity Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={facilityForm.maturityDate}
+                      onChange={(e) => setFacilityForm({ ...facilityForm, maturityDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Repayment Arrangement</label>
+                  <label className="block text-slate-300 font-medium mb-1">Servicing Bank Account</label>
                   <select
-                    value={facilityForm.repaymentType}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, repaymentType: e.target.value })}
+                    required
+                    value={facilityForm.paymentAccountId}
+                    onChange={(e) => setFacilityForm({ ...facilityForm, paymentAccountId: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
                   >
-                    <option value="INTEREST_ONLY">Interest-Only</option>
-                    <option value="CAPITAL_REPAYMENT">Capital Repayment</option>
-                    <option value="PART_AND_PART">Part and Part</option>
+                    <option value="">-- Select Bank Account --</option>
+                    {accounts.map((a) => (
+                      <option key={a._id} value={a._id}>
+                        {a.name} ({a.bankName})
+                      </option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Monthly Repayment (£)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={facilityForm.expectedRepaymentAmount}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, expectedRepaymentAmount: e.target.value })}
-                    placeholder="750.00"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Mortgage Start Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={facilityForm.startDate}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, startDate: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Maturity Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={facilityForm.maturityDate}
-                    onChange={(e) => setFacilityForm({ ...facilityForm, maturityDate: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Servicing Bank Account</label>
-                <select
-                  required
-                  value={facilityForm.paymentAccountId}
-                  onChange={(e) => setFacilityForm({ ...facilityForm, paymentAccountId: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Select Bank Account --</option>
-                  {accounts.map((a) => (
-                    <option key={a._id} value={a._id}>
-                      {a.name} ({a.bankName})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              {/* Sticky Footer */}
+              <div className="px-5 py-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowFacilityModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={facilitySubmitting}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {facilitySubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>Save Mortgage</span>
@@ -674,183 +688,194 @@ export function MortgagesPage({ selectedCompany }) {
 
       {/* Modal: Record Mortgage Payment (with strict split validation) */}
       {showPaymentModal && selectedMortgage && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 sm:p-6 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div>
-                <h2 className="text-base font-bold text-white">Record Mortgage Payment</h2>
-                <p className="text-xs text-indigo-400 mt-0.5">
-                  {selectedMortgage.lenderName} · Ref: {selectedMortgage.accountReference}
-                </p>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Sticky Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white">Record Mortgage Payment</h2>
+                  <p className="text-[11px] text-indigo-400">
+                    {selectedMortgage.lenderName} · Ref: {selectedMortgage.accountReference}
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowPaymentModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {paymentError && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
-                {paymentError}
-              </div>
-            )}
+            {/* Scrollable Form Body */}
+            <form onSubmit={handlePaymentSubmit} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-5 sm:p-6 space-y-3.5 text-xs flex-1 custom-scrollbar">
+                {paymentError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                    {paymentError}
+                  </div>
+                )}
 
-            <form onSubmit={handlePaymentSubmit} className="mt-4 space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Payment Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={paymentForm.paymentDate}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Total Paid from Bank (£)</label>
+                    <input
+                      type="number"
+                      required
+                      min="0.01"
+                      step="0.01"
+                      value={paymentForm.totalAmountPaid}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, totalAmountPaid: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Accounting Split Section */}
+                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200">Accounting Component Split</span>
+                    <div className={`text-[11px] font-semibold flex items-center gap-1 ${
+                      Math.abs(splitDifference) <= 0.01 ? 'text-emerald-400' : 'text-amber-400'
+                    }`}>
+                      {Math.abs(splitDifference) <= 0.01 ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Balanced (£{enteredSplitSum})</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>Unallocated: £{splitDifference}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">
+                        Interest Component (£)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={paymentForm.interestAmount}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, interestAmount: e.target.value })}
+                        placeholder="0.00"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-100 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500 block mt-0.5">Finance Cost</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">
+                        Principal Repayment (£)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={paymentForm.principalAmount}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, principalAmount: e.target.value })}
+                        placeholder="0.00"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-100 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500 block mt-0.5">Reduces Liability</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-1">
+                        Lender Fees (£)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={paymentForm.feeAmount}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, feeAmount: e.target.value })}
+                        placeholder="0.00"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-100 focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500 block mt-0.5">Operating Fee</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Payment Date</label>
-                  <input
-                    type="date"
+                  <label className="block text-slate-300 font-medium mb-1">Paying Bank Account</label>
+                  <select
                     required
-                    value={paymentForm.paymentDate}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                    value={paymentForm.paymentAccountId}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentAccountId: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Total Paid from Bank (£)</label>
-                  <input
-                    type="number"
-                    required
-                    min="0.01"
-                    step="0.01"
-                    value={paymentForm.totalAmountPaid}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, totalAmountPaid: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Accounting Split Section */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-200">Accounting Component Split</span>
-                  <div className={`text-[11px] font-semibold flex items-center gap-1 ${
-                    Math.abs(splitDifference) <= 0.01 ? 'text-emerald-400' : 'text-amber-400'
-                  }`}>
-                    {Math.abs(splitDifference) <= 0.01 ? (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Balanced (£{enteredSplitSum})</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        <span>Unallocated: £{splitDifference}</span>
-                      </>
-                    )}
-                  </div>
+                  >
+                    <option value="">-- Select Bank Account --</option>
+                    {accounts.map((a) => (
+                      <option key={a._id} value={a._id}>
+                        {a.name} ({a.bankName}) · Bal: {formatGBP(a.currentBalance)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-slate-400 text-[11px] mb-1">
-                      Interest Component (£)
-                    </label>
+                    <label className="block text-slate-300 font-medium mb-1">Reference / Direct Debit Narration</label>
                     <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      value={paymentForm.interestAmount}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, interestAmount: e.target.value })}
-                      placeholder="0.00"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-100 focus:outline-none"
+                      type="text"
+                      value={paymentForm.paymentReference}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, paymentReference: e.target.value })}
+                      placeholder="DD-MORTGAGE"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
                     />
-                    <span className="text-[10px] text-slate-500 block mt-0.5">Finance Cost</span>
                   </div>
-
-                  <div>
-                    <label className="block text-slate-400 text-[11px] mb-1">
-                      Principal Repayment (£)
-                    </label>
+                  <div className="flex items-center gap-2 pt-6">
                     <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      value={paymentForm.principalAmount}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, principalAmount: e.target.value })}
-                      placeholder="0.00"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-100 focus:outline-none"
+                      type="checkbox"
+                      id="isConfirmed"
+                      checked={paymentForm.isLenderConfirmed}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, isLenderConfirmed: e.target.checked })}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-800 cursor-pointer"
                     />
-                    <span className="text-[10px] text-slate-500 block mt-0.5">Reduces Liability</span>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 text-[11px] mb-1">
-                      Lender Fees (£)
+                    <label htmlFor="isConfirmed" className="text-slate-300 cursor-pointer text-[11px]">
+                      Confirmed from Lender Statement
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={paymentForm.feeAmount}
-                      onChange={(e) => setPaymentForm({ ...paymentForm, feeAmount: e.target.value })}
-                      placeholder="0.00"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-slate-100 focus:outline-none"
-                    />
-                    <span className="text-[10px] text-slate-500 block mt-0.5">Operating Fee</span>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Paying Bank Account</label>
-                <select
-                  required
-                  value={paymentForm.paymentAccountId}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentAccountId: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Select Bank Account --</option>
-                  {accounts.map((a) => (
-                    <option key={a._id} value={a._id}>
-                      {a.name} ({a.bankName}) · Bal: {formatGBP(a.currentBalance)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Reference / Direct Debit Narration</label>
-                  <input
-                    type="text"
-                    value={paymentForm.paymentReference}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentReference: e.target.value })}
-                    placeholder="DD-MORTGAGE"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <input
-                    type="checkbox"
-                    id="isConfirmed"
-                    checked={paymentForm.isLenderConfirmed}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, isLenderConfirmed: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-950 border-slate-800 cursor-pointer"
-                  />
-                  <label htmlFor="isConfirmed" className="text-slate-300 cursor-pointer text-[11px]">
-                    Confirmed from Lender Statement
-                  </label>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              {/* Sticky Footer */}
+              <div className="px-5 py-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowPaymentModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={paymentSubmitting || Math.abs(splitDifference) > 0.05}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {paymentSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>Post Mortgage Payment</span>
@@ -863,95 +888,106 @@ export function MortgagesPage({ selectedCompany }) {
 
       {/* Modal: Reconcile Statement Balance */}
       {showReconcileModal && selectedMortgage && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div>
-                <h2 className="text-base font-bold text-white">Reconcile Lender Balance</h2>
-                <p className="text-xs text-indigo-400 mt-0.5">
-                  {selectedMortgage.lenderName} · Ref: {selectedMortgage.accountReference}
-                </p>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Sticky Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white">Reconcile Lender Balance</h2>
+                  <p className="text-[11px] text-indigo-400">
+                    {selectedMortgage.lenderName} · Ref: {selectedMortgage.accountReference}
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowReconcileModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {reconcileError && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
-                {reconcileError}
-              </div>
-            )}
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleReconcileSubmit} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-5 sm:p-6 space-y-3.5 text-xs flex-1 custom-scrollbar">
+                {reconcileError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                    {reconcileError}
+                  </div>
+                )}
 
-            <form onSubmit={handleReconcileSubmit} className="mt-4 space-y-3.5 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Current Ledger Principal:</span>
-                  <span className="font-bold text-slate-200">
-                    {formatGBP(selectedMortgage.outstandingPrincipalBalance)}
-                  </span>
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Current Ledger Principal:</span>
+                    <span className="font-bold text-slate-200">
+                      {formatGBP(selectedMortgage.outstandingPrincipalBalance)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Last Confirmed Date:</span>
+                    <span className="text-slate-300">
+                      {formatUKDate(selectedMortgage.lastConfirmedDate)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Last Confirmed Date:</span>
-                  <span className="text-slate-300">
-                    {formatUKDate(selectedMortgage.lastConfirmedDate)}
-                  </span>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Confirmed Balance on Statement (£)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={reconcileForm.confirmedBalance}
+                    onChange={(e) => setReconcileForm({ ...reconcileForm, confirmedBalance: e.target.value })}
+                    placeholder="e.g. 175420.50"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Statement Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={reconcileForm.statementDate}
+                    onChange={(e) => setReconcileForm({ ...reconcileForm, statementDate: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Reconciliation Notes</label>
+                  <textarea
+                    rows="2"
+                    value={reconcileForm.notes}
+                    onChange={(e) => setReconcileForm({ ...reconcileForm, notes: e.target.value })}
+                    placeholder="e.g. Verified against annual statement dated 31/12/2026."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Confirmed Balance on Statement (£)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  step="0.01"
-                  value={reconcileForm.confirmedBalance}
-                  onChange={(e) => setReconcileForm({ ...reconcileForm, confirmedBalance: e.target.value })}
-                  placeholder="e.g. 175420.50"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Statement Date</label>
-                <input
-                  type="date"
-                  required
-                  value={reconcileForm.statementDate}
-                  onChange={(e) => setReconcileForm({ ...reconcileForm, statementDate: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Reconciliation Notes</label>
-                <textarea
-                  rows="2"
-                  value={reconcileForm.notes}
-                  onChange={(e) => setReconcileForm({ ...reconcileForm, notes: e.target.value })}
-                  placeholder="e.g. Verified against annual statement dated 31/12/2026."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              {/* Sticky Footer */}
+              <div className="px-5 py-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowReconcileModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={reconcileSubmitting}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {reconcileSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>Confirm Reconciliation</span>

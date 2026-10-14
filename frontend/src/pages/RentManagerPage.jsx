@@ -127,6 +127,15 @@ export function RentManagerPage({ selectedCompany }) {
     setShowCollectModal(true);
   };
 
+  const handleOpenQuickCollect = () => {
+    const defaultSched = schedules.find((s) => s.status !== 'PAID') || schedules[0] || null;
+    if (!defaultSched) {
+      alert('No rent billing schedules available for this month. Please click "Generate Invoices" first.');
+      return;
+    }
+    handleOpenCollect(defaultSched);
+  };
+
   const handleCollectSubmit = async (e) => {
     e.preventDefault();
     setCollecting(true);
@@ -228,6 +237,15 @@ export function RentManagerPage({ selectedCompany }) {
               className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium"
             />
           </div>
+
+          <button
+            onClick={handleOpenQuickCollect}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+            title="Open Collect Rent popup dialog"
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Collect Rent</span>
+          </button>
 
           <button
             onClick={handleGenerateMonthly}
@@ -445,150 +463,193 @@ export function RentManagerPage({ selectedCompany }) {
 
       {/* Collect Rent Modal */}
       {showCollectModal && selectedSchedule && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div>
-                <h2 className="text-base font-bold text-white">Record Rent Collection</h2>
-                <p className="text-xs text-indigo-400 mt-0.5">
-                  {selectedSchedule.propertyId?.name} ({selectedSchedule.unitId?.unitName})
-                </p>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Sticky Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                  <Receipt className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-white">Record Rent Collection</h2>
+                  <p className="text-[11px] text-emerald-400">
+                    {selectedSchedule.propertyId?.name} ({selectedSchedule.unitId?.unitName || 'Direct AST'})
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowCollectModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {collectError && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
-                {collectError}
-              </div>
-            )}
-
-            <form onSubmit={handleCollectSubmit} className="mt-4 space-y-3.5 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Tenant:</span>
-                  <span className="font-semibold text-slate-200">{selectedSchedule.tenantId?.fullName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Billing Period:</span>
-                  <span className="text-slate-300">{formatMonthLabel(selectedSchedule.billingMonth)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Due:</span>
-                  <span className="font-bold text-amber-400">{formatGBP(selectedSchedule.outstandingAmount)}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Amount Paid (£)</label>
-                <input
-                  type="number"
-                  required
-                  min="0.01"
-                  step="0.01"
-                  value={collectForm.amount}
-                  onChange={(e) => setCollectForm({ ...collectForm, amount: e.target.value })}
-                  placeholder="e.g. 1200.00"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Receipt Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={collectForm.paymentDate}
-                    onChange={(e) => setCollectForm({ ...collectForm, paymentDate: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Payment Method</label>
-                  <select
-                    value={collectForm.paymentMethod}
-                    onChange={(e) => setCollectForm({ ...collectForm, paymentMethod: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  >
-                    <option value="STANDING_ORDER">Standing Order</option>
-                    <option value="DIRECT_DEBIT">Direct Debit</option>
-                    <option value="BANK_TRANSFER">Bank Transfer (BACS)</option>
-                    <option value="CARD">Debit Card</option>
-                    <option value="CASH">Cash</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Receiving Bank Account</label>
-                <select
-                  required
-                  value={collectForm.receivingAccountId}
-                  onChange={(e) => setCollectForm({ ...collectForm, receivingAccountId: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Select Receiving Account --</option>
-                  {accounts.map((a) => (
-                    <option key={a._id} value={a._id}>
-                      {a.name} ({a.bankName}) · Sort: {a.sortCode}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Receipt Notes</label>
-                <input
-                  type="text"
-                  value={collectForm.notes}
-                  onChange={(e) => setCollectForm({ ...collectForm, notes: e.target.value })}
-                  placeholder="e.g. Cleared via online banking reference SO-102"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Attach Payment Receipt / Remittance Slip (Optional)
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,image/png,image/jpeg,image/webp,image/jpg"
-                  onChange={(e) => setCollectFile(e.target.files?.[0] || null)}
-                  className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-950 p-2 rounded-xl border border-slate-800"
-                />
-                {collectFile && (
-                  <div className="text-[11px] text-indigo-300 mt-1.5 flex items-center justify-between">
-                    <span className="truncate max-w-[260px]">Selected: {collectFile.name} ({(collectFile.size / 1024).toFixed(1)} KB)</span>
-                    <button
-                      type="button"
-                      onClick={() => setCollectFile(null)}
-                      className="text-rose-400 hover:underline cursor-pointer"
-                    >
-                      Clear
-                    </button>
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleCollectSubmit} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-5 sm:p-6 space-y-3.5 text-xs flex-1 custom-scrollbar">
+                {collectError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                    {collectError}
                   </div>
                 )}
+
+                {/* Tenancy Selector Dropdown */}
+                {schedules.length > 1 && (
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Select Property &amp; Tenant Schedule</label>
+                    <select
+                      value={selectedSchedule._id}
+                      onChange={(e) => {
+                        const sched = schedules.find((s) => s._id === e.target.value);
+                        if (sched) {
+                          setSelectedSchedule(sched);
+                          setCollectForm((prev) => ({
+                            ...prev,
+                            amount: String(sched.outstandingAmount || sched.expectedAmount || ''),
+                            notes: `Rent payment for ${formatMonthLabel(sched.billingMonth)}`,
+                          }));
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer text-xs"
+                    >
+                      {schedules.map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.propertyId?.name} - {s.tenantId?.fullName} (Due: {formatGBP(s.outstandingAmount || s.expectedAmount)}) [{s.status}]
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Tenant Name:</span>
+                    <span className="font-semibold text-slate-200">{selectedSchedule.tenantId?.fullName || 'No Tenant'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Billing Period:</span>
+                    <span className="text-slate-300">{formatMonthLabel(selectedSchedule.billingMonth)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Outstanding Rent Balance:</span>
+                    <span className="font-bold text-amber-400">{formatGBP(selectedSchedule.outstandingAmount)}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Amount Paid (£) <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0.01"
+                    step="0.01"
+                    value={collectForm.amount}
+                    onChange={(e) => setCollectForm({ ...collectForm, amount: e.target.value })}
+                    placeholder="e.g. 1200.00"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Receipt Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={collectForm.paymentDate}
+                      onChange={(e) => setCollectForm({ ...collectForm, paymentDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Payment Method</label>
+                    <select
+                      value={collectForm.paymentMethod}
+                      onChange={(e) => setCollectForm({ ...collectForm, paymentMethod: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="STANDING_ORDER">Standing Order</option>
+                      <option value="DIRECT_DEBIT">Direct Debit</option>
+                      <option value="BANK_TRANSFER">Bank Transfer (BACS)</option>
+                      <option value="CARD">Debit Card</option>
+                      <option value="CASH">Cash</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Receiving Bank Account <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    required
+                    value={collectForm.receivingAccountId}
+                    onChange={(e) => setCollectForm({ ...collectForm, receivingAccountId: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">-- Select Receiving Account --</option>
+                    {accounts.map((a) => (
+                      <option key={a._id} value={a._id}>
+                        {a.name} ({a.bankName}) · Sort: {a.sortCode}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Receipt Notes / Reference</label>
+                  <input
+                    type="text"
+                    value={collectForm.notes}
+                    onChange={(e) => setCollectForm({ ...collectForm, notes: e.target.value })}
+                    placeholder="e.g. Cleared via online banking reference SO-102"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Attach Payment Receipt / Remittance Slip (Optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".pdf,image/png,image/jpeg,image/webp,image/jpg"
+                    onChange={(e) => setCollectFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-950 p-2 rounded-xl border border-slate-800"
+                  />
+                  {collectFile && (
+                    <div className="text-[11px] text-indigo-300 mt-1.5 flex items-center justify-between">
+                      <span className="truncate max-w-[260px]">Selected: {collectFile.name} ({(collectFile.size / 1024).toFixed(1)} KB)</span>
+                      <button
+                        type="button"
+                        onClick={() => setCollectFile(null)}
+                        className="text-rose-400 hover:underline cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              {/* Sticky Footer */}
+              <div className="px-5 py-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowCollectModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={collecting}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {collecting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>Post Rent Receipt</span>
@@ -601,115 +662,121 @@ export function RentManagerPage({ selectedCompany }) {
 
       {/* Edit Rent Schedule Modal */}
       {editingSchedule && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Sticky Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                   <Edit3 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white">Edit Rent Invoice Schedule</h2>
+                  <h2 className="text-sm sm:text-base font-bold text-white">Edit Rent Invoice Schedule</h2>
                   <p className="text-[11px] text-indigo-400">
-                    {editingSchedule.propertyId?.name} ({editingSchedule.unitId?.unitName}) · {formatMonthLabel(editingSchedule.billingMonth)}
+                    {editingSchedule.propertyId?.name} ({editingSchedule.unitId?.unitName || 'Direct AST'}) · {formatMonthLabel(editingSchedule.billingMonth)}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setEditingSchedule(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {editScheduleError && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
-                {editScheduleError}
-              </div>
-            )}
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleEditScheduleSubmit} className="flex-1 overflow-y-auto flex flex-col min-h-0">
+              <div className="p-5 sm:p-6 space-y-3.5 text-xs flex-1 custom-scrollbar">
+                {editScheduleError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+                    {editScheduleError}
+                  </div>
+                )}
 
-            <form onSubmit={handleEditScheduleSubmit} className="mt-4 space-y-3.5 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <span className="text-[10px] text-slate-500 block">Tenant:</span>
-                <span className="text-sm font-bold text-white">{editingSchedule.tenantId?.fullName}</span>
-              </div>
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <span className="text-[10px] text-slate-500 block">Tenant:</span>
+                  <span className="text-sm font-bold text-white">{editingSchedule.tenantId?.fullName}</span>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  <label className="block text-emerald-400 font-bold mb-1">Expected Rent (£)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editScheduleForm.expectedAmount}
-                    onChange={(e) => setEditScheduleForm({ ...editScheduleForm, expectedAmount: e.target.value })}
-                    className="w-full bg-slate-950 border border-emerald-500/30 rounded-lg px-3 py-2 text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <label className="block text-emerald-400 font-bold mb-1">Expected Rent (£)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={editScheduleForm.expectedAmount}
+                      onChange={(e) => setEditScheduleForm({ ...editScheduleForm, expectedAmount: e.target.value })}
+                      className="w-full bg-slate-950 border border-emerald-500/30 rounded-lg px-3 py-2 text-emerald-300 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Paid Amount (£)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editScheduleForm.paidAmount}
+                      onChange={(e) => setEditScheduleForm({ ...editScheduleForm, paidAmount: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Due Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={editScheduleForm.dueDate}
+                      onChange={(e) => setEditScheduleForm({ ...editScheduleForm, dueDate: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Status Override</label>
+                    <select
+                      value={editScheduleForm.status}
+                      onChange={(e) => setEditScheduleForm({ ...editScheduleForm, status: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                    >
+                      <option value="PENDING">PENDING</option>
+                      <option value="PARTIAL">PARTIAL</option>
+                      <option value="PAID">PAID</option>
+                      <option value="OVERDUE">OVERDUE</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Paid Amount (£)</label>
+                  <label className="block text-slate-300 font-medium mb-1">Invoice Notes</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    value={editScheduleForm.paidAmount}
-                    onChange={(e) => setEditScheduleForm({ ...editScheduleForm, paidAmount: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-amber-500"
+                    type="text"
+                    value={editScheduleForm.notes}
+                    onChange={(e) => setEditScheduleForm({ ...editScheduleForm, notes: e.target.value })}
+                    placeholder="e.g. Adjusted rent agreed due to repair delay..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Due Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={editScheduleForm.dueDate}
-                    onChange={(e) => setEditScheduleForm({ ...editScheduleForm, dueDate: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Status Override</label>
-                  <select
-                    value={editScheduleForm.status}
-                    onChange={(e) => setEditScheduleForm({ ...editScheduleForm, status: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
-                  >
-                    <option value="PENDING">PENDING</option>
-                    <option value="PARTIAL">PARTIAL</option>
-                    <option value="PAID">PAID</option>
-                    <option value="OVERDUE">OVERDUE</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Invoice Notes</label>
-                <input
-                  type="text"
-                  value={editScheduleForm.notes}
-                  onChange={(e) => setEditScheduleForm({ ...editScheduleForm, notes: e.target.value })}
-                  placeholder="e.g. Adjusted rent agreed due to repair delay..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              {/* Sticky Footer */}
+              <div className="px-5 py-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditingSchedule(null)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editScheduleSubmitting}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-lg shadow-amber-600/25 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {editScheduleSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>Save Rent Invoice</span>
