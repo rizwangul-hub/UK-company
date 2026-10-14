@@ -87,6 +87,24 @@ const rentPaymentSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    receiptUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    receiptFilename: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    documents: [
+      {
+        title: { type: String, default: '' },
+        url: { type: String, required: true },
+        docType: { type: String, default: 'RENT_RECEIPT' },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

@@ -68,6 +68,9 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
     narration,
     reference = '',
     userId = null,
+    receiptUrl = '',
+    receiptFilename = '',
+    documents = [],
   } = data;
 
   if (!companyId) {
@@ -98,6 +101,12 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
       : 'EXP';
 
   const voucherNo = customVoucherNo || (await generateVoucherNo(typeCode, companyId));
+
+  const resolvedDocs = Array.isArray(documents) && documents.length > 0
+    ? documents
+    : receiptUrl
+    ? [{ title: receiptFilename || 'Receipt', url: receiptUrl, docType: 'RECEIPT', uploadedAt: new Date() }]
+    : [];
 
   const runOperation = async (session) => {
     // 1. Verify primary account exists in company and is active
@@ -138,6 +147,9 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
           description: narration,
           totalAmount: numericAmount,
           reference,
+          receiptUrl,
+          receiptFilename,
+          documents: resolvedDocs,
           status: 'POSTED',
           createdBy: userId,
         },
@@ -165,6 +177,9 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
           periodMonth,
           narration,
           reference,
+          receiptUrl,
+          receiptFilename,
+          documents: resolvedDocs,
           status: 'POSTED',
           createdBy: userId,
         },

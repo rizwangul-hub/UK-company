@@ -10,6 +10,8 @@ import {
   Calendar,
   Layers,
   Edit3,
+  Paperclip,
+  ExternalLink,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import pixxLogo from '../assets/logo.png';
@@ -264,6 +266,34 @@ export function SingleVoucherPrintModal({ voucher, selectedCompany, onClose, onE
                   {formatGBP(amount)}
                 </span>
               </div>
+
+              {/* 7. Attached Receipt / Source Verification Document */}
+              {voucher.receiptUrl && (
+                <div className="bg-indigo-50/80 border border-indigo-200 rounded-lg p-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 truncate">
+                    <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700 shrink-0">
+                      <Paperclip size={16} />
+                    </div>
+                    <div className="truncate">
+                      <div className="text-[10px] uppercase font-bold text-indigo-800 tracking-wider">
+                        Attached Receipt / Source Document
+                      </div>
+                      <div className="text-xs font-semibold text-slate-800 truncate">
+                        {voucher.receiptFilename || 'Verified Transaction Document'}
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href={voucher.receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-xs shrink-0"
+                  >
+                    <ExternalLink size={12} />
+                    <span>View Document</span>
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Bottom Signatures & Certification */}

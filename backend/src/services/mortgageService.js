@@ -76,6 +76,8 @@ export const recordMortgagePayment = async (data, userId = null, companyId = nul
     isLenderConfirmed = false,
     notes = '',
     documents = [],
+    receiptUrl = '',
+    receiptFilename = '',
   } = data;
 
   const numTotal = round2(totalAmountPaid);
@@ -130,6 +132,12 @@ export const recordMortgagePayment = async (data, userId = null, companyId = nul
 
   const voucherNo = await generateVoucherNo('MTG', effectiveCompanyId);
 
+  const resolvedDocs = Array.isArray(documents) && documents.length > 0
+    ? documents
+    : receiptUrl
+    ? [{ title: receiptFilename || 'Mortgage Receipt', url: receiptUrl, uploadedAt: new Date() }]
+    : [];
+
   let session = null;
   try {
     session = await mongoose.startSession();
@@ -146,6 +154,9 @@ export const recordMortgagePayment = async (data, userId = null, companyId = nul
           description: `Mortgage payment to ${mortgage.lenderName} (${mortgage.accountReference}) - Split: Int £${numInterest}, Prin £${numPrincipal}${numFee ? `, Fees £${numFee}` : ''}`,
           totalAmount: numTotal,
           reference: paymentReference || mortgage.accountReference,
+          receiptUrl: receiptUrl.trim(),
+          receiptFilename: receiptFilename.trim(),
+          documents: resolvedDocs,
           status: 'POSTED',
           createdBy: userId,
         },
@@ -171,6 +182,9 @@ export const recordMortgagePayment = async (data, userId = null, companyId = nul
           periodMonth: `${new Date(paymentDate).getFullYear()}-${String(new Date(paymentDate).getMonth() + 1).padStart(2, '0')}`,
           narration: `Mortgage payment: ${mortgage.lenderName} (Ref: ${mortgage.accountReference}) - Total £${numTotal} [Interest: £${numInterest}, Principal: £${numPrincipal}${numFee ? `, Fees: £${numFee}` : ''}]`,
           reference: paymentReference,
+          receiptUrl: receiptUrl.trim(),
+          receiptFilename: receiptFilename.trim(),
+          documents: resolvedDocs,
           status: 'POSTED',
           createdBy: userId,
         },
@@ -212,7 +226,9 @@ export const recordMortgagePayment = async (data, userId = null, companyId = nul
           paymentReference,
           isLenderConfirmed,
           transactionId: transaction._id,
-          documents,
+          receiptUrl: receiptUrl.trim(),
+          receiptFilename: receiptFilename.trim(),
+          documents: resolvedDocs,
           notes,
         },
       ],

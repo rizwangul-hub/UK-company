@@ -29,6 +29,7 @@ import {
   CheckSquare,
   Square,
   Check,
+  Paperclip,
 } from 'lucide-react';
 import { ledgerAPI, accountsAPI, reportsAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
@@ -867,6 +868,17 @@ export function LedgerPage({ selectedCompany }) {
                         </td>
                         <td className="p-3 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-1.5">
+                            {tx.receiptUrl && (
+                              <a
+                                href={tx.receiptUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600 hover:text-white transition"
+                                title={`View Attached Receipt: ${tx.receiptFilename || 'Document'}`}
+                              >
+                                <Paperclip size={13} />
+                              </a>
+                            )}
                             <button
                               onClick={() => setActiveVoucher(tx)}
                               className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-600 dark:text-slate-300 transition cursor-pointer"

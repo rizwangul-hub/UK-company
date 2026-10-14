@@ -157,6 +157,9 @@ export const recordPayment = async (req, res) => {
       receivingAccountId,
       paymentMethod = 'STANDING_ORDER',
       notes = '',
+      receiptUrl = '',
+      receiptFilename = '',
+      documents = [],
     } = req.body;
 
     const numAmount = round2(amount);
@@ -249,6 +252,12 @@ export const recordPayment = async (req, res) => {
     const unitNamePart = schedule.unitId?.unitName ? ` (${schedule.unitId.unitName})` : '';
     const tenantName = schedule.tenantId?.fullName || schedule.propertyId?.tenantName || 'Tenant';
 
+    const resolvedDocs = Array.isArray(documents) && documents.length > 0
+      ? documents
+      : receiptUrl
+      ? [{ title: receiptFilename || 'Rent Receipt', url: receiptUrl, docType: 'RENT_RECEIPT', uploadedAt: new Date() }]
+      : [];
+
     // 1. Post ledger transaction (IN = Cash inflow to receiving bank)
     const { transaction } = await postLedgerTransaction({
       companyId: req.companyId,
@@ -265,6 +274,9 @@ export const recordPayment = async (req, res) => {
       narration: `Rent received from ${tenantName} for ${propName}${unitNamePart} - Period: ${schedule.billingMonth}`,
       reference: receiptRef,
       userId: req.user?._id,
+      receiptUrl: receiptUrl.trim(),
+      receiptFilename: receiptFilename.trim(),
+      documents: resolvedDocs,
     });
 
     // 2. Create RentPayment record
@@ -282,6 +294,9 @@ export const recordPayment = async (req, res) => {
       receivingAccountId,
       paymentMethod,
       transactionId: transaction._id,
+      receiptUrl: receiptUrl.trim(),
+      receiptFilename: receiptFilename.trim(),
+      documents: resolvedDocs,
       notes,
     });
 

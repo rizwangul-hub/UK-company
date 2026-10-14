@@ -452,6 +452,22 @@ export const ledgerAPI = {
     const res = await api.delete(`/ledger/categories/${id}`);
     return res.data;
   },
+  uploadReceipt: async (formData) => {
+    const res = await api.post('/ledger/upload-receipt', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  attachReceipt: async (transactionId, formData) => {
+    const res = await api.post(`/ledger/transactions/${transactionId}/receipt`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  removeReceipt: async (transactionId) => {
+    const res = await api.delete(`/ledger/transactions/${transactionId}/receipt`);
+    return res.data;
+  },
 };
 
 // --------------------------------------------------------------------------

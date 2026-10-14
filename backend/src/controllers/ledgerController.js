@@ -12,6 +12,7 @@ import MortgagePayment from '../models/MortgagePayment.js';
 import Unit from '../models/Unit.js';
 import { postLedgerTransaction, round2 } from '../services/ledgerService.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
+import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 
 const parseDateRange = (datePreset, startDate, endDate) => {
   const now = new Date();
@@ -646,6 +647,9 @@ export const queryEntityLedger = async (req, res) => {
           propertyName: tx.propertyId?.name || '',
           unitName: tx.unitId?.unitName || '',
           reference: tx.reference || '',
+          receiptUrl: tx.receiptUrl || (tx.documents?.[0]?.url || ''),
+          receiptFilename: tx.receiptFilename || (tx.documents?.[0]?.title || ''),
+          documents: tx.documents || [],
           debit: round2(debit),
           credit: round2(credit),
           amount: round2(tx.amount),
@@ -731,6 +735,9 @@ export const recordExpense = async (req, res) => {
       narration,
       reference = '',
       periodMonth = null,
+      receiptUrl = '',
+      receiptFilename = '',
+      documents = [],
     } = req.body;
 
     const numAmount = round2(amount);
@@ -768,6 +775,9 @@ export const recordExpense = async (req, res) => {
       narration: narration.trim(),
       reference: reference.trim(),
       userId: req.user?._id,
+      receiptUrl: receiptUrl.trim(),
+      receiptFilename: receiptFilename.trim(),
+      documents,
     });
 
     return apiSuccess(
@@ -793,6 +803,9 @@ export const recordIncome = async (req, res) => {
       narration,
       reference = '',
       periodMonth = null,
+      receiptUrl = '',
+      receiptFilename = '',
+      documents = [],
     } = req.body;
 
     const numAmount = round2(amount);
@@ -830,6 +843,9 @@ export const recordIncome = async (req, res) => {
       narration: narration.trim(),
       reference: reference.trim(),
       userId: req.user?._id,
+      receiptUrl: receiptUrl.trim(),
+      receiptFilename: receiptFilename.trim(),
+      documents,
     });
 
     return apiSuccess(
@@ -1046,6 +1062,9 @@ export const updateTransaction = async (req, res) => {
     if (categoryId !== undefined) transaction.categoryId = categoryId || null;
     if (propertyId !== undefined) transaction.propertyId = propertyId || null;
     if (unitId !== undefined) transaction.unitId = unitId || null;
+    if (req.body.receiptUrl !== undefined) transaction.receiptUrl = req.body.receiptUrl.trim();
+    if (req.body.receiptFilename !== undefined) transaction.receiptFilename = req.body.receiptFilename.trim();
+    if (Array.isArray(req.body.documents)) transaction.documents = req.body.documents;
 
     await transaction.save();
 
@@ -1058,6 +1077,9 @@ export const updateTransaction = async (req, res) => {
           description: transaction.narration,
           reference: transaction.reference,
           voucherDate: transaction.transactionDate,
+          receiptUrl: transaction.receiptUrl,
+          receiptFilename: transaction.receiptFilename,
+          documents: transaction.documents,
         }
       );
     }
@@ -1065,5 +1087,160 @@ export const updateTransaction = async (req, res) => {
     return apiSuccess(res, transaction, `Voucher / Transaction ${transaction.voucherNo} updated successfully`);
   } catch (error) {
     return apiError(res, error.message || 'Failed to update transaction', 400, error);
+  }
+};
+
+/**
+ * Upload general ledger entry receipt (Rent, Expense, Transfer, Other Income, Mortgage)
+ */
+export const uploadLedgerReceipt = async (req, res) => {
+  try {
+    if (!req.file) {
+      return apiError(res, 'No receipt file provided for upload', 400);
+    }
+
+    let fileUrl = '';
+    if (isCloudinaryConfigured()) {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: `${CLOUDINARY_FOLDER}/receipts`,
+            resource_type: 'auto',
+          },
+          (err, result) => {
+            if (err) return reject(err);
+            resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
+      fileUrl = uploadResult.secure_url;
+    } else {
+      const mime = req.file.mimetype || 'application/octet-stream';
+      fileUrl = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+    }
+
+    return apiSuccess(
+      res,
+      {
+        url: fileUrl,
+        filename: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+      },
+      'Receipt uploaded successfully',
+      201
+    );
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to upload receipt', 500, error);
+  }
+};
+
+/**
+ * Attach a receipt file directly to an existing transaction
+ */
+export const attachTransactionReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const transaction = await Transaction.findOne({ _id: id, companyId: req.companyId });
+    if (!transaction) {
+      return apiError(res, 'Transaction not found in active company', 404);
+    }
+
+    let fileUrl = req.body.receiptUrl || '';
+    let filename = req.body.receiptFilename || req.body.title || 'Receipt Document';
+
+    if (req.file) {
+      filename = req.file.originalname;
+      if (isCloudinaryConfigured()) {
+        const uploadResult = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: `${CLOUDINARY_FOLDER}/receipts`,
+              resource_type: 'auto',
+            },
+            (err, result) => {
+              if (err) return reject(err);
+              resolve(result);
+            }
+          );
+          stream.end(req.file.buffer);
+        });
+        fileUrl = uploadResult.secure_url;
+      } else {
+        const mime = req.file.mimetype || 'application/octet-stream';
+        fileUrl = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+      }
+    }
+
+    if (!fileUrl) {
+      return apiError(res, 'No file or receipt URL provided', 400);
+    }
+
+    transaction.receiptUrl = fileUrl;
+    transaction.receiptFilename = filename;
+    transaction.documents.push({
+      title: filename,
+      url: fileUrl,
+      docType: req.body.docType || 'RECEIPT',
+      uploadedAt: new Date(),
+    });
+
+    await transaction.save();
+
+    if (transaction.voucherId) {
+      await Voucher.findOneAndUpdate(
+        { _id: transaction.voucherId, companyId: req.companyId },
+        {
+          receiptUrl: fileUrl,
+          receiptFilename: filename,
+          $push: {
+            documents: {
+              title: filename,
+              url: fileUrl,
+              docType: req.body.docType || 'RECEIPT',
+              uploadedAt: new Date(),
+            },
+          },
+        }
+      );
+    }
+
+    return apiSuccess(res, transaction, 'Receipt attached to transaction successfully');
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to attach receipt', 500, error);
+  }
+};
+
+/**
+ * Remove receipt from transaction
+ */
+export const removeTransactionReceipt = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const transaction = await Transaction.findOne({ _id: id, companyId: req.companyId });
+    if (!transaction) {
+      return apiError(res, 'Transaction not found', 404);
+    }
+
+    transaction.receiptUrl = '';
+    transaction.receiptFilename = '';
+    transaction.documents = [];
+    await transaction.save();
+
+    if (transaction.voucherId) {
+      await Voucher.findOneAndUpdate(
+        { _id: transaction.voucherId, companyId: req.companyId },
+        {
+          receiptUrl: '',
+          receiptFilename: '',
+          documents: [],
+        }
+      );
+    }
+
+    return apiSuccess(res, transaction, 'Receipt removed successfully');
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to remove receipt', 500, error);
   }
 };

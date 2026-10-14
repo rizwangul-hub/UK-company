@@ -136,7 +136,17 @@ export const getAccountStatement = async (req, res) => {
 
 export const executeTransfer = async (req, res) => {
   try {
-    const { fromAccountId, toAccountId, amount, transferDate = new Date(), reference = '', narration = '' } = req.body;
+    const {
+      fromAccountId,
+      toAccountId,
+      amount,
+      transferDate = new Date(),
+      reference = '',
+      narration = '',
+      receiptUrl = '',
+      receiptFilename = '',
+      documents = [],
+    } = req.body;
     const numAmount = round2(amount);
 
     if (!fromAccountId || !toAccountId || numAmount <= 0) {
@@ -169,6 +179,9 @@ export const executeTransfer = async (req, res) => {
       narration: desc,
       reference,
       userId: req.user?._id,
+      receiptUrl: receiptUrl.trim(),
+      receiptFilename: receiptFilename.trim(),
+      documents,
     });
 
     return apiSuccess(

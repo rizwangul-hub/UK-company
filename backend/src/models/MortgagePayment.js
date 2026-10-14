@@ -82,6 +82,16 @@ const mortgagePaymentSchema = new mongoose.Schema(
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
+    receiptUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    receiptFilename: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     notes: {
       type: String,
       trim: true,

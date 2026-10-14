@@ -17,8 +17,11 @@ import {
   Plus,
   Zap,
   Flame,
-  Wrench,
   Tag,
+  Upload,
+  ExternalLink,
+  Paperclip,
+  X,
 } from 'lucide-react';
 import {
   accountsAPI,
@@ -30,6 +33,80 @@ import {
 } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import pixxLogo from '../assets/logo.png';
+
+// Reusable Receipt / Document Attachment Field
+function ReceiptUploadField({ file, setFile, label = "Upload Receipt / Document (Optional)", colorScheme = "indigo" }) {
+  const fileInputRef = React.useRef(null);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const ringColor = {
+    indigo: 'border-indigo-500/40 text-indigo-300 bg-indigo-950/30',
+    emerald: 'border-emerald-500/40 text-emerald-300 bg-emerald-950/30',
+    rose: 'border-rose-500/40 text-rose-300 bg-rose-950/30',
+    sky: 'border-sky-500/40 text-sky-300 bg-sky-950/30',
+    amber: 'border-amber-500/40 text-amber-300 bg-amber-950/30',
+  }[colorScheme] || 'border-indigo-500/40 text-indigo-300 bg-indigo-950/30';
+
+  const inputId = `file-upload-${label.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`;
+
+  return (
+    <div className="lg:col-span-3 bg-slate-950/60 border border-slate-800 rounded-xl p-3">
+      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+        <span className="flex items-center gap-1.5">
+          <Paperclip className="w-3.5 h-3.5 text-indigo-400" />
+          {label}
+        </span>
+        <span className="text-[10px] text-slate-500 font-normal">PDF, JPG, PNG &bull; Max 10MB</span>
+      </label>
+      {file ? (
+        <div className={`flex items-center justify-between p-2.5 rounded-lg border text-xs ${ringColor}`}>
+          <div className="flex items-center gap-2 truncate">
+            <FileText className="w-4 h-4 shrink-0" />
+            <span className="font-semibold text-slate-200 truncate">{file.name}</span>
+            <span className="text-slate-400 text-[10px] shrink-0 font-mono">
+              ({(file.size / 1024).toFixed(1)} KB)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setFile(null);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }}
+            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition ml-2 cursor-pointer"
+            title="Remove file"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".pdf,image/png,image/jpeg,image/webp,image/jpg"
+            className="hidden"
+            id={inputId}
+          />
+          <label
+            htmlFor={inputId}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold cursor-pointer transition shadow-xs"
+          >
+            <Upload className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Choose Receipt / Attachment...</span>
+          </label>
+          <span className="text-[11px] text-slate-500 italic">No receipt attached</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function DataEntryPage({ selectedCompany }) {
   const [activeTab, setActiveTab] = useState('rent'); // 'rent' | 'expense' | 'transfer' | 'other' | 'mortgage' | 'recent'
@@ -111,6 +188,31 @@ export function DataEntryPage({ selectedCompany }) {
     paymentReference: '',
     notes: '',
   });
+
+  // Receipt File Attachment States for Forms
+  const [rentFile, setRentFile] = useState(null);
+  const [expenseFile, setExpenseFile] = useState(null);
+  const [transferFile, setTransferFile] = useState(null);
+  const [otherIncomeFile, setOtherIncomeFile] = useState(null);
+  const [mortgageFile, setMortgageFile] = useState(null);
+
+  // Quick Attach Receipt Modal (from Recent Journal)
+  const [attachModalTx, setAttachModalTx] = useState(null);
+  const [attachModalFile, setAttachModalFile] = useState(null);
+  const [attachModalUploading, setAttachModalUploading] = useState(false);
+  const [attachModalError, setAttachModalError] = useState('');
+
+  // Helper to upload receipt file if selected
+  const uploadReceiptIfPresent = async (file) => {
+    if (!file) return { receiptUrl: '', receiptFilename: '' };
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await ledgerAPI.uploadReceipt(formData);
+    return {
+      receiptUrl: res?.data?.url || '',
+      receiptFilename: res?.data?.filename || file.name,
+    };
+  };
 
   // Load All System Master Data
   const loadData = useCallback(async (force = false) => {
@@ -296,6 +398,42 @@ export function DataEntryPage({ selectedCompany }) {
     }
   };
 
+  // Handle attaching a receipt to an existing transaction from the Recent Journal
+  const handleAttachReceiptSubmit = async () => {
+    if (!attachModalTx || !attachModalFile) return;
+    try {
+      setAttachModalUploading(true);
+      setAttachModalError('');
+      const formData = new FormData();
+      formData.append('file', attachModalFile);
+      const res = await ledgerAPI.attachReceipt(attachModalTx._id, formData);
+      if (res?.success) {
+        setFeedback({
+          text: `Receipt successfully attached to Voucher ${attachModalTx.voucherNo}.`,
+          type: 'success',
+        });
+        setAttachModalTx(null);
+        setAttachModalFile(null);
+        await loadData();
+      }
+    } catch (err) {
+      setAttachModalError(err.response?.data?.message || err.message || 'Failed to attach receipt.');
+    } finally {
+      setAttachModalUploading(false);
+    }
+  };
+
+  const handleRemoveReceipt = async (txId, voucherNo) => {
+    if (!window.confirm(`Are you sure you want to remove the receipt attachment for Voucher ${voucherNo}?`)) return;
+    try {
+      await ledgerAPI.removeReceipt(txId);
+      setFeedback({ text: `Receipt attachment removed for Voucher ${voucherNo}.`, type: 'success' });
+      await loadData();
+    } catch (err) {
+      setFeedback({ text: err.response?.data?.message || err.message || 'Failed to remove receipt.', type: 'error' });
+    }
+  };
+
   // Submit 1: Rent Payment Receipt
   const handleRentSubmit = async (e) => {
     e.preventDefault();
@@ -310,6 +448,10 @@ export function DataEntryPage({ selectedCompany }) {
     try {
       setSubmitting(true);
       setFeedback({ text: '', type: '' });
+      let uploadedDoc = { receiptUrl: '', receiptFilename: '' };
+      if (rentFile) {
+        uploadedDoc = await uploadReceiptIfPresent(rentFile);
+      }
       const res = await rentAPI.recordPayment({
         scheduleId: rentForm.scheduleId || undefined,
         propertyId: rentForm.propertyId || undefined,
@@ -319,6 +461,8 @@ export function DataEntryPage({ selectedCompany }) {
         receivingAccountId: rentForm.receivingAccountId,
         paymentMethod: rentForm.paymentMethod,
         notes: rentForm.notes,
+        receiptUrl: uploadedDoc.receiptUrl || undefined,
+        receiptFilename: uploadedDoc.receiptFilename || undefined,
       });
 
       if (res?.success) {
@@ -326,6 +470,7 @@ export function DataEntryPage({ selectedCompany }) {
           text: `Rent receipt of ${formatGBP(Number(rentForm.amount))} for ${rentForm.billingMonth} successfully posted into bank account.`,
           type: 'success',
         });
+        setRentFile(null);
         setRentForm((prev) => ({
           ...prev,
           scheduleId: '',
@@ -352,6 +497,10 @@ export function DataEntryPage({ selectedCompany }) {
     try {
       setSubmitting(true);
       setFeedback({ text: '', type: '' });
+      let uploadedDoc = { receiptUrl: '', receiptFilename: '' };
+      if (expenseFile) {
+        uploadedDoc = await uploadReceiptIfPresent(expenseFile);
+      }
       const res = await ledgerAPI.recordExpense({
         transactionDate: expenseForm.transactionDate,
         accountId: expenseForm.accountId,
@@ -362,6 +511,8 @@ export function DataEntryPage({ selectedCompany }) {
         narration: expenseForm.narration,
         reference: expenseForm.reference,
         periodMonth: expenseForm.transactionDate.slice(0, 7),
+        receiptUrl: uploadedDoc.receiptUrl || undefined,
+        receiptFilename: uploadedDoc.receiptFilename || undefined,
       });
 
       if (res?.success) {
@@ -369,6 +520,7 @@ export function DataEntryPage({ selectedCompany }) {
           text: `Expense voucher of ${formatGBP(Number(expenseForm.amount))} recorded and deducted from bank balance.`,
           type: 'success',
         });
+        setExpenseFile(null);
         setExpenseForm((prev) => ({
           ...prev,
           amount: '',
@@ -398,6 +550,10 @@ export function DataEntryPage({ selectedCompany }) {
     try {
       setSubmitting(true);
       setFeedback({ text: '', type: '' });
+      let uploadedDoc = { receiptUrl: '', receiptFilename: '' };
+      if (transferFile) {
+        uploadedDoc = await uploadReceiptIfPresent(transferFile);
+      }
       const res = await accountsAPI.transfer({
         fromAccountId: transferForm.fromAccountId,
         toAccountId: transferForm.toAccountId,
@@ -405,6 +561,8 @@ export function DataEntryPage({ selectedCompany }) {
         transferDate: transferForm.transferDate,
         reference: transferForm.reference,
         narration: transferForm.narration,
+        receiptUrl: uploadedDoc.receiptUrl || undefined,
+        receiptFilename: uploadedDoc.receiptFilename || undefined,
       });
 
       if (res?.success) {
@@ -412,6 +570,7 @@ export function DataEntryPage({ selectedCompany }) {
           text: `Internal transfer of ${formatGBP(Number(transferForm.amount))} executed successfully between accounts.`,
           type: 'success',
         });
+        setTransferFile(null);
         setTransferForm((prev) => ({
           ...prev,
           amount: '',
@@ -437,6 +596,10 @@ export function DataEntryPage({ selectedCompany }) {
     try {
       setSubmitting(true);
       setFeedback({ text: '', type: '' });
+      let uploadedDoc = { receiptUrl: '', receiptFilename: '' };
+      if (otherIncomeFile) {
+        uploadedDoc = await uploadReceiptIfPresent(otherIncomeFile);
+      }
       const res = await ledgerAPI.recordIncome({
         transactionDate: otherIncomeForm.transactionDate,
         accountId: otherIncomeForm.accountId,
@@ -449,6 +612,8 @@ export function DataEntryPage({ selectedCompany }) {
           : otherIncomeForm.narration,
         reference: otherIncomeForm.reference,
         periodMonth: otherIncomeForm.transactionDate.slice(0, 7),
+        receiptUrl: uploadedDoc.receiptUrl || undefined,
+        receiptFilename: uploadedDoc.receiptFilename || undefined,
       });
 
       if (res?.success) {
@@ -456,6 +621,7 @@ export function DataEntryPage({ selectedCompany }) {
           text: `Income receipt of ${formatGBP(Number(otherIncomeForm.amount))} successfully recorded into bank balance.`,
           type: 'success',
         });
+        setOtherIncomeFile(null);
         setOtherIncomeForm((prev) => ({
           ...prev,
           amount: '',
@@ -496,6 +662,10 @@ export function DataEntryPage({ selectedCompany }) {
     try {
       setSubmitting(true);
       setFeedback({ text: '', type: '' });
+      let uploadedDoc = { receiptUrl: '', receiptFilename: '' };
+      if (mortgageFile) {
+        uploadedDoc = await uploadReceiptIfPresent(mortgageFile);
+      }
       const res = await mortgagesAPI.recordPayment(mortgageForm.mortgageId, {
         paymentDate: mortgageForm.paymentDate,
         totalAmountPaid: total,
@@ -505,6 +675,8 @@ export function DataEntryPage({ selectedCompany }) {
         paymentAccountId: mortgageForm.paymentAccountId,
         paymentReference: mortgageForm.paymentReference,
         notes: mortgageForm.notes,
+        receiptUrl: uploadedDoc.receiptUrl || undefined,
+        receiptFilename: uploadedDoc.receiptFilename || undefined,
       });
 
       if (res?.success) {
@@ -512,6 +684,7 @@ export function DataEntryPage({ selectedCompany }) {
           text: `Mortgage payment of ${formatGBP(total)} posted. Principal debt reduced by ${formatGBP(principal)}.`,
           type: 'success',
         });
+        setMortgageFile(null);
         setMortgageForm((prev) => ({
           ...prev,
           totalAmountPaid: '',
@@ -1030,6 +1203,13 @@ export function DataEntryPage({ selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
                 />
               </div>
+
+              <ReceiptUploadField
+                file={rentFile}
+                setFile={setRentFile}
+                label="Rent Remittance Slip / Bank Transfer Receipt (Optional)"
+                colorScheme="emerald"
+              />
             </div>
 
             <div className="flex justify-end pt-3 border-t border-slate-800">
@@ -1269,6 +1449,13 @@ export function DataEntryPage({ selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
                 />
               </div>
+
+              <ReceiptUploadField
+                file={expenseFile}
+                setFile={setExpenseFile}
+                label="Supplier Invoice / Purchase Receipt / Contractor Bill (Optional)"
+                colorScheme="rose"
+              />
             </div>
 
             <div className="flex justify-end pt-3 border-t border-slate-800">
@@ -1398,6 +1585,13 @@ export function DataEntryPage({ selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-sky-500 focus:outline-none"
                 />
               </div>
+
+              <ReceiptUploadField
+                file={transferFile}
+                setFile={setTransferFile}
+                label="Transfer Confirmation / Remittance Voucher / Cheque Scan (Optional)"
+                colorScheme="sky"
+              />
             </div>
 
             <div className="flex justify-end pt-3 border-t border-slate-800">
@@ -1541,6 +1735,13 @@ export function DataEntryPage({ selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
                 />
               </div>
+
+              <ReceiptUploadField
+                file={otherIncomeFile}
+                setFile={setOtherIncomeFile}
+                label="Income Deposit Slip / Payer Advice / Payment Receipt (Optional)"
+                colorScheme="amber"
+              />
             </div>
 
             <div className="flex justify-end pt-3 border-t border-slate-800">
@@ -1715,6 +1916,13 @@ export function DataEntryPage({ selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-indigo-500 focus:outline-none"
                 />
               </div>
+
+              <ReceiptUploadField
+                file={mortgageFile}
+                setFile={setMortgageFile}
+                label="Lender Statement / Mortgage Debit Receipt / Bank Advice (Optional)"
+                colorScheme="indigo"
+              />
             </div>
 
             <div className="flex justify-end pt-3 border-t border-slate-800">
@@ -1767,12 +1975,13 @@ export function DataEntryPage({ selectedCompany }) {
                   <th className="py-2.5 px-3">Bank Account</th>
                   <th className="py-2.5 px-3">Narration</th>
                   <th className="py-2.5 px-3 text-right">Amount</th>
+                  <th className="py-2.5 px-3 text-center">Receipt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {filteredRecent.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500 font-medium">
+                    <td colSpan={7} className="py-8 text-center text-slate-500 font-medium">
                       No matching transaction entries found.
                     </td>
                   </tr>
@@ -1824,12 +2033,145 @@ export function DataEntryPage({ selectedCompany }) {
                           {isIncome ? '+' : '-'}
                           {formatGBP(tx.amount)}
                         </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {tx.receiptUrl ? (
+                              <a
+                                href={tx.receiptUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 text-[10px] font-semibold transition"
+                                title={tx.receiptFilename || 'View Receipt'}
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>View</span>
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 italic">None</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttachModalTx(tx);
+                                setAttachModalFile(null);
+                                setAttachModalError('');
+                              }}
+                              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+                              title={tx.receiptUrl ? 'Replace or Manage Receipt' : 'Attach Receipt'}
+                            >
+                              <Paperclip className="w-3.5 h-3.5 text-indigo-400" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Attach Receipt Modal */}
+      {attachModalTx && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Paperclip className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-base font-bold text-white">Attach Transaction Receipt</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachModalTx(null)}
+                className="text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 space-y-1 bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div>
+                <strong className="text-slate-400">Voucher:</strong>{' '}
+                <span className="font-mono text-indigo-300 font-bold">{attachModalTx.voucherNo}</span>
+              </div>
+              <div>
+                <strong className="text-slate-400">Date:</strong> {formatUKDate(attachModalTx.transactionDate)}
+              </div>
+              <div>
+                <strong className="text-slate-400">Narration:</strong> {attachModalTx.narration}
+              </div>
+              <div>
+                <strong className="text-slate-400">Amount:</strong> {formatGBP(attachModalTx.amount)}
+              </div>
+              {attachModalTx.receiptUrl && (
+                <div className="pt-2 mt-2 border-t border-slate-800 flex items-center justify-between">
+                  <a
+                    href={attachModalTx.receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 underline inline-flex items-center gap-1 font-semibold"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>View current ({attachModalTx.receiptFilename || 'Document'})</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveReceipt(attachModalTx._id, attachModalTx.voucherNo)}
+                    className="text-rose-400 hover:text-rose-300 text-[11px] font-semibold underline cursor-pointer"
+                  >
+                    Remove attachment
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {attachModalError && (
+              <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/50 text-rose-300 text-xs font-semibold">
+                {attachModalError}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Upload New Document (PDF, JPG, PNG)
+              </label>
+              <input
+                type="file"
+                accept=".pdf,image/png,image/jpeg,image/webp,image/jpg"
+                onChange={(e) => setAttachModalFile(e.target.files?.[0] || null)}
+                className="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-950 p-2 rounded-xl border border-slate-800"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setAttachModalTx(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!attachModalFile || attachModalUploading}
+                onClick={handleAttachReceiptSubmit}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                {attachModalUploading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload &amp; Attach</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

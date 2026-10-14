@@ -15,9 +15,12 @@ import {
   ArrowRight,
   Edit3,
   FileSpreadsheet,
+  Paperclip,
+  Upload,
+  ExternalLink,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
-import { rentAPI, accountsAPI, reportsAPI, getApiCache } from '../services/api.js';
+import { rentAPI, accountsAPI, ledgerAPI, reportsAPI, getApiCache } from '../services/api.js';
 
 export function RentManagerPage({ selectedCompany }) {
   const currentMonthVal = getCurrentMonth();
@@ -38,6 +41,7 @@ export function RentManagerPage({ selectedCompany }) {
   const [accounts, setAccounts] = useState([]);
   const [collecting, setCollecting] = useState(false);
   const [collectError, setCollectError] = useState('');
+  const [collectFile, setCollectFile] = useState(null);
   const [collectForm, setCollectForm] = useState({
     amount: '',
     paymentDate: new Date().toISOString().slice(0, 10),
@@ -111,6 +115,7 @@ export function RentManagerPage({ selectedCompany }) {
   const handleOpenCollect = (schedule) => {
     setSelectedSchedule(schedule);
     setCollectError('');
+    setCollectFile(null);
     setCollectForm({
       amount: String(schedule.outstandingAmount || schedule.expectedAmount || ''),
       paymentDate: new Date().toISOString().slice(0, 10),
@@ -127,6 +132,16 @@ export function RentManagerPage({ selectedCompany }) {
     setCollectError('');
 
     try {
+      let receiptUrl = '';
+      let receiptFilename = '';
+      if (collectFile) {
+        const formData = new FormData();
+        formData.append('file', collectFile);
+        const uploadRes = await ledgerAPI.uploadReceipt(formData);
+        receiptUrl = uploadRes?.data?.url || '';
+        receiptFilename = uploadRes?.data?.filename || collectFile.name;
+      }
+
       await rentAPI.recordPayment({
         scheduleId: selectedSchedule._id,
         amount: Number(collectForm.amount),
@@ -134,8 +149,11 @@ export function RentManagerPage({ selectedCompany }) {
         receivingAccountId: collectForm.receivingAccountId,
         paymentMethod: collectForm.paymentMethod,
         notes: collectForm.notes,
+        receiptUrl: receiptUrl || undefined,
+        receiptFilename: receiptFilename || undefined,
       });
 
+      setCollectFile(null);
       setShowCollectModal(false);
       loadSchedules();
     } catch (err) {
@@ -368,6 +386,17 @@ export function RentManagerPage({ selectedCompany }) {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {s.receiptUrl && (
+                          <a
+                            href={s.receiptUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/25 transition"
+                            title={`View Payment Receipt: ${s.receiptFilename || 'Receipt'}`}
+                          >
+                            <Paperclip className="w-3.5 h-3.5" />
+                          </a>
+                        )}
                         {s.status !== 'PAID' ? (
                           <button
                             onClick={() => handleOpenCollect(s)}
@@ -506,6 +535,30 @@ export function RentManagerPage({ selectedCompany }) {
                   placeholder="e.g. Cleared via online banking reference SO-102"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Attach Payment Receipt / Remittance Slip (Optional)
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,image/png,image/jpeg,image/webp,image/jpg"
+                  onChange={(e) => setCollectFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-950 p-2 rounded-xl border border-slate-800"
+                />
+                {collectFile && (
+                  <div className="text-[11px] text-indigo-300 mt-1.5 flex items-center justify-between">
+                    <span className="truncate max-w-[260px]">Selected: {collectFile.name} ({(collectFile.size / 1024).toFixed(1)} KB)</span>
+                    <button
+                      type="button"
+                      onClick={() => setCollectFile(null)}
+                      className="text-rose-400 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">

@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import {
   getTransactions,
   recordExpense,
@@ -10,6 +11,9 @@ import {
   updateTransaction,
   getLedgerEntities,
   queryEntityLedger,
+  uploadLedgerReceipt,
+  attachTransactionReceipt,
+  removeTransactionReceipt,
 } from '../controllers/ledgerController.js';
 import {
   getLedgerReportPreview,
@@ -18,6 +22,11 @@ import {
 } from '../controllers/reportController.js';
 import { protect } from '../middleware/auth.js';
 import { requireCompanyContext } from '../middleware/companyContext.js';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+});
 
 const router = express.Router();
 
@@ -35,6 +44,9 @@ router.get('/transactions', getTransactions);
 router.put('/transactions/:id', updateTransaction);
 router.post('/expenses', recordExpense);
 router.post('/income', recordIncome);
+router.post('/upload-receipt', upload.single('file'), uploadLedgerReceipt);
+router.post('/transactions/:id/receipt', upload.single('file'), attachTransactionReceipt);
+router.delete('/transactions/:id/receipt', removeTransactionReceipt);
 router.get('/categories', getCategories);
 router.post('/categories', createCategory);
 router.put('/categories/:id', updateCategory);
