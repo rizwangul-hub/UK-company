@@ -89,11 +89,10 @@ const serviceChargePayeeSchema = new mongoose.Schema(
   }
 );
 
-serviceChargePayeeSchema.pre('validate', function (next) {
+serviceChargePayeeSchema.pre('validate', function () {
   if (!this.name && this._payeeName) {
     this.name = this._payeeName;
   }
-  next();
 });
 
 serviceChargePayeeSchema

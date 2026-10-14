@@ -25,9 +25,9 @@ export const getPayees = async (req, res) => {
     const payees = await ServiceChargePayee.find({
       companyId: req.companyId,
       isActive: true,
-    }).sort({ payeeName: 1 }).lean();
+    }).sort({ name: 1 }).lean();
 
-    return apiSuccess(res, payees);
+    return apiSuccess(res, payees.map((p) => ({ ...p, payeeName: p.payeeName || p.name })));
   } catch (err) {
     return apiError(res, err.message, 500);
   }

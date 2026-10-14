@@ -57,6 +57,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [detailedPropertyData, setDetailedPropertyData] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [detailTab, setDetailTab] = useState('overview');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -109,6 +110,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
     setSelectedProperty(prop);
     setDetailedPropertyData(prop);
     setLoadingDetails(true);
+    setDetailTab('overview'); // reset to overview tab on every open
     if (onSelectProperty) onSelectProperty(prop._id);
 
     try {
@@ -143,6 +145,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   const handleCloseDetails = () => {
     setSelectedProperty(null);
     setDetailedPropertyData(null);
+    setDetailTab('overview');
   };
 
   // Property Create / Edit Handlers
@@ -502,10 +505,38 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
           </div>
         </div>
 
-        {/* Core Insights 4-Card Module Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Module 1: Tenancy & Rent Roll */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+        {/* ── Tab Navigation Bar ─────────────────────────────── */}
+        <div className="flex items-center gap-0.5 border-b border-slate-800 overflow-x-auto bg-slate-900/60 rounded-t-2xl px-3">
+          {[
+            { id: 'overview',   label: 'Overview' },
+            { id: 'rent',       label: 'Rent Ledger' },
+            { id: 'financials', label: 'Financials' },
+            { id: 'charges',    label: 'Service Charges' },
+            { id: 'documents',  label: 'Documents' },
+            { id: 'appliances', label: 'Appliances' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setDetailTab(tab.id)}
+              className={`px-3 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
+                detailTab === tab.id
+                  ? 'border-indigo-500 text-indigo-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Tab Panels ─────────────────────────────────────── */}
+        <div className="space-y-5">
+
+          {/* OVERVIEW TAB — Modules 1-4 in 2-col grid */}
+          {detailTab === 'overview' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Module 1: Tenancy & Rent Roll */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-indigo-400" />
@@ -761,154 +792,158 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Module 5: Rent Billing & Schedule History Register */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Receipt className="w-4 h-4 text-emerald-400" />
-                <span>Rent Billing &amp; Schedule Register</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Contractual rent billing records and payment reconciliation for this property.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-500">
-              {schedulesList.length} Records
-            </span>
           </div>
+          )} {/* end overview tab */}
 
-          {schedulesList.length === 0 ? (
-            <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-500">
-              No rent billing schedules generated for this property yet.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] uppercase tracking-wider text-slate-400 bg-slate-950/80 border-b border-slate-800">
-                  <tr>
-                    <th className="py-2.5 px-3">Billing Month</th>
-                    <th className="py-2.5 px-3">Due Date</th>
-                    <th className="py-2.5 px-3 text-right">Rent Due</th>
-                    <th className="py-2.5 px-3 text-right">Collected</th>
-                    <th className="py-2.5 px-3 text-right">Outstanding</th>
-                    <th className="py-2.5 px-3 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {schedulesList.map((sched) => {
-                    const balance = Math.max(0, (sched.amountDue || 0) - (sched.amountPaid || 0));
-                    return (
-                      <tr key={sched._id} className="hover:bg-slate-850/50 transition">
-                        <td className="py-2.5 px-3 font-semibold text-white">{sched.billingMonth}</td>
-                        <td className="py-2.5 px-3 text-slate-400">{formatUKDate(sched.dueDate)}</td>
-                        <td className="py-2.5 px-3 text-right font-medium text-slate-200">{formatGBP(sched.amountDue)}</td>
-                        <td className="py-2.5 px-3 text-right font-medium text-emerald-400">{formatGBP(sched.amountPaid)}</td>
-                        <td className={`py-2.5 px-3 text-right font-bold ${balance > 0 ? 'text-rose-400' : 'text-slate-500'}`}>
-                          {formatGBP(balance)}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              sched.status === 'PAID'
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : sched.status === 'OVERDUE'
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                : sched.status === 'PARTIALLY_PAID'
-                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+          {/* ── RENT LEDGER TAB ─────────────────────── */}
+          {detailTab === 'rent' && (
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-emerald-400" />
+                    <span>Rent Billing &amp; Schedule Register</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Contractual rent billing records and payment reconciliation for this property.
+                  </p>
+                </div>
+                <span className="text-[11px] text-slate-500">{schedulesList.length} Records</span>
+              </div>
+
+              {schedulesList.length === 0 ? (
+                <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-500">
+                  No rent billing schedules generated for this property yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="text-[10px] uppercase tracking-wider text-slate-400 bg-slate-950/80 border-b border-slate-800">
+                      <tr>
+                        <th className="py-2.5 px-3">Billing Month</th>
+                        <th className="py-2.5 px-3">Due Date</th>
+                        <th className="py-2.5 px-3 text-right">Rent Due</th>
+                        <th className="py-2.5 px-3 text-right">Collected</th>
+                        <th className="py-2.5 px-3 text-right">Outstanding</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      {schedulesList.map((sched) => {
+                        const balance = Math.max(0, (sched.amountDue || 0) - (sched.amountPaid || 0));
+                        return (
+                          <tr key={sched._id} className="hover:bg-slate-850/50 transition">
+                            <td className="py-2.5 px-3 font-semibold text-white">{sched.billingMonth}</td>
+                            <td className="py-2.5 px-3 text-slate-400">{formatUKDate(sched.dueDate)}</td>
+                            <td className="py-2.5 px-3 text-right font-medium text-slate-200">{formatGBP(sched.amountDue)}</td>
+                            <td className="py-2.5 px-3 text-right font-medium text-emerald-400">{formatGBP(sched.amountPaid)}</td>
+                            <td className={`py-2.5 px-3 text-right font-bold ${balance > 0 ? 'text-rose-400' : 'text-slate-500'}`}>
+                              {formatGBP(balance)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                sched.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : sched.status === 'OVERDUE' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                : sched.status === 'PARTIALLY_PAID' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                                 : 'bg-slate-800 text-slate-400 border-slate-700'
-                            }`}
-                          >
-                            {sched.status}
-                          </span>
-                        </td>
+                              }`}>
+                                {sched.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )} {/* end rent tab */}
+
+          {/* ── FINANCIALS TAB ──────────────────────── */}
+          {detailTab === 'financials' && (
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-indigo-400" />
+                    <span>Recent Financial Operations</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Income receipts and operational expenses posted to this property.
+                  </p>
+                </div>
+                <span className="text-[11px] text-slate-500">{transactionsList.length} Transactions</span>
+              </div>
+
+              {transactionsList.length === 0 ? (
+                <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-500">
+                  No financial operations recorded for this property yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="text-[10px] uppercase tracking-wider text-slate-400 bg-slate-950/80 border-b border-slate-800">
+                      <tr>
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">Description</th>
+                        <th className="py-2.5 px-3">Category</th>
+                        <th className="py-2.5 px-3">Account</th>
+                        <th className="py-2.5 px-3 text-right">Amount</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      {transactionsList.map((tx) => {
+                        const isIncome = tx.direction === 'IN' || tx.type === 'RENT_RECEIPT' || tx.type === 'OTHER_INCOME';
+                        return (
+                          <tr key={tx._id} className="hover:bg-slate-850/50 transition">
+                            <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">{formatUKDate(tx.transactionDate)}</td>
+                            <td className="py-2.5 px-3 font-medium text-white max-w-xs truncate">{tx.description || 'Property Transaction'}</td>
+                            <td className="py-2.5 px-3 text-slate-400">{tx.categoryId?.name || tx.type}</td>
+                            <td className="py-2.5 px-3 text-slate-400">{tx.accountId?.name || 'Bank Account'}</td>
+                            <td className={`py-2.5 px-3 text-right font-bold tabular-nums ${isIncome ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {isIncome ? '+' : '-'} {formatGBP(tx.amount)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          )} {/* end financials tab */}
 
-        {/* Module 6: Recent Financial Operations Ledger */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-indigo-400" />
-                <span>Recent Financial Operations</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Income receipts and operational expenses posted to this property.
-              </p>
-            </div>
-            <span className="text-[11px] text-slate-500">
-              {transactionsList.length} Transactions
-            </span>
-          </div>
+          {/* ── SERVICE CHARGES TAB ─────────────────── */}
+          {detailTab === 'charges' && (
+            <PropertyChargesSection
+              propertyId={propDetail?._id}
+              propertyName={propDetail?.name}
+              companyId={selectedCompany}
+              onRefreshParent={handleRefreshDetails}
+            />
+          )} {/* end charges tab */}
 
-          {transactionsList.length === 0 ? (
-            <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-500">
-              No financial operations recorded for this property yet.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="text-[10px] uppercase tracking-wider text-slate-400 bg-slate-950/80 border-b border-slate-800">
-                  <tr>
-                    <th className="py-2.5 px-3">Date</th>
-                    <th className="py-2.5 px-3">Description</th>
-                    <th className="py-2.5 px-3">Category</th>
-                    <th className="py-2.5 px-3">Account</th>
-                    <th className="py-2.5 px-3 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {transactionsList.map((tx) => {
-                    const isIncome = tx.direction === 'IN' || tx.type === 'RENT_RECEIPT' || tx.type === 'OTHER_INCOME';
-                    return (
-                      <tr key={tx._id} className="hover:bg-slate-850/50 transition">
-                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">{formatUKDate(tx.transactionDate)}</td>
-                        <td className="py-2.5 px-3 font-medium text-white max-w-xs truncate">{tx.description || 'Property Transaction'}</td>
-                        <td className="py-2.5 px-3 text-slate-400">{tx.categoryId?.name || tx.type}</td>
-                        <td className="py-2.5 px-3 text-slate-400">{tx.accountId?.name || 'Bank Account'}</td>
-                        <td className={`py-2.5 px-3 text-right font-bold tabular-nums ${isIncome ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {isIncome ? '+' : '-'} {formatGBP(tx.amount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+          {/* ── DOCUMENTS TAB ───────────────────────── */}
+          {detailTab === 'documents' && (
+            <PropertyComplianceSection
+              propertyId={propDetail?._id}
+              propertyName={propDetail?.name}
+              onRefreshParent={handleRefreshDetails}
+            />
+          )} {/* end documents tab */}
 
-        {/* Module 7: Service Charges & Ground Rent Ledger */}
-        <PropertyChargesSection
-          propertyId={propDetail?._id}
-          propertyName={propDetail?.name}
-          companyId={selectedCompany}
-          onRefreshParent={handleRefreshDetails}
-        />
+          {/* ── APPLIANCES TAB ──────────────────────── */}
+          {detailTab === 'appliances' && (
+            <PropertyAppliancesSection
+              propertyId={propDetail?._id}
+              propertyName={propDetail?.name}
+              appliances={detailedPropertyData?.appliances || []}
+              onRefresh={handleRefreshDetails}
+            />
+          )} {/* end appliances tab */}
 
-        {/* Module 8: Complete Property Documents, Safety Certificates & Council Records */}
-        <PropertyComplianceSection
-          propertyId={propDetail?._id}
-          propertyName={propDetail?.name}
-          onRefreshParent={handleRefreshDetails}
-        />
-
-        {/* Module 8: Appliances, Currys Warranties & Squeaky Clean Valet */}
-        <PropertyAppliancesSection
-          propertyId={propDetail?._id}
-          propertyName={propDetail?.name}
-          appliances={detailedPropertyData?.appliances || []}
-          onRefresh={handleRefreshDetails}
-        />
+        </div> {/* end tab panels */}
 
         {/* Modal for editing property details */}
         {showModal && renderEditModal()}
