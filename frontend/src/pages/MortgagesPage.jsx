@@ -254,10 +254,10 @@ export function MortgagesPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
               <span>Mortgage Management</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
                 UK Module
@@ -269,7 +269,7 @@ export function MortgagesPage({ selectedCompany }) {
               </span>
             )}
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
             Track lender terms, interest vs capital principal splits, and statement reconciliations for {selectedCompany?.legalName || selectedCompany?.name || 'portfolio'}.
           </p>
         </div>
@@ -279,7 +279,7 @@ export function MortgagesPage({ selectedCompany }) {
             setFacilityError('');
             setShowFacilityModal(true);
           }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/25 transition cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>New Mortgage Facility</span>
@@ -288,41 +288,47 @@ export function MortgagesPage({ selectedCompany }) {
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
-          <div className="text-xs font-medium text-slate-400 mb-1 flex items-center justify-between">
-            <span>Total Outstanding Principal</span>
-            <Landmark className="w-4 h-4 text-rose-400" />
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium">Total Outstanding Principal</span>
+            <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400">
+              <Landmark className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-white">
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
             {formatGBP(summary?.totalOutstandingPrincipal)}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             Aggregate mortgage debt across portfolio
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
-          <div className="text-xs font-medium text-slate-400 mb-1 flex items-center justify-between">
-            <span>Monthly Debt Service</span>
-            <CreditCard className="w-4 h-4 text-indigo-400" />
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium">Monthly Debt Service</span>
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+              <CreditCard className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-white">
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-indigo-300 tracking-tight tabular-nums">
             {formatGBP(summary?.totalExpectedMonthlyPayment)}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             Scheduled monthly cash outflow
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
-          <div className="text-xs font-medium text-slate-400 mb-1 flex items-center justify-between">
-            <span>Active Facilities</span>
-            <Building2 className="w-4 h-4 text-emerald-400" />
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium">Active Facilities</span>
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Building2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-white">
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-emerald-400 tracking-tight tabular-nums">
             {summary?.activeCount || 0}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             Active lenders & secured mortgages
           </div>
         </div>

@@ -199,10 +199,10 @@ export function RentManagerPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Rent Invoicing &amp; Collections
             </h1>
             {selectedCompany?.name && (
@@ -211,27 +211,27 @@ export function RentManagerPage({ selectedCompany }) {
               </span>
             )}
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
             Expected rent billing schedules, collection receipts, and tenant arrears management for {selectedCompany?.legalName || selectedCompany?.name || 'portfolio'}.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Month Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300">
+          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-slate-300 shadow-sm">
             <Calendar className="w-3.5 h-3.5 text-indigo-400" />
             <input
               type="month"
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent text-slate-200 focus:outline-none cursor-pointer"
+              className="bg-transparent text-slate-200 focus:outline-none cursor-pointer font-medium"
             />
           </div>
 
           <button
             onClick={handleGenerateMonthly}
             disabled={generating}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition cursor-pointer disabled:opacity-50"
           >
             {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             <span>Generate Invoices</span>
@@ -251,7 +251,7 @@ export function RentManagerPage({ selectedCompany }) {
               }
             }}
             disabled={landlordLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition cursor-pointer disabled:opacity-50"
             title="Download official Landlord Rent Statement Excel report (Direct Properties, No Units)"
           >
             {landlordLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
@@ -271,32 +271,47 @@ export function RentManagerPage({ selectedCompany }) {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
-          <div className="text-xs font-medium text-slate-400 mb-1">Expected Rent Roll</div>
-          <div className="text-xl sm:text-2xl font-bold text-white">
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium">Expected Rent Roll</span>
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
             {formatGBP(totals?.totalExpected)}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             Total rent billed for {formatMonthLabel(selectedMonth)}
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
-          <div className="text-xs font-medium text-emerald-400 mb-1">Rent Received</div>
-          <div className="text-xl sm:text-2xl font-bold text-emerald-300">
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium">Rent Received</span>
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-emerald-400 tracking-tight tabular-nums">
             {formatGBP(totals?.totalPaid)}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-slate-400 mt-1">
             Settled into UK bank accounts
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5">
-          <div className="text-xs font-medium text-amber-400 mb-1">Uncollected / Arrears</div>
-          <div className="text-xl sm:text-2xl font-bold text-amber-300">
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-medium">Uncollected / Arrears</span>
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-amber-400 tracking-tight tabular-nums">
             {formatGBP(totals?.totalOutstanding)}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-[11px] text-amber-400/80 mt-1">
             Outstanding balance pending payment
           </div>
         </div>

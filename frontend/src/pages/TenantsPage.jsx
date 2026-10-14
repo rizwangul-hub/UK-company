@@ -219,10 +219,10 @@ export function TenantsPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Tenants &amp; Tenancy Agreements
             </h1>
             {selectedCompany?.name && (
@@ -231,18 +231,18 @@ export function TenantsPage({ selectedCompany }) {
               </span>
             )}
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
             Manage residential ASTs, commercial leases, tenant contact details, and deposit tracking for {selectedCompany?.legalName || selectedCompany?.name || 'portfolio'}.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             onClick={() => {
               setTenantError('');
               setShowTenantModal(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-xs font-semibold transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/60 text-xs font-bold transition cursor-pointer shadow-sm"
           >
             <Plus className="w-4 h-4 text-indigo-400" />
             <span>Add Tenant</span>
@@ -253,7 +253,7 @@ export function TenantsPage({ selectedCompany }) {
               setTenancyError('');
               setShowTenancyModal(true);
             }}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/25 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>New Tenancy Lease</span>

@@ -537,10 +537,10 @@ export function ChartOfAccountsPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-3.5">
-            <div className="h-12 w-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center p-1.5 shadow-md shrink-0 overflow-hidden">
+            <div className="h-12 w-12 rounded-2xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-center p-1.5 shadow-md shrink-0 overflow-hidden">
               <img src={selectedCompany?.logo || pixxLogo} alt={selectedCompany?.name || "Company Logo"} className="h-full w-full object-contain" />
             </div>
             <div>
@@ -558,7 +558,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium max-w-3xl">
                 Organized master financial hierarchy &bull; Main Property Heads &rarr; Electricity, Gas, Maintenance, Bank Accounts &amp; Mortgages for {selectedCompany?.name || 'active portfolio'}
               </p>
             </div>
@@ -569,7 +569,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handleOpenCreateModal('EXPENSE')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-md shadow-rose-600/25 transition cursor-pointer"
           >
             <Plus size={14} />
             <span>New Expense Head</span>
@@ -577,7 +577,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
 
           <button
             onClick={() => handleOpenCreateModal('LIQUIDITY')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md shadow-indigo-600/25 transition cursor-pointer"
           >
             <Plus size={14} />
             <span>Bank / Cash Account</span>
@@ -585,7 +585,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
 
           <button
             onClick={() => handleOpenCreateModal('INCOME')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-600/25 transition cursor-pointer"
           >
             <Plus size={14} />
             <span>Income Head</span>
@@ -593,7 +593,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
 
           <button
             onClick={() => handleOpenCreateModal('MORTGAGE')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs shadow-md shadow-purple-600/25 transition cursor-pointer"
           >
             <Plus size={14} />
             <span>Mortgage Facility</span>
@@ -602,7 +602,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
           <button
             onClick={loadAllData}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold text-xs shadow-sm transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold text-xs shadow-sm transition cursor-pointer"
           >
             <RefreshCw size={13} className={loading ? 'animate-spin text-indigo-600' : ''} />
           </button>
@@ -629,20 +629,22 @@ export function ChartOfAccountsPage({ selectedCompany }) {
         {/* 1. Operating Expense Heads */}
         <div
           onClick={() => setActiveTab('EXPENSE')}
-          className={`bg-white dark:bg-slate-900 border rounded-2xl p-4 shadow-sm transition cursor-pointer ${
+          className={`executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden transition cursor-pointer ${
             activeTab === 'EXPENSE'
               ? 'border-rose-500 ring-2 ring-rose-500/20'
-              : 'border-slate-200 dark:border-slate-800 hover:border-rose-400'
+              : 'hover:border-rose-400'
           }`}
         >
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider">Expense Heads</span>
-            <Receipt size={16} className="text-rose-500" />
+            <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+              <Receipt size={16} />
+            </div>
           </div>
-          <div className="text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
             {expenseCategories.length}
           </div>
-          <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
             {properties.length} Properties &bull; {mainExpenseHeads.length} Main Heads
           </div>
         </div>
@@ -650,20 +652,22 @@ export function ChartOfAccountsPage({ selectedCompany }) {
         {/* 2. Bank Accounts & Cash Floats */}
         <div
           onClick={() => setActiveTab('LIQUIDITY')}
-          className={`bg-white dark:bg-slate-900 border rounded-2xl p-4 shadow-sm transition cursor-pointer ${
+          className={`executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden transition cursor-pointer ${
             activeTab === 'LIQUIDITY'
               ? 'border-indigo-500 ring-2 ring-indigo-500/20'
-              : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400'
+              : 'hover:border-indigo-400'
           }`}
         >
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider">Bank &amp; Cash Floats</span>
-            <Landmark size={16} className="text-indigo-500" />
+            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+              <Landmark size={16} />
+            </div>
           </div>
-          <div className="text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
             {formatGBP(totalLiquiditySum)}
           </div>
-          <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
             {accounts.filter((a) => a.accountType === 'BANK').length} Banks &bull;{' '}
             {accounts.filter((a) => a.accountType === 'CASH').length} Petty Cash
           </div>
@@ -672,20 +676,22 @@ export function ChartOfAccountsPage({ selectedCompany }) {
         {/* 3. Income & Revenue Heads */}
         <div
           onClick={() => setActiveTab('INCOME')}
-          className={`bg-white dark:bg-slate-900 border rounded-2xl p-4 shadow-sm transition cursor-pointer ${
+          className={`executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden transition cursor-pointer ${
             activeTab === 'INCOME'
               ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-              : 'border-slate-200 dark:border-slate-800 hover:border-emerald-400'
+              : 'hover:border-emerald-400'
           }`}
         >
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Income &amp; Revenue Heads</span>
-            <ArrowDownLeft size={16} className="text-emerald-500" />
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Income &amp; Revenue</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <ArrowDownLeft size={16} />
+            </div>
           </div>
-          <div className="text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
             {incomeCategories.length}
           </div>
-          <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
             {incomeCategories.filter((c) => c.isRentalHead).length} Rental &bull;{' '}
             {incomeCategories.filter((c) => !c.isRentalHead).length} Sundry Non-Rent
           </div>
@@ -694,20 +700,22 @@ export function ChartOfAccountsPage({ selectedCompany }) {
         {/* 4. Mortgage Facilities */}
         <div
           onClick={() => setActiveTab('FINANCE')}
-          className={`bg-white dark:bg-slate-900 border rounded-2xl p-4 shadow-sm transition cursor-pointer ${
+          className={`executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden transition cursor-pointer ${
             activeTab === 'FINANCE'
               ? 'border-purple-500 ring-2 ring-purple-500/20'
-              : 'border-slate-200 dark:border-slate-800 hover:border-purple-400'
+              : 'hover:border-purple-400'
           }`}
         >
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Mortgage Facilities</span>
-            <Percent size={16} className="text-purple-500" />
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Mortgages</span>
+            <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400">
+              <Percent size={16} />
+            </div>
           </div>
-          <div className="text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
+          <div className="text-xl sm:text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
             {formatGBP(totalMortgageDebtSum)}
           </div>
-          <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
             {mortgages.length} Active Facilities &bull; {financeCostCategories.length} Finance Heads
           </div>
         </div>

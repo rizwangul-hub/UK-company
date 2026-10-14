@@ -417,74 +417,86 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
 
         {/* 6 Executive Financial KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Monthly Rent</span>
-              <Receipt className="w-4 h-4 text-emerald-400" />
+          <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Monthly Rent</span>
+              <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                <Receipt className="w-4 h-4" />
+              </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-emerald-400 mt-1 tabular-nums font-display">
+            <div className="text-lg sm:text-xl font-extrabold text-emerald-400 tabular-nums font-display">
               {formatGBP(propDetail?.contractualRent || 0)}
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">{formatGBP(annualRentVal)} / year</div>
+            <div className="text-[11px] text-slate-400 mt-1">{formatGBP(annualRentVal)} / year</div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Asset Valuation</span>
-              <TrendingUp className="w-4 h-4 text-sky-400" />
+          <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Valuation</span>
+              <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+                <TrendingUp className="w-4 h-4" />
+              </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-white mt-1 tabular-nums font-display">
+            <div className="text-lg sm:text-xl font-extrabold text-white tabular-nums font-display">
               {formatGBP(propDetail?.currentValuation || propDetail?.purchasePrice || 0)}
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Appraisal basis</div>
+            <div className="text-[11px] text-slate-400 mt-1">Appraisal basis</div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Mortgage Debt</span>
-              <Landmark className="w-4 h-4 text-rose-400" />
+          <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Mortgage Debt</span>
+              <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+                <Landmark className="w-4 h-4" />
+              </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-rose-300 mt-1 tabular-nums font-display">
+            <div className="text-lg sm:text-xl font-extrabold text-rose-300 tabular-nums font-display">
               {formatGBP(propDetail?.totalMortgageDebt || 0)}
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
+            <div className="text-[11px] text-slate-400 mt-1">
               {mortgagesList.length} Active {mortgagesList.length === 1 ? 'Mortgage' : 'Mortgages'}
             </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Net Equity</span>
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Net Equity</span>
+              <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-emerald-400 mt-1 tabular-nums font-display">
+            <div className="text-lg sm:text-xl font-extrabold text-emerald-400 tabular-nums font-display">
               {formatGBP(propDetail?.equity || 0)}
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Asset Value − Debt</div>
+            <div className="text-[11px] text-slate-400 mt-1">Asset Value − Debt</div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Loan-to-Value</span>
-              <Percent className="w-4 h-4 text-indigo-400" />
+          <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Loan-to-Value</span>
+              <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                <Percent className="w-4 h-4" />
+              </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-indigo-300 mt-1 tabular-nums font-display">
+            <div className="text-lg sm:text-xl font-extrabold text-indigo-300 tabular-nums font-display">
               {ltvVal}%
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">
+            <div className="text-[11px] text-slate-400 mt-1">
               {ltvVal === 0 ? 'Unencumbered' : ltvVal < 60 ? 'Low Gearing' : ltvVal <= 75 ? 'Moderate' : 'High Gearing'}
             </div>
           </div>
 
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Gross Yield</span>
-              <DollarSign className="w-4 h-4 text-amber-400" />
+          <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-400 mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider">Gross Yield</span>
+              <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+                <DollarSign className="w-4 h-4" />
+              </div>
             </div>
-            <div className="text-lg sm:text-xl font-black text-amber-300 mt-1 tabular-nums font-display">
+            <div className="text-lg sm:text-xl font-extrabold text-amber-300 tabular-nums font-display">
               {grossYieldVal}%
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Annual Rent / Value</div>
+            <div className="text-[11px] text-slate-400 mt-1">Annual Rent / Value</div>
           </div>
         </div>
 
@@ -893,10 +905,10 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   return (
     <div key="properties-grid-list" className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 page-anim-book-flip">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Properties
             </h1>
             {selectedCompany?.name && (
@@ -905,14 +917,14 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
               </span>
             )}
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
             Direct property ownership, contractual rents, tenancy tracking, and mortgage liabilities for {selectedCompany?.legalName || selectedCompany?.name || 'the active portfolio'}.
           </p>
         </div>
 
         <button
           onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/20 transition cursor-pointer self-start sm:self-auto"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/25 transition cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           <span>Add Property</span>
@@ -921,50 +933,58 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
 
       {/* Portfolio Summary KPI Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Properties</span>
-            <Building2 className="w-4 h-4 text-indigo-400" />
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Properties</span>
+            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+              <Building2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-white mt-1 tabular-nums">
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
             {summary?.totalProperties || properties.length}
           </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
+          <div className="text-[11px] text-slate-400 mt-1">
             {summary?.occupiedCount || properties.filter((p) => p.status === 'Occupied' || p.tenantName).length} Occupied · {summary?.availableCount || properties.filter((p) => p.status !== 'Occupied' && !p.tenantName).length} Available
           </div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Monthly Rent Roll</span>
-            <Receipt className="w-4 h-4 text-emerald-400" />
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Monthly Rent Roll</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <Receipt className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-emerald-400 mt-1 tabular-nums font-display">
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-emerald-400 tracking-tight tabular-nums">
             {formatGBP(summary?.totalContractualRent || properties.reduce((s, p) => s + (p.contractualRent || 0), 0))}
           </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Contractual monthly income</div>
+          <div className="text-[11px] text-slate-400 mt-1">Contractual monthly income</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Portfolio Valuation</span>
-            <TrendingUp className="w-4 h-4 text-sky-400" />
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Portfolio Valuation</span>
+            <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+              <TrendingUp className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-white mt-1 tabular-nums font-display">
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight tabular-nums">
             {formatGBP(summary?.totalValuation || properties.reduce((s, p) => s + (p.currentValuation || p.purchasePrice || 0), 0))}
           </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Market asset base</div>
+          <div className="text-[11px] text-slate-400 mt-1">Market asset base</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-medium uppercase tracking-wider">Mortgage Debt</span>
-            <Landmark className="w-4 h-4 text-rose-400" />
+        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Mortgage Debt</span>
+            <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+              <Landmark className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-rose-300 mt-1 tabular-nums font-display">
+          <div className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold text-rose-300 tracking-tight tabular-nums">
             {formatGBP(summary?.totalMortgageDebt || properties.reduce((s, p) => s + (p.totalMortgageDebt || 0), 0))}
           </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
+          <div className="text-[11px] text-slate-400 mt-1">
             {properties.reduce((s, p) => s + (p.activeMortgagesCount || 0), 0)} Linked facilities
           </div>
         </div>

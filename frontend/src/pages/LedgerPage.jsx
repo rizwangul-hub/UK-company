@@ -377,10 +377,10 @@ export function LedgerPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Top Header & Professional Reporting Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-3.5">
-            <div className="h-12 w-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center p-1.5 shadow-md shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-center p-1.5 shadow-md shrink-0">
               <img src={pixxLogo} alt="Pixx Technologies Logo" className="h-full w-full object-contain" />
             </div>
             <div>
@@ -394,7 +394,7 @@ export function LedgerPage({ selectedCompany }) {
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5 max-w-3xl">
                 {selectedCompany?.name ? `Complete general and nominal ledgers partitioned strictly for ${selectedCompany.name}.` : 'Individual Dedicated Ledgers • Bank Accounts, Cash Floats, Properties, Tenants, Mortgages & Nominal Heads'}
               </p>
             </div>
@@ -619,73 +619,87 @@ export function LedgerPage({ selectedCompany }) {
             </div>
 
             {/* 4 Summary KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {/* 1. Opening Balance */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5">
-                <div className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">
-                  Opening Balance
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider">Opening Balance</span>
+                  <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                    <FileText size={15} />
+                  </div>
                 </div>
-                <div className="text-xl sm:text-2xl font-black font-display text-slate-900 dark:text-white mt-1 tabular-nums">
+                <div className="font-display text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight tabular-nums">
                   {formatGBP(summary.openingBalance)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                <div className="text-[11px] text-slate-400 mt-1 font-medium">
                   Brought forward
                 </div>
               </div>
 
               {/* 2. Total Inflow / Debit */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5">
-                <div className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  {ledgerData.isLiquidity ? (
-                    <ArrowDownLeft size={14} className="text-emerald-500" />
-                  ) : (
-                    <ArrowUpRight size={14} className="text-rose-500" />
-                  )}
-                  {ledgerData.isLiquidity ? 'Total Receipts (In)' : 'Total Debit (Dr)'}
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider flex items-center gap-1">
+                    {ledgerData.isLiquidity ? 'Total Receipts (In)' : 'Total Debit (Dr)'}
+                  </span>
+                  <div className={`p-1.5 rounded-lg ${ledgerData.isLiquidity ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                    {ledgerData.isLiquidity ? (
+                      <ArrowDownLeft size={15} />
+                    ) : (
+                      <ArrowUpRight size={15} />
+                    )}
+                  </div>
                 </div>
                 <div
-                  className={`text-xl sm:text-2xl font-black font-display mt-1 tabular-nums ${
+                  className={`font-display text-xl sm:text-2xl font-extrabold tracking-tight tabular-nums ${
                     ledgerData.isLiquidity ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                   }`}
                 >
                   {formatGBP(summary.totalDebit)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                <div className="text-[11px] text-slate-400 mt-1 font-medium">
                   Period additions
                 </div>
               </div>
 
               {/* 3. Total Outflow / Credit */}
-              <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5">
-                <div className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  {ledgerData.isLiquidity ? (
-                    <ArrowUpRight size={14} className="text-rose-500" />
-                  ) : (
-                    <ArrowDownLeft size={14} className="text-emerald-500" />
-                  )}
-                  {ledgerData.isLiquidity ? 'Total Payments (Out)' : 'Total Credit (Cr)'}
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider flex items-center gap-1">
+                    {ledgerData.isLiquidity ? 'Total Payments (Out)' : 'Total Credit (Cr)'}
+                  </span>
+                  <div className={`p-1.5 rounded-lg ${ledgerData.isLiquidity ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                    {ledgerData.isLiquidity ? (
+                      <ArrowUpRight size={15} />
+                    ) : (
+                      <ArrowDownLeft size={15} />
+                    )}
+                  </div>
                 </div>
                 <div
-                  className={`text-xl sm:text-2xl font-black font-display mt-1 tabular-nums ${
+                  className={`font-display text-xl sm:text-2xl font-extrabold tracking-tight tabular-nums ${
                     ledgerData.isLiquidity ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
                   }`}
                 >
                   {formatGBP(summary.totalCredit)}
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                <div className="text-[11px] text-slate-400 mt-1 font-medium">
                   Period deductions
                 </div>
               </div>
 
               {/* 4. Closing Balance */}
-              <div className="bg-indigo-50/70 dark:bg-indigo-950/30 border-2 border-indigo-500/40 rounded-xl p-3.5">
-                <div className="text-[11px] font-bold uppercase text-indigo-700 dark:text-indigo-300">
-                  Closing Balance
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden border-indigo-500/40">
+                <div className="flex items-center justify-between text-indigo-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider">Closing Balance</span>
+                  <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300">
+                    <Sparkles size={15} />
+                  </div>
                 </div>
-                <div className="text-xl sm:text-2xl font-black font-display text-indigo-900 dark:text-indigo-200 mt-1 tabular-nums">
+                <div className="font-display text-xl sm:text-2xl font-extrabold text-indigo-900 dark:text-indigo-200 tracking-tight tabular-nums">
                   {formatGBP(summary.closingBalance)}
                 </div>
-                <div className="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 mt-0.5 font-medium">
+                <div className="text-[11px] text-indigo-400/80 mt-1 font-medium">
                   Net carried forward
                 </div>
               </div>

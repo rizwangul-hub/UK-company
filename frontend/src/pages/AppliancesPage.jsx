@@ -413,10 +413,10 @@ export function AppliancesPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 page-anim-scale-pop">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-indigo-400" />
               <span>Appliances, Warranties &amp; Contracts</span>
             </h1>
@@ -429,7 +429,7 @@ export function AppliancesPage({ selectedCompany }) {
               Currys &amp; Howdens
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
             Complete property equipment register, supplier master invoices, decoupled warranties, Currys Care &amp; Repair agreements, and annual Squeaky Clean Valets for {selectedCompany?.legalName || selectedCompany?.name || 'this portfolio'}.
           </p>
         </div>
@@ -439,7 +439,7 @@ export function AppliancesPage({ selectedCompany }) {
           <button
             onClick={() => loadData(true)}
             disabled={refreshing}
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850 transition cursor-pointer"
+            className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer shadow-sm"
             title="Refresh Data"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -447,7 +447,7 @@ export function AppliancesPage({ selectedCompany }) {
 
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 hover:text-white hover:bg-slate-850 text-xs font-semibold transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-slate-200 hover:text-white hover:bg-slate-800 text-xs font-bold transition cursor-pointer shadow-sm"
           >
             <Download className="w-4 h-4 text-emerald-400" />
             <span>Export Register</span>
@@ -455,7 +455,7 @@ export function AppliancesPage({ selectedCompany }) {
 
           <button
             onClick={() => setShowReceiptModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-indigo-500/40 text-indigo-300 hover:text-white hover:bg-indigo-600/20 text-xs font-semibold transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-indigo-500/40 text-indigo-300 hover:text-white hover:bg-indigo-600/20 text-xs font-bold transition cursor-pointer shadow-sm"
           >
             <Receipt className="w-4 h-4 text-indigo-400" />
             <span>Record Supplier Invoice</span>
@@ -463,7 +463,7 @@ export function AppliancesPage({ selectedCompany }) {
 
           <button
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/25 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Appliance</span>
@@ -472,71 +472,83 @@ export function AppliancesPage({ selectedCompany }) {
       </div>
 
       {/* KPI Metrics Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-semibold uppercase tracking-wider">Total Equipment</span>
-            <Sparkles className="w-4 h-4 text-indigo-400" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Total Equipment</span>
+            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl font-black text-white mt-1 tabular-nums">
+          <div className="font-display text-xl sm:text-2xl font-extrabold text-white tracking-tight tabular-nums">
             {metrics.total}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{properties.length} Properties</div>
+          <div className="text-[11px] text-slate-400 mt-1">{properties.length} Properties</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-semibold uppercase tracking-wider">Pending Location</span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+        <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Pending Location</span>
+            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl font-black text-amber-400 mt-1 tabular-nums">
+          <div className="font-display text-xl sm:text-2xl font-extrabold text-amber-400 tracking-tight tabular-nums">
             {metrics.pendingLocation}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Needs physical check</div>
+          <div className="text-[11px] text-amber-400/80 mt-1">Needs physical check</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-semibold uppercase tracking-wider">Care &amp; Repair Plans</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Care &amp; Repair</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl font-black text-emerald-400 mt-1 tabular-nums">
+          <div className="font-display text-xl sm:text-2xl font-extrabold text-emerald-400 tracking-tight tabular-nums">
             {metrics.covered}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Currys 5-Yr / Service</div>
+          <div className="text-[11px] text-slate-400 mt-1">Currys 5-Yr / Service</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-semibold uppercase tracking-wider">Master Invoices</span>
-            <Receipt className="w-4 h-4 text-blue-400" />
+        <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Master Invoices</span>
+            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+              <Receipt className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl font-black text-blue-300 mt-1 tabular-nums">
+          <div className="font-display text-xl sm:text-2xl font-extrabold text-blue-300 tracking-tight tabular-nums">
             {metrics.totalReceipts}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Currys &amp; Howdens</div>
+          <div className="text-[11px] text-slate-400 mt-1">Currys &amp; Howdens</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-semibold uppercase tracking-wider">Annual Valet Due</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+        <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Annual Valet Due</span>
+            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+              <Clock className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl font-black text-amber-300 mt-1 tabular-nums">
+          <div className="font-display text-xl sm:text-2xl font-extrabold text-amber-300 tracking-tight tabular-nums">
             {metrics.valetDue}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Currys Squeaky Clean</div>
+          <div className="text-[11px] text-slate-400 mt-1">Currys Squeaky Clean</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[10px] font-semibold uppercase tracking-wider">Expiry Alerts</span>
-            <Bell className="w-4 h-4 text-rose-400" />
+        <div className="executive-card rounded-2xl p-4 relative overflow-hidden">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Expiry Alerts</span>
+            <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+              <Bell className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-xl font-black text-rose-400 mt-1 tabular-nums">
+          <div className="font-display text-xl sm:text-2xl font-extrabold text-rose-400 tracking-tight tabular-nums">
             {metrics.activeReminders}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Within 90 Days</div>
+          <div className="text-[11px] text-rose-400/80 mt-1">Within 90 Days</div>
         </div>
       </div>
 

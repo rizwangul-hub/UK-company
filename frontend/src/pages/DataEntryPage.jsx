@@ -819,19 +819,19 @@ export function DataEntryPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden">
+          <div className="h-12 w-12 rounded-2xl bg-slate-900/90 border border-slate-700/60 flex items-center justify-center p-1.5 shadow-sm shrink-0 overflow-hidden">
             <img src={selectedCompany?.logo || pixxLogo} alt={selectedCompany?.name || "Company Logo"} className="h-full w-full object-contain" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-bold uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-black uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5" />
                 Operational Workspace
               </span>
               {selectedCompany && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   {selectedCompany.name} ({selectedCompany.legalName})
                 </span>
@@ -840,7 +840,7 @@ export function DataEntryPage({ selectedCompany }) {
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Data Entry Desk
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-400 max-w-3xl">
               Fast daily transaction entry for Rent Collection, Expense Vouchers, Transfers, Other Receipts, and Mortgages for {selectedCompany?.name || 'the active portfolio'}.
             </p>
           </div>
@@ -849,7 +849,7 @@ export function DataEntryPage({ selectedCompany }) {
           <button
             onClick={loadData}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-semibold transition cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition cursor-pointer shadow-sm"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh Ledger</span>
@@ -858,7 +858,7 @@ export function DataEntryPage({ selectedCompany }) {
       </div>
 
       {/* Live Bank Accounts Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
         {accounts.length === 0 ? (
           <div className="col-span-full p-4 rounded-2xl bg-slate-900/60 border border-dashed border-slate-800 text-center text-xs text-slate-400">
             No bank or cash accounts configured for <strong className="text-slate-300">{selectedCompany?.name || 'this company'}</strong>. Create accounts in the Accounts tab to record transactions.
@@ -867,18 +867,20 @@ export function DataEntryPage({ selectedCompany }) {
           accounts.map((acc) => (
             <div
               key={acc._id}
-              className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/90 shadow-sm flex flex-col justify-between"
+              className="executive-card p-3.5 sm:p-4 rounded-2xl flex flex-col justify-between"
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider truncate">
                   {acc.name}
                 </span>
-                <CreditCard className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                  <CreditCard className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="text-base sm:text-lg font-black text-slate-100 mt-1.5 font-mono">
+              <div className="font-display text-base sm:text-lg font-extrabold text-white mt-2 tabular-nums">
                 {formatGBP(acc.currentBalance)}
               </div>
-              <div className="text-[10px] text-slate-500 mt-0.5 capitalize">
+              <div className="text-[10px] text-slate-400 mt-1 capitalize">
                 {acc.accountType} &bull; {acc.bankName || 'UK Cash'}
               </div>
             </div>

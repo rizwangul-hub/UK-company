@@ -150,18 +150,18 @@ export function ReportsPage({ selectedCompany }) {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl dashboard-header-banner">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              Financial & Tax Reporting
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Financial &amp; Tax Reporting
             </h1>
             <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
               {companyName}
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-            HMRC Section 24 property finance reports, P&L summaries, and individual property rental yields for {companyLegal}.
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
+            HMRC Section 24 property finance reports, P&amp;L summaries, and individual property rental yields for {companyLegal}.
           </p>
         </div>
 
@@ -285,7 +285,7 @@ export function ReportsPage({ selectedCompany }) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Income & Allowable Expenses */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+              <div className="executive-card rounded-2xl p-5 sm:p-6 space-y-4">
                 <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-3">
                   Trading Position (Rental Business)
                 </h3>
@@ -309,7 +309,7 @@ export function ReportsPage({ selectedCompany }) {
               </div>
 
               {/* Section 24 Mortgage Finance Restriction */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+              <div className="executive-card rounded-2xl p-5 sm:p-6 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <h3 className="text-sm font-bold text-white">Section 24 Finance Cost Relief</h3>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
