@@ -4,7 +4,7 @@ import ComplianceNotification from '../models/ComplianceNotification.js';
 import Property from '../models/Property.js';
 import Appliance from '../models/Appliance.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
-import { cloudinary, isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
+import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 import { checkAndGenerateComplianceReminders } from '../services/complianceReminderService.js';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
