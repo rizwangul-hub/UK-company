@@ -90,3 +90,54 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// 4. PWA Push Notifications & Expiry Alerts
+self.addEventListener('push', (event) => {
+  let payload = {
+    title: 'UK Compliance Alert',
+    body: 'A property compliance deadline or expiry reminder requires attention.',
+    url: '/properties',
+  };
+
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch {
+      payload.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: payload.body,
+    icon: '/icon-192.png',
+    badge: '/icon-32.png',
+    data: payload.url || '/properties',
+    vibrate: [100, 50, 100],
+    tag: payload.tag || 'compliance-alert',
+    renotify: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(payload.title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data || '/properties';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus().then((focused) => {
+            if ('navigate' in focused) {
+              return focused.navigate(targetUrl);
+            }
+          });
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

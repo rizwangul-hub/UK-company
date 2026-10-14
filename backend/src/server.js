@@ -17,6 +17,7 @@ import accountRoutes from './routes/accountRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import applianceRoutes from './routes/applianceRoutes.js';
+import complianceRoutes from './routes/complianceRoutes.js';
 
 // Configure UK Cloudinary if credentials are present in UK .env
 configureCloudinary();
@@ -138,6 +139,7 @@ app.use('/api/mortgages', mortgageRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/appliances', applianceRoutes);
+app.use('/api/compliance', complianceRoutes);
 app.use('/api', tenancyRoutes); // exposes /api/tenants and /api/tenancies
 
 // 404 Handler
@@ -170,6 +172,13 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
       console.log(`  [Database Host]:      ${conn.connection.host}`);
       const { seedDefaultsIfEmpty } = await import('./scripts/seedDefaults.js');
       await seedDefaultsIfEmpty();
+      const { checkAndGenerateComplianceReminders } = await import('./services/complianceReminderService.js');
+      await checkAndGenerateComplianceReminders().catch((remErr) => {
+        console.warn('  [Compliance Reminders Check Notice]:', remErr.message);
+      });
+      setInterval(() => {
+        checkAndGenerateComplianceReminders().catch(() => {});
+      }, 12 * 60 * 60 * 1000);
     } catch (dbErr) {
       console.error(`  [Database Connection Failed]: ${dbErr.message}`);
     }

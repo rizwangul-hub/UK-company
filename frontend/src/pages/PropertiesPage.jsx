@@ -31,6 +31,7 @@ import {
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { propertiesAPI, getApiCache } from '../services/api.js';
 import PropertyAppliancesSection from '../components/PropertyAppliancesSection.jsx';
+import PropertyComplianceSection from '../components/PropertyComplianceSection.jsx';
 
 export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   const initialCache = getApiCache('/properties', {
@@ -885,7 +886,14 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
           )}
         </div>
 
-        {/* Module 7: Appliances, Currys Warranties & Squeaky Clean Valet */}
+        {/* Module 7: Complete Property Documents, Safety Certificates & Council Records */}
+        <PropertyComplianceSection
+          propertyId={propDetail?._id}
+          propertyName={propDetail?.name}
+          onRefreshParent={handleRefreshDetails}
+        />
+
+        {/* Module 8: Appliances, Currys Warranties & Squeaky Clean Valet */}
         <PropertyAppliancesSection
           propertyId={propDetail?._id}
           propertyName={propDetail?.name}

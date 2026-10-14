@@ -32,6 +32,9 @@ import Voucher from '../src/models/Voucher.js';
 import Appliance from '../src/models/Appliance.js';
 import MaintenanceTask from '../src/models/MaintenanceTask.js';
 import SupplierReceipt from '../src/models/SupplierReceipt.js';
+import PropertyDocument from '../src/models/PropertyDocument.js';
+import CouncilApplication from '../src/models/CouncilApplication.js';
+import ComplianceNotification from '../src/models/ComplianceNotification.js';
 
 // -----------------------------------------------------------------------------
 // 1. COMPANY REGISTRY & IDENTIFIER VALIDATION
@@ -249,7 +252,7 @@ test('MIDDLEWARE: Restricts non-admin user when company is not in allowedCompani
 // -----------------------------------------------------------------------------
 // 3. MONGOOSE SCHEMA & INDEX ISOLATION
 // -----------------------------------------------------------------------------
-test('SCHEMAS: All 14 operational models have required companyId in schema', () => {
+test('SCHEMAS: All 17 operational models have required companyId in schema', () => {
   const models = [
     { name: 'Property', schema: Property.schema },
     { name: 'Unit', schema: Unit.schema },
@@ -265,6 +268,9 @@ test('SCHEMAS: All 14 operational models have required companyId in schema', () 
     { name: 'Voucher', schema: Voucher.schema },
     { name: 'Appliance', schema: Appliance.schema },
     { name: 'MaintenanceTask', schema: MaintenanceTask.schema },
+    { name: 'PropertyDocument', schema: PropertyDocument.schema },
+    { name: 'CouncilApplication', schema: CouncilApplication.schema },
+    { name: 'ComplianceNotification', schema: ComplianceNotification.schema },
   ];
 
   models.forEach(({ name, schema }) => {

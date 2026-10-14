@@ -595,4 +595,87 @@ export const reportsAPI = {
   },
 };
 
+// --------------------------------------------------------------------------
+// Property Documents & Compliance API
+// --------------------------------------------------------------------------
+export const complianceAPI = {
+  getDocuments: async (propertyId, params, config = {}) => {
+    return cachedGet(`/compliance/properties/${propertyId}/documents`, { params, ...config });
+  },
+  createDocument: async (propertyId, formData) => {
+    const isFormData = formData instanceof FormData;
+    const res = await api.post(`/compliance/properties/${propertyId}/documents`, formData, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    });
+    return res.data;
+  },
+  updateDocument: async (id, data) => {
+    const res = await api.put(`/compliance/documents/${id}`, data);
+    return res.data;
+  },
+  uploadVersion: async (id, formData) => {
+    const res = await api.post(`/compliance/documents/${id}/version`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  deleteDocument: async (id) => {
+    const res = await api.delete(`/compliance/documents/${id}`);
+    return res.data;
+  },
+  downloadDocument: (id) => {
+    const token = localStorage.getItem('token');
+    const companyId = localStorage.getItem('companyId') || 'old-street';
+    window.open(`/api/compliance/documents/${id}/download?token=${token}&companyId=${companyId}`, '_blank');
+  },
+  getCouncilApplications: async (propertyId, params, config = {}) => {
+    const url = propertyId
+      ? `/compliance/properties/${propertyId}/council-applications`
+      : '/compliance/council-applications';
+    return cachedGet(url, { params, ...config });
+  },
+  createCouncilApplication: async (propertyId, data) => {
+    const res = await api.post(`/compliance/properties/${propertyId}/council-applications`, data);
+    return res.data;
+  },
+  updateCouncilApplication: async (id, data) => {
+    const res = await api.put(`/compliance/council-applications/${id}`, data);
+    return res.data;
+  },
+  addCorrespondence: async (id, formData) => {
+    const isFormData = formData instanceof FormData;
+    const res = await api.post(`/compliance/council-applications/${id}/correspondence`, formData, {
+      headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    });
+    return res.data;
+  },
+  getOverview: async (config = {}) => {
+    return cachedGet('/compliance/overview', config);
+  },
+  getNotifications: async (config = {}) => {
+    return cachedGet('/compliance/notifications', config);
+  },
+  markNotificationRead: async (id) => {
+    const res = await api.patch(`/compliance/notifications/${id}/read`);
+    return res.data;
+  },
+  markAllNotificationsRead: async () => {
+    const res = await api.post('/compliance/notifications/mark-all-read');
+    return res.data;
+  },
+  checkReminders: async () => {
+    const res = await api.post('/compliance/reminders/check');
+    return res.data;
+  },
+  downloadReport: async (format = 'excel', customFilename) => {
+    const res = await api.get(`/compliance/reports/export?format=${format}`, {
+      responseType: 'blob',
+    });
+    const defaultFilename = `Compliance_Register_${new Date().toISOString().slice(0, 10)}.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+    triggerBlobDownload(res.data, customFilename || defaultFilename);
+    return true;
+  },
+};
+
 export default api;
+

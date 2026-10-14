@@ -18,9 +18,13 @@ import {
   Sparkles,
   FileText,
   Clock,
+  CheckCircle2,
+  AlertCircle,
+  Bell,
+  Download,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
-import { reportsAPI, getApiCache } from '../services/api.js';
+import { reportsAPI, complianceAPI, getApiCache } from '../services/api.js';
 
 export function DashboardPage({ onNavigate, selectedCompany }) {
   const currentMonthVal = getCurrentMonth();
@@ -28,6 +32,8 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthVal);
   const [data, setData] = useState(initialCache?.data || null);
   const [loading, setLoading] = useState(!initialCache?.data);
+  const [complianceData, setComplianceData] = useState(null);
+  const [exportingReport, setExportingReport] = useState(false);
 
   const companyName = selectedCompany?.name || 'Portfolio';
   const companyLegal = selectedCompany?.legalName || 'UK Property Finance';
@@ -35,9 +41,15 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await reportsAPI.getDashboardStats({ month: selectedMonth }, { forceRefresh: true });
+      const [res, compRes] = await Promise.all([
+        reportsAPI.getDashboardStats({ month: selectedMonth }, { forceRefresh: true }),
+        complianceAPI.getOverview({ forceRefresh: true }).catch(() => null),
+      ]);
       if (res?.success) {
         setData(res.data);
+      }
+      if (compRes?.success) {
+        setComplianceData(compRes.data);
       }
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);
@@ -58,9 +70,15 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
     const loadStats = async () => {
       try {
-        const res = await reportsAPI.getDashboardStats({ month: selectedMonth });
+        const [res, compRes] = await Promise.all([
+          reportsAPI.getDashboardStats({ month: selectedMonth }),
+          complianceAPI.getOverview().catch(() => null),
+        ]);
         if (isCurrent && res?.success) {
           setData(res.data);
+        }
+        if (isCurrent && compRes?.success) {
+          setComplianceData(compRes.data);
         }
       } catch (err) {
         if (isCurrent) console.error('Failed to load dashboard stats:', err);
@@ -354,6 +372,204 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Portfolio Statutory Compliance & Expiry Register */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">
+                      Statutory Compliance & Document Centre
+                    </h3>
+                    <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      45-Day Advance Alerts
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Gas safety CP12, electrical EICR, EPC, building insurance, and council HMO licensing tracking.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if ('Notification' in window) {
+                      Notification.requestPermission().then((perm) => {
+                        if (perm === 'granted') {
+                          alert('Browser push alerts enabled for statutory compliance deadlines!');
+                        }
+                      });
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                  title="Enable browser notifications"
+                >
+                  <Bell className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden sm:inline">Push Alerts</span>
+                </button>
+
+                <div className="flex items-center rounded-xl bg-slate-800/80 border border-slate-700 p-0.5">
+                  <button
+                    type="button"
+                    disabled={exportingReport}
+                    onClick={async () => {
+                      setExportingReport(true);
+                      try {
+                        await complianceAPI.downloadReport('excel');
+                      } catch (err) {
+                        console.error(err);
+                      } finally {
+                        setExportingReport(false);
+                      }
+                    }}
+                    className="px-2.5 py-1 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Excel</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={exportingReport}
+                    onClick={async () => {
+                      setExportingReport(true);
+                      try {
+                        await complianceAPI.downloadReport('pdf');
+                      } catch (err) {
+                        console.error(err);
+                      } finally {
+                        setExportingReport(false);
+                      }
+                    }}
+                    className="px-2.5 py-1 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition flex items-center gap-1 cursor-pointer disabled:opacity-50 border-l border-slate-700"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>PDF</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate('properties')}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition cursor-pointer"
+                >
+                  <span>Properties Register</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Compliance Quick Metric Indicators */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Valid & Active</span>
+                <div className="text-xl font-extrabold text-emerald-400 mt-1 tabular-nums">
+                  {complianceData?.summary?.activeValid ?? '—'}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5">Certificates current</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-amber-500/20 flex flex-col justify-between">
+                <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">≤ 45 Days Warning</span>
+                <div className="text-xl font-extrabold text-amber-400 mt-1 tabular-nums">
+                  {complianceData?.summary?.expiringWithin45 ?? '—'}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5">Priority renewals</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-rose-500/20 flex flex-col justify-between">
+                <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider">Expired / Overdue</span>
+                <div className="text-xl font-extrabold text-rose-400 mt-1 tabular-nums">
+                  {complianceData?.summary?.expiredCount ?? '—'}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5">Action required</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-yellow-500/20 flex flex-col justify-between">
+                <span className="text-[11px] font-semibold text-yellow-400 uppercase tracking-wider">Missing Records</span>
+                <div className="text-xl font-extrabold text-yellow-400 mt-1 tabular-nums">
+                  {complianceData?.summary?.missingCount ?? '—'}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5">Statutory items</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-indigo-500/20 flex flex-col justify-between col-span-2 sm:col-span-1">
+                <span className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider">Council Deadlines</span>
+                <div className="text-xl font-extrabold text-indigo-400 mt-1 tabular-nums">
+                  {complianceData?.summary?.councilDeadlinesCount ?? '—'}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5">Pending applications</span>
+              </div>
+            </div>
+
+            {/* Critical Document Alerts List */}
+            {complianceData?.criticalAlerts && complianceData.criticalAlerts.length > 0 ? (
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Statutory Compliance Alerts ({complianceData.criticalAlerts.length})</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">Target response window: 45 days</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {complianceData.criticalAlerts.map((alertItem) => (
+                    <div
+                      key={alertItem._id}
+                      className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                            alertItem.status === 'EXPIRED'
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              : alertItem.isMissing
+                              ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}>
+                            {alertItem.status}
+                          </span>
+                          <span className="font-bold text-white truncate" title={alertItem.title}>
+                            {alertItem.title}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-1 truncate">
+                          <span>{alertItem.propertyId?.name || 'Property'}</span>
+                          {alertItem.expiryDate && (
+                            <>
+                              <span className="mx-1.5">•</span>
+                              <span className={alertItem.status === 'EXPIRED' ? 'text-rose-400 font-bold' : 'text-amber-400'}>
+                                Expiry: {formatUKDate(alertItem.expiryDate)} ({alertItem.daysUntilExpiry}d left)
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onNavigate && onNavigate('properties')}
+                        className="px-2.5 py-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition shrink-0 cursor-pointer"
+                      >
+                        Inspect
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center gap-3 text-xs text-emerald-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  All gas safety, electrical condition, energy performance, insurance, and licensing records are fully up to date for {companyName}.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Recent Activity & Monthly Comparison Grid */}
