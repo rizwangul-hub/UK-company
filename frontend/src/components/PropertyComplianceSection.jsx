@@ -378,14 +378,253 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
           </button>
 
           <button
-            onClick={() => setUploadModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/25 transition cursor-pointer"
+            onClick={() => {
+              setUploadModalOpen(!uploadModalOpen);
+              if (!uploadModalOpen) {
+                resetUploadForm();
+              }
+            }}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer shadow-sm ${
+              uploadModalOpen
+                ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/25'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>Upload Document</span>
+            {uploadModalOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            <span>{uploadModalOpen ? 'Close Form' : 'Upload Document'}</span>
           </button>
         </div>
       </div>
+
+      {/* SINGLE COMPACT INLINE UPLOAD & ATTACH FORM (No empty borders / popups) */}
+      {uploadModalOpen && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-indigo-500/40 shadow-xl space-y-4 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <h4 className="text-sm font-bold text-white">
+                  Upload Property Document &amp; Compliance Details
+                </h4>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Attach document files and record statutory details (Issue Date, Expiry Deadline, Reference, Provider) for <strong className="text-slate-200">{propertyName}</strong>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUploadModalOpen(false)}
+              className="self-end sm:self-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              title="Close form"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Quick Pre-fill Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-slate-400 font-semibold mr-1">Quick Fill:</span>
+            {[
+              { label: '+ Gas Safety CP12', cat: 'SAFETY_COMPLIANCE', type: 'GAS_SAFETY_CP12', title: 'Annual Gas Safety Certificate (CP12)' },
+              { label: '+ EICR (5-Year)', cat: 'SAFETY_COMPLIANCE', type: 'EICR', title: '5-Year Electrical Installation Condition Report (EICR)' },
+              { label: '+ EPC (10-Year)', cat: 'SAFETY_COMPLIANCE', type: 'EPC', title: 'Energy Performance Certificate (EPC)' },
+              { label: '+ Building Insurance', cat: 'INSURANCE', type: 'BUILDING_INSURANCE', title: 'Building Insurance Policy & Schedule' },
+              { label: '+ Title Deed', cat: 'LEGAL_PURCHASE', type: 'TITLE_DEED', title: 'Official Copy of Register of Title' },
+              { label: '+ Floor Plan', cat: 'DRAWINGS_STRUCTURAL', type: 'FLOOR_PLAN', title: 'Architectural Floor & Layout Plans' },
+            ].map((preset, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  setFormCategory(preset.cat);
+                  setFormSubCategory(preset.type);
+                  setFormTitle(preset.title);
+                }}
+                className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-indigo-600 hover:text-white text-indigo-300 border border-indigo-500/30 transition cursor-pointer font-medium"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          {actionError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-bold">
+              {actionError}
+            </div>
+          )}
+
+          <form onSubmit={handleUploadSubmit} className="space-y-3.5 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left Column: Classification & Dates */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Document Category <span className="text-rose-400">*</span>
+                  </label>
+                  <select
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:ring-2 focus:ring-indigo-500 text-xs"
+                  >
+                    <option value="SAFETY_COMPLIANCE">Safety &amp; Compliance (CP12, EICR, EPC, Fire)</option>
+                    <option value="INSURANCE">Insurance Documents (Building &amp; Schedules)</option>
+                    <option value="LEGAL_PURCHASE">Legal &amp; Purchase (Deeds, Conveyancing, Contracts)</option>
+                    <option value="DRAWINGS_STRUCTURAL">Drawings &amp; Structural (Plans, Elevations, Surveys)</option>
+                    <option value="COUNCIL_LICENSING">Council &amp; Licensing (HMO, Planning, Notices)</option>
+                    <option value="APPLIANCE_EQUIPMENT">Appliance &amp; Equipment (Warranties &amp; White Goods)</option>
+                    <option value="OTHER">Other Property Records</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Certificate / Document Type</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CP12 / EICR / Policy"
+                      value={formSubCategory}
+                      onChange={(e) => setFormSubCategory(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Document Title <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 2026 Gas Safety Certificate"
+                      value={formTitle}
+                      onChange={(e) => setFormTitle(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Issue / Inspection Date</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formIssueDate}
+                      onChange={(e) => setFormIssueDate(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Expiry / Renewal Deadline</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={formExpiryDate}
+                      onChange={(e) => setFormExpiryDate(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium text-xs"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Alerts start 45 days in advance</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Provider, File Upload, Notes */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Provider / Issuing Authority</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. British Gas / Zurich"
+                      value={formProvider}
+                      onChange={(e) => setFormProvider(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Reference / Policy Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CERT-98214"
+                      value={formRefNumber}
+                      onChange={(e) => setFormRefNumber(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Missing document checkbox */}
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-semibold text-white text-xs block">Certificate Missing / Not Uploaded?</span>
+                    <span className="text-[10px] text-slate-400">Record missing statutory item without uploading file</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formIsMissing}
+                    onChange={(e) => setFormIsMissing(e.target.checked)}
+                    className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                  />
+                </div>
+
+                {/* File Upload Attachment Box */}
+                {!formIsMissing && (
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                      <span>Attach Document File (PDF, PNG, JPG, DOC)</span>
+                      {selectedFile && (
+                        <span className="text-[10px] text-emerald-400 font-bold">
+                          {(selectedFile.size / 1024).toFixed(1)} KB selected
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                      onChange={(e) => setSelectedFile(e.target.files[0] || null)}
+                      className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-900 border border-slate-700/80 rounded-xl p-1"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Notes / Renewal Guidance</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Passed inspection; service certificate on file"
+                    value={formNotes}
+                    onChange={(e) => setFormNotes(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setUploadModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={actionLoading}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer transition disabled:opacity-50"
+              >
+                {actionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                <span>Save &amp; Attach Document</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Category Pills Navigation */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -621,178 +860,6 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* MODAL 1: Upload New Document or Record Missing Document Item */}
-      {uploadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <div className="executive-card w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Upload className="w-5 h-5 text-indigo-400" />
-                <span>Upload Document or Record Missing Certificate</span>
-              </h3>
-              <button onClick={() => setUploadModalOpen(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {actionError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-bold">
-                {actionError}
-              </div>
-            )}
-
-            <form onSubmit={handleUploadSubmit} className="space-y-4 text-xs">
-              {/* Category Picker */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Document Category</label>
-                <select
-                  value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="SAFETY_COMPLIANCE">Safety &amp; Compliance (CP12, EICR, EPC, Fire)</option>
-                  <option value="INSURANCE">Insurance Documents (Building &amp; Schedules)</option>
-                  <option value="LEGAL_PURCHASE">Legal &amp; Purchase (Deeds, Conveyancing, Contracts)</option>
-                  <option value="DRAWINGS_STRUCTURAL">Drawings &amp; Structural (Plans, Elevations, Surveys)</option>
-                  <option value="COUNCIL_LICENSING">Council &amp; Licensing (HMO, Planning, Notices)</option>
-                  <option value="APPLIANCE_EQUIPMENT">Appliance &amp; Equipment (Warranties &amp; White Goods)</option>
-                  <option value="OTHER">Other Property Records</option>
-                </select>
-              </div>
-
-              {/* SubCategory / Type */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Certificate / Document Type</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Gas Safety Certificate (CP12) / Building Insurance / Title Deed"
-                  value={formSubCategory}
-                  onChange={(e) => setFormSubCategory(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
-                />
-              </div>
-
-              {/* Title */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Document Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 2026 Annual Gas Safety Record - Flat 4"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
-                />
-              </div>
-
-              {/* Missing Certificate Toggle */}
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-white block">Certificate Missing / Action Required?</span>
-                  <span className="text-[11px] text-slate-400">Record a statutory requirement without uploading a file</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formIsMissing}
-                  onChange={(e) => setFormIsMissing(e.target.checked)}
-                  className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
-                />
-              </div>
-
-              {/* File Attachment (Optional if missing) */}
-              {!formIsMissing && (
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Document Attachment (PDF, JPG, PNG)</label>
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    onChange={(e) => setSelectedFile(e.target.files[0] || null)}
-                    className="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
-                  />
-                </div>
-              )}
-
-              {/* Provider & Reference */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Provider / Issuing Authority</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. British Gas / Zurich / Westminster Council"
-                    value={formProvider}
-                    onChange={(e) => setFormProvider(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Reference Number</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. CERT-98214 / POL-0041"
-                    value={formRefNumber}
-                    onChange={(e) => setFormRefNumber(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
-                  />
-                </div>
-              </div>
-
-              {/* Issue & Expiry Dates */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Issue / Inspection Date</label>
-                  <input
-                    type="date"
-                    value={formIssueDate}
-                    onChange={(e) => setFormIssueDate(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">Expiry / Renewal Deadline</label>
-                  <input
-                    type="date"
-                    value={formExpiryDate}
-                    onChange={(e) => setFormExpiryDate(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
-                  />
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Leave blank for non-expiring deeds/plans</span>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1">Notes / Renewal Guidance</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Gas engineer noted pilot light replaced. Next service due before tenant renewal."
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-medium"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setUploadModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold shadow-lg shadow-indigo-600/25 flex items-center gap-2"
-                >
-                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  <span>Save Record</span>
-                </button>
-              </div>
-            </form>
-          </div>
         </div>
       )}
 
