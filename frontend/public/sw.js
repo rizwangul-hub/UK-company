@@ -1,4 +1,4 @@
-const CACHE_NAME = 'uk-company-pwa-v4';
+const CACHE_NAME = 'uk-company-pwa-v5';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
@@ -53,6 +53,31 @@ self.addEventListener('fetch', (event) => {
     request.headers.has('authorization') ||
     request.headers.has('x-company-id')
   ) {
+    return;
+  }
+
+  // Always prefer the deployed app bundles, while retaining a cached copy for offline use.
+  if (
+    url.origin === self.location.origin &&
+    (request.destination === 'style' || request.destination === 'script')
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse.ok) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseToCache));
+          }
+          return networkResponse;
+        })
+        .catch(async (error) => {
+          const cachedResponse = await caches.match(request);
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          throw error;
+        })
+    );
     return;
   }
 

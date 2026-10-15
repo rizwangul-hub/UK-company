@@ -17,6 +17,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { appliancesAPI, propertiesAPI } from '../services/api.js';
+import { ModalPortal } from './ModalPortal.jsx';
 
 export const APPLIANCE_TYPES = [
   { id: 'WASHING_MACHINE', label: 'Washing Machine' },
@@ -330,7 +331,7 @@ export function ApplianceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm">
+    <ModalPortal isOpen={true} onClose={onClose}>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
@@ -1023,7 +1024,7 @@ export function ApplianceModal({
           </div>
         </form>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

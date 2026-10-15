@@ -524,12 +524,12 @@ export function AccountsPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Add Account Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <ModalPortal isOpen={showAddModal} onClose={() => setShowAddModal(false)}>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <h2 className="text-base font-bold text-white">Add UK Bank Account</h2>
@@ -638,12 +638,12 @@ export function AccountsPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Transfer Funds Modal */}
       {showTransferModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <ModalPortal isOpen={showTransferModal} onClose={() => setShowTransferModal(false)}>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <h2 className="text-base font-bold text-white">Transfer Funds Between Accounts</h2>
@@ -752,12 +752,12 @@ export function AccountsPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Account Statement Drawer/Modal */}
       {statementAccount && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <ModalPortal isOpen={Boolean(statementAccount)} onClose={() => setStatementAccount(null)}>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl p-5 sm:p-6 shadow-2xl my-8">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div>
@@ -832,7 +832,7 @@ export function AccountsPage({ selectedCompany }) {
               )}
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );
