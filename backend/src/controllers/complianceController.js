@@ -233,7 +233,7 @@ export const createPropertyDocument = async (req, res) => {
       await property.save();
     }
 
-    return apiSuccess(res, document, 201, 'Document recorded successfully');
+    return apiSuccess(res, document, 'Document recorded successfully', 201);
   } catch (error) {
     return apiError(res, error.message || 'Failed to create property document', 500, error);
   }
@@ -291,7 +291,7 @@ export const updatePropertyDocument = async (req, res) => {
     }
 
     await document.save();
-    return apiSuccess(res, document, 200, 'Document updated successfully');
+    return apiSuccess(res, document, 'Document updated successfully', 200);
   } catch (error) {
     return apiError(res, error.message || 'Failed to update document', 500, error);
   }
@@ -379,7 +379,7 @@ export const uploadDocumentVersion = async (req, res) => {
       { $set: { isDismissed: true, isRead: true } }
     );
 
-    return apiSuccess(res, document, 200, `Document renewed to Version ${document.version}`);
+    return apiSuccess(res, document, `Document renewed to Version ${document.version}`, 200);
   } catch (error) {
     return apiError(res, error.message || 'Failed to upload document version', 500, error);
   }
@@ -431,7 +431,7 @@ export const deletePropertyDocument = async (req, res) => {
     document.status = 'ARCHIVED';
     await document.save();
 
-    return apiSuccess(res, null, 200, 'Document archived successfully');
+    return apiSuccess(res, null, 'Document archived successfully', 200);
   } catch (error) {
     return apiError(res, 'Failed to archive document', 500, error);
   }
@@ -500,7 +500,7 @@ export const createCouncilApplication = async (req, res) => {
       outcomeNotes: notes || '',
     });
 
-    return apiSuccess(res, app, 201, 'Council application registered');
+    return apiSuccess(res, app, 'Council application registered', 201);
   } catch (error) {
     return apiError(res, error.message || 'Failed to register council application', 500, error);
   }
@@ -536,7 +536,7 @@ export const updateCouncilApplication = async (req, res) => {
     if (nextFollowUpDate !== undefined) app.nextFollowUpDate = nextFollowUpDate ? new Date(nextFollowUpDate) : null;
 
     await app.save();
-    return apiSuccess(res, app, 200, 'Council application updated');
+    return apiSuccess(res, app, 'Council application updated', 200);
   } catch (error) {
     return apiError(res, 'Failed to update application', 500, error);
   }
@@ -597,7 +597,7 @@ export const addCouncilCorrespondence = async (req, res) => {
     app.lastCommunicationDate = date ? new Date(date) : new Date();
     await app.save();
 
-    return apiSuccess(res, app, 201, 'Correspondence logged successfully');
+    return apiSuccess(res, app, 'Correspondence logged successfully', 201);
   } catch (error) {
     return apiError(res, 'Failed to record correspondence', 500, error);
   }
@@ -738,7 +738,7 @@ export const markNotificationRead = async (req, res) => {
   try {
     const { id } = req.params;
     await ComplianceNotification.updateOne({ _id: id, companyId: req.companyId }, { $set: { isRead: true } });
-    return apiSuccess(res, null, 200, 'Notification marked as read');
+    return apiSuccess(res, null, 'Notification marked as read', 200);
   } catch (error) {
     return apiError(res, 'Failed to update notification', 500, error);
   }
@@ -747,7 +747,7 @@ export const markNotificationRead = async (req, res) => {
 export const markAllNotificationsRead = async (req, res) => {
   try {
     await ComplianceNotification.updateMany({ companyId: req.companyId }, { $set: { isRead: true } });
-    return apiSuccess(res, null, 200, 'All notifications marked as read');
+    return apiSuccess(res, null, 'All notifications marked as read', 200);
   } catch (error) {
     return apiError(res, 'Failed to update notifications', 500, error);
   }
@@ -759,7 +759,7 @@ export const markAllNotificationsRead = async (req, res) => {
 export const runRemindersCheck = async (req, res) => {
   try {
     const result = await checkAndGenerateComplianceReminders(req.companyId);
-    return apiSuccess(res, result, 200, 'Compliance reminders evaluated successfully');
+    return apiSuccess(res, result, 'Compliance reminders evaluated successfully', 200);
   } catch (error) {
     return apiError(res, 'Failed to run reminders check', 500, error);
   }

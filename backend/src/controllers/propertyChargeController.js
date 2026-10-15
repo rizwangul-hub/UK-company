@@ -70,7 +70,7 @@ export const createPayee = async (req, res) => {
       createdBy: req.user?._id || req.user?.id,
     });
 
-    return apiSuccess(res, payee, 201);
+    return apiSuccess(res, payee, 'Payee created successfully', 201);
   } catch (err) {
     return apiError(res, err.message, 400);
   }
@@ -182,7 +182,7 @@ export const createDemand = async (req, res) => {
       { ...req.body, ...documentData }
     );
 
-    return apiSuccess(res, demand, 201);
+    return apiSuccess(res, demand, 'Demand notice recorded successfully', 201);
   } catch (err) {
     return apiError(res, err.message, 400);
   }
@@ -329,7 +329,7 @@ export const recordPayment = async (req, res) => {
       }
     );
 
-    return apiSuccess(res, result, 201);
+    return apiSuccess(res, result, 'Payment recorded successfully', 201);
   } catch (err) {
     return apiError(res, err.message, 400);
   }
