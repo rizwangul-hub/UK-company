@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { tenantsAPI, tenanciesAPI, propertiesAPI, getApiCache } from '../services/api.js';
+import { ModalPortal } from '../components/ModalPortal.jsx';
 
 export function TenantsPage({ selectedCompany }) {
   const [activeTab, setActiveTab] = useState('agreements'); // 'agreements' | 'directory'
@@ -408,7 +409,7 @@ export function TenantsPage({ selectedCompany }) {
 
       {/* Modal: New Tenant */}
       {showTenantModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <ModalPortal isOpen={showTenantModal} onClose={() => setShowTenantModal(false)}>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <h2 className="text-base font-bold text-white">Add UK Tenant</h2>
@@ -478,12 +479,12 @@ export function TenantsPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Modal: New Tenancy Lease */}
       {showTenancyModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <ModalPortal isOpen={showTenancyModal} onClose={() => setShowTenancyModal(false)}>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <h2 className="text-base font-bold text-white">Create Tenancy Agreement (AST)</h2>
@@ -621,12 +622,12 @@ export function TenantsPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Modal: Edit Tenant */}
       {editingTenant && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <ModalPortal isOpen={Boolean(editingTenant)} onClose={() => setEditingTenant(null)}>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
@@ -753,12 +754,12 @@ export function TenantsPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Modal: Edit Tenancy Lease */}
       {editingTenancy && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <ModalPortal isOpen={Boolean(editingTenancy)} onClose={() => setEditingTenancy(null)}>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
@@ -894,7 +895,7 @@ export function TenantsPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );
