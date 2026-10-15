@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
 import { rentAPI, accountsAPI, ledgerAPI, reportsAPI, getApiCache } from '../services/api.js';
+import { ModalPortal } from '../components/ModalPortal.jsx';
 
 export function RentManagerPage({ selectedCompany }) {
   const currentMonthVal = getCurrentMonth();
@@ -463,7 +464,7 @@ export function RentManagerPage({ selectedCompany }) {
 
       {/* Collect Rent Modal */}
       {showCollectModal && selectedSchedule && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+        <ModalPortal isOpen={Boolean(showCollectModal && selectedSchedule)} onClose={() => setShowCollectModal(false)}>
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             {/* Sticky Header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
@@ -657,12 +658,12 @@ export function RentManagerPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Edit Rent Schedule Modal */}
       {editingSchedule && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+        <ModalPortal isOpen={Boolean(editingSchedule)} onClose={() => setEditingSchedule(null)}>
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             {/* Sticky Header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
@@ -784,7 +785,7 @@ export function RentManagerPage({ selectedCompany }) {
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { propertyChargesAPI, accountsAPI } from '../services/api.js';
+import { ModalPortal } from './ModalPortal.jsx';
 
 export function PropertyChargesSection({ propertyId, propertyName, companyId, onRefreshParent }) {
   const [activeTab, setActiveTab] = useState('ALL'); // 'ALL' | 'SERVICE_CHARGE' | 'GROUND_RENT' | 'CONFIG' | 'PAYEE'
@@ -811,7 +812,7 @@ export function PropertyChargesSection({ propertyId, propertyName, companyId, on
           MODAL 1: RECORD DEMAND NOTICE
          ========================================================================= */}
       {showDemandModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-2xs">
+        <ModalPortal isOpen={showDemandModal} onClose={() => setShowDemandModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-5 py-3.5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -975,14 +976,14 @@ export function PropertyChargesSection({ propertyId, propertyName, companyId, on
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* =========================================================================
           MODAL 2: RECORD PAYMENT
          ========================================================================= */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-2xs">
+        <ModalPortal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-5 py-3.5 bg-gradient-to-r from-emerald-900 to-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1124,14 +1125,14 @@ export function PropertyChargesSection({ propertyId, propertyName, companyId, on
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* =========================================================================
           MODAL 3: CHARGE CONFIGURATION
          ========================================================================= */}
       {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-2xs">
+        <ModalPortal isOpen={showConfigModal} onClose={() => setShowConfigModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1230,7 +1231,7 @@ export function PropertyChargesSection({ propertyId, propertyName, companyId, on
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

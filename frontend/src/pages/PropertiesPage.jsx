@@ -34,6 +34,7 @@ import { propertiesAPI, getApiCache } from '../services/api.js';
 import PropertyAppliancesSection from '../components/PropertyAppliancesSection.jsx';
 import PropertyComplianceSection from '../components/PropertyComplianceSection.jsx';
 import PropertyChargesSection from '../components/PropertyChargesSection.jsx';
+import { ModalPortal } from '../components/ModalPortal.jsx';
 
 export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   const initialCache = getApiCache('/properties', {
@@ -1254,7 +1255,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   // Helper function to render modal in both views
   function renderEditModal() {
     return (
-      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+      <ModalPortal isOpen={showModal} onClose={() => setShowModal(false)}>
         <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
           {/* Sticky Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
@@ -1575,7 +1576,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
             </div>
           </form>
         </div>
-      </div>
+      </ModalPortal>
     );
   }
 }

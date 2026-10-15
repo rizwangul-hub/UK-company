@@ -33,6 +33,7 @@ import {
 } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import pixxLogo from '../assets/logo.png';
+import { ModalPortal } from '../components/ModalPortal.jsx';
 
 // Reusable Receipt / Document Attachment Field
 function ReceiptUploadField({ file, setFile, label = "Upload Receipt / Document (Optional)", colorScheme = "indigo" }) {
@@ -109,7 +110,9 @@ function ReceiptUploadField({ file, setFile, label = "Upload Receipt / Document 
 }
 
 export function DataEntryPage({ selectedCompany }) {
-  const [activeTab, setActiveTab] = useState('rent'); // 'rent' | 'expense' | 'transfer' | 'other' | 'mortgage' | 'recent'
+  const [activeTab, setActiveTab] = useState('recent'); // 'rent' | 'expense' | 'transfer' | 'other' | 'mortgage' | 'recent'
+  const [showRentModal, setShowRentModal] = useState(false);
+  const [showMortgageModal, setShowMortgageModal] = useState(false);
 
   const cachedAccs = getApiCache('/accounts');
   const cachedProps = getApiCache('/properties');
@@ -478,6 +481,8 @@ export function DataEntryPage({ selectedCompany }) {
           amount: '',
           notes: '',
         }));
+        setShowRentModal(false);
+        setActiveTab('recent');
         await loadData();
       }
     } catch (err) {
@@ -694,6 +699,8 @@ export function DataEntryPage({ selectedCompany }) {
           paymentReference: '',
           notes: '',
         }));
+        setShowMortgageModal(false);
+        setActiveTab('recent');
         await loadData();
       }
     } catch (err) {
@@ -917,7 +924,7 @@ export function DataEntryPage({ selectedCompany }) {
       {/* Primary Navigation Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800">
         <button
-          onClick={() => { setActiveTab('rent'); setFeedback({ text: '', type: '' }); }}
+          onClick={() => { setActiveTab('rent'); setShowRentModal(true); setFeedback({ text: '', type: '' }); }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'rent'
               ? 'bg-emerald-600 text-white shadow-md'
@@ -965,7 +972,7 @@ export function DataEntryPage({ selectedCompany }) {
         </button>
 
         <button
-          onClick={() => { setActiveTab('mortgage'); setFeedback({ text: '', type: '' }); }}
+          onClick={() => { setActiveTab('mortgage'); setShowMortgageModal(true); setFeedback({ text: '', type: '' }); }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'mortgage'
               ? 'bg-indigo-600 text-white shadow-md'
@@ -992,7 +999,10 @@ export function DataEntryPage({ selectedCompany }) {
       {/* ------------------------------------------------------------------ */}
       {/* TAB 1: COLLECT RENT */}
       {/* ------------------------------------------------------------------ */}
-      {activeTab === 'rent' && (
+      {activeTab === 'rent' && showRentModal && (
+        <ModalPortal>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 mb-5 border-b border-slate-800">
             <div className="flex items-center gap-2">
@@ -1017,6 +1027,14 @@ export function DataEntryPage({ selectedCompany }) {
             >
               <Zap className={`w-3.5 h-3.5 ${generatingSchedules ? 'animate-spin' : ''}`} />
               <span>{generatingSchedules ? 'Generating...' : `Generate Invoices (${rentForm.billingMonth})`}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowRentModal(false); setActiveTab('recent'); }}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              aria-label="Close rent collection form"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
 
@@ -1226,6 +1244,9 @@ export function DataEntryPage({ selectedCompany }) {
             </div>
           </form>
         </div>
+        </div>
+        </div>
+        </ModalPortal>
       )}
 
       {/* ------------------------------------------------------------------ */}
@@ -1763,7 +1784,10 @@ export function DataEntryPage({ selectedCompany }) {
       {/* ------------------------------------------------------------------ */}
       {/* TAB 5: MORTGAGE PAYMENT */}
       {/* ------------------------------------------------------------------ */}
-      {activeTab === 'mortgage' && (
+      {activeTab === 'mortgage' && showMortgageModal && (
+        <ModalPortal>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
           <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
             <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400">
@@ -1777,6 +1801,14 @@ export function DataEntryPage({ selectedCompany }) {
                 Split payment between Interest expense (P&L) and Principal repayment (reduces mortgage liability).
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => { setShowMortgageModal(false); setActiveTab('recent'); }}
+              className="ml-auto p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              aria-label="Close mortgage payment form"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           <form onSubmit={handleMortgageSubmit} className="space-y-4">
@@ -1939,6 +1971,9 @@ export function DataEntryPage({ selectedCompany }) {
             </div>
           </form>
         </div>
+        </div>
+        </div>
+        </ModalPortal>
       )}
 
       {/* ------------------------------------------------------------------ */}

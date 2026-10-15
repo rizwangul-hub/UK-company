@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { formatUKDate } from '../utils/formatters.js';
 import { complianceAPI } from '../services/api.js';
+import { ModalPortal } from './ModalPortal.jsx';
 
 export const COMPLIANCE_CATEGORIES = [
   { id: 'ALL', label: 'All Documents', icon: Layers, countKey: 'all' },
@@ -396,9 +397,10 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
         </div>
       </div>
 
-      {/* SINGLE COMPACT INLINE UPLOAD & ATTACH FORM (No empty borders / popups) */}
+      {/* Property document upload dialog */}
       {uploadModalOpen && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-indigo-500/40 shadow-xl space-y-4 animate-in fade-in">
+        <ModalPortal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)}>
+          <div className="w-full max-w-4xl max-h-[92vh] overflow-y-auto p-4 sm:p-5 rounded-2xl bg-slate-950 border border-indigo-500/40 shadow-2xl space-y-4 animate-in fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
             <div>
               <div className="flex items-center gap-2">
@@ -624,7 +626,8 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
             </div>
           </form>
         </div>
-      )}
+      </ModalPortal>
+    )}
 
       {/* Category Pills Navigation */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -865,7 +868,7 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
 
       {/* MODAL 2: Renew / Upload New Version */}
       {versionModalDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+        <ModalPortal isOpen={Boolean(versionModalDoc)} onClose={() => setVersionModalDoc(null)}>
           <div className="executive-card w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
@@ -956,12 +959,12 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* MODAL 3: Version History Viewer */}
       {historyModalDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+        <ModalPortal isOpen={Boolean(historyModalDoc)} onClose={() => setHistoryModalDoc(null)}>
           <div className="executive-card w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
@@ -1008,12 +1011,12 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
               ))}
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* MODAL 4: Create Council Application */}
       {councilModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+        <ModalPortal isOpen={councilModalOpen} onClose={() => setCouncilModalOpen(false)}>
           <div className="executive-card w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-extrabold text-white flex items-center gap-2">
@@ -1107,12 +1110,12 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* MODAL 5: Log Council Correspondence */}
       {correspondenceModalApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+        <ModalPortal isOpen={Boolean(correspondenceModalApp)} onClose={() => setCorrespondenceModalApp(null)}>
           <div className="executive-card w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
@@ -1207,7 +1210,7 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
               </div>
             </form>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );
