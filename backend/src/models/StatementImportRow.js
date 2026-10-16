@@ -114,6 +114,28 @@ const statementImportRowSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    suggestedHeadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+      index: true,
+    },
+    suggestedHead: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    suggestedSubHeadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+      index: true,
+    },
+    suggestedSubHead: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     suggestedTenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tenant',

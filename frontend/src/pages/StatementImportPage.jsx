@@ -457,6 +457,39 @@ export function StatementImportPage({ selectedCompany }) {
     }
   };
 
+  // Delete Statement Import Batch
+  const handleDeleteBatch = async (batchId) => {
+    const targetBatch = batchesList.find((b) => b._id === batchId) || (activeBatchId === batchId ? batchData : null);
+    const hasPosted = (targetBatch?.postedRows || 0) > 0;
+    const confirmMsg = hasPosted
+      ? `Are you sure you want to PERMANENTLY DELETE this bank statement batch?\n\nWARNING: This batch has ${targetBatch.postedRows} posted transaction(s). Deleting it will automatically REVERSE and void all associated Central Ledger transactions and restore bank balances before deleting the import records.`
+      : 'Are you sure you want to PERMANENTLY DELETE this bank statement batch and all its staged rows? This action cannot be undone.';
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      setPostingLoading(true);
+      const res = await statementImportAPI.deleteBatch(batchId);
+      if (res?.success) {
+        alert(res.message || 'Statement batch deleted successfully.');
+        if (activeBatchId === batchId) {
+          setActiveBatchId(null);
+          setBatchData(null);
+          setStagedRows([]);
+          setActiveTab('history');
+        }
+        await loadBatchHistory();
+        await loadReconciliation();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to delete statement batch.');
+    } finally {
+      setPostingLoading(false);
+    }
+  };
+
   // Summary Metrics for Active Batch
   const approvedCount = stagedRows.filter((r) => r.status === 'APPROVED' && !r.isExcluded).length;
   const duplicateCount = stagedRows.filter((r) => r.isDuplicate).length;
@@ -947,6 +980,8 @@ export function StatementImportPage({ selectedCompany }) {
                       <th className="px-3 py-2.5">Date</th>
                       <th className="px-3 py-2.5">Description</th>
                       <th className="px-3 py-2.5">Original Narrative</th>
+                      <th className="px-3 py-2.5">Head</th>
+                      <th className="px-3 py-2.5">Sub Head</th>
                       <th className="px-3 py-2.5 text-right">Debit (Out)</th>
                       <th className="px-3 py-2.5 text-right">Credit (In)</th>
                       <th className="px-3 py-2.5 text-right">Balance</th>
@@ -964,6 +999,18 @@ export function StatementImportPage({ selectedCompany }) {
                         </td>
                         <td className="px-3 py-2 text-slate-500 dark:text-slate-400 max-w-xs truncate text-[11px]">
                           {r.originalNarrative || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                          {r.head ? (
+                            <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 font-semibold text-[11px]">
+                              {r.head}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400 text-[11px] whitespace-nowrap">
+                          {r.subHead || '—'}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-rose-600 dark:text-rose-400">
                           {r.direction === 'OUT' ? formatGBP(r.amount) : '—'}
@@ -1067,6 +1114,16 @@ export function StatementImportPage({ selectedCompany }) {
                     >
                       <Send className="w-3.5 h-3.5" />
                       Post Selected to Ledger ({selectedRowIds.size})
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteBatch(activeBatchId)}
+                      disabled={postingLoading}
+                      className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-700 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 dark:text-slate-300 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                      title="Permanently delete this statement batch"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      Delete Batch
                     </button>
                   </div>
                 </div>
@@ -1217,14 +1274,14 @@ export function StatementImportPage({ selectedCompany }) {
                               {/* Head */}
                               <td className="px-3 py-3 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
                                 <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold">
-                                  {row.head || '—'}
+                                  {row.head || row.suggestedHead || '—'}
                                 </span>
                               </td>
 
                               {/* Sub Head */}
                               <td className="px-3 py-3 text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
                                 <span className="text-[11px]">
-                                  {row.subHead || '—'}
+                                  {row.subHead || row.suggestedSubHead || '—'}
                                 </span>
                               </td>
 
@@ -1641,6 +1698,14 @@ export function StatementImportPage({ selectedCompany }) {
                                 Cancel
                               </button>
                             )}
+                            <button
+                              onClick={() => handleDeleteBatch(b._id)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-600 dark:bg-slate-800 dark:hover:bg-rose-950 dark:hover:text-rose-300 dark:text-slate-400 font-semibold transition cursor-pointer flex items-center gap-1"
+                              title="Permanently delete this statement batch"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                              Delete
+                            </button>
                           </div>
                         </td>
                       </tr>

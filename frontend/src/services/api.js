@@ -844,6 +844,10 @@ export const statementImportAPI = {
     const res = await api.post(`/statement-import/batches/${batchId}/cancel`);
     return res.data;
   },
+  deleteBatch: async (batchId) => {
+    const res = await api.delete(`/statement-import/batches/${batchId}`);
+    return res.data;
+  },
   getReconciliation: async (params, config = {}) => {
     return cachedGet('/statement-import/reconciliation', { params, ...config });
   },

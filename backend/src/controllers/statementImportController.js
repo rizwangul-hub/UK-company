@@ -8,6 +8,7 @@ import {
   saveStatementBatch,
   postBatchTransactions,
   reverseBatchTransactions,
+  deleteStatementBatch,
   getReconciliationReport,
 } from '../services/statementImportService.js';
 
@@ -410,6 +411,36 @@ export const getReconciliation = async (req, res) => {
       data: report,
     });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Permanently delete a statement import batch and associated staging/posted records
+ */
+export const deleteBatch = async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const { batchId } = req.params;
+
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: 'Company context is required.' });
+    }
+
+    const result = await deleteStatementBatch({
+      batchId,
+      companyId,
+      userId: req.user?._id || null,
+      userName: req.user?.name || 'System Operator',
+    });
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[Delete Batch Error]:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

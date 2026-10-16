@@ -14,6 +14,7 @@ import {
   detectColumnMapping,
   parseStatementBuffer,
   classifyAndMatchRows,
+  deleteStatementBatch,
 } from '../src/services/statementImportService.js';
 import { round2 } from '../src/services/ledgerService.js';
 
@@ -245,4 +246,12 @@ test('SCHEMA: StatementImportBatch and StatementImportRow have sheet and head/su
   assert.ok(rowPaths.excelRowNumber, 'Row must have excelRowNumber');
   assert.ok(rowPaths.head, 'Row must have head');
   assert.ok(rowPaths.subHead, 'Row must have subHead');
+  assert.ok(rowPaths.suggestedHeadId, 'Row must have suggestedHeadId');
+  assert.ok(rowPaths.suggestedHead, 'Row must have suggestedHead');
+  assert.ok(rowPaths.suggestedSubHeadId, 'Row must have suggestedSubHeadId');
+  assert.ok(rowPaths.suggestedSubHead, 'Row must have suggestedSubHead');
+});
+
+test('BATCH DELETION: deleteStatementBatch service is defined and exported', () => {
+  assert.equal(typeof deleteStatementBatch, 'function', 'deleteStatementBatch must be an exported function');
 });

@@ -10,6 +10,7 @@ import {
   postBatch,
   reverseBatch,
   cancelBatch,
+  deleteBatch,
   getReconciliation,
 } from '../controllers/statementImportController.js';
 import { protect } from '../middleware/auth.js';
@@ -26,6 +27,7 @@ router.post('/process-batch', uploadMiddleware.single('statementFile'), processS
 // Batch Management
 router.get('/batches', getBatches);
 router.get('/batches/:id', getBatchById);
+router.delete('/batches/:batchId', deleteBatch);
 router.put('/batches/:batchId/rows/:rowId', updateBatchRow);
 router.put('/batches/:batchId/rows', bulkUpdateRows);
 router.post('/batches/:batchId/post', postBatch);

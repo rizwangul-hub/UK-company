@@ -150,9 +150,9 @@ export const detectColumnMapping = (headerCells) => {
       mapping.originalNarrativeCol = idx;
     } else if (mapping.descCol === -1 && /memo|description|details|narrative|particulars|payee/i.test(h)) {
       mapping.descCol = idx;
-    } else if (mapping.headCol === -1 && /^head$/i.test(h)) {
+    } else if (mapping.headCol === -1 && (/^head$/i.test(h) || /main[\s_-]?head|category[\s_-]?head|^head[\s_-]?category/i.test(h))) {
       mapping.headCol = idx;
-    } else if (mapping.subHeadCol === -1 && /sub[\s_-]?head/i.test(h)) {
+    } else if (mapping.subHeadCol === -1 && (/sub[\s_-]?head/i.test(h) || /sub[\s_-]?category|child[\s_-]?category/i.test(h))) {
       mapping.subHeadCol = idx;
     } else if (mapping.debitCol === -1 && /payment|paid out|debit|outflow|dr/i.test(h)) {
       mapping.debitCol = idx;
@@ -563,6 +563,10 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
     let suggestedType = 'UNCATEGORIZED';
     let suggestedCategoryId = null;
     let suggestedCategoryName = '';
+    let suggestedHeadId = null;
+    let suggestedHead = (row.head || '').trim();
+    let suggestedSubHeadId = null;
+    let suggestedSubHead = (row.subHead || '').trim();
     let suggestedPropertyId = matchedProperty ? matchedProperty._id : null;
     let suggestedPropertyName = matchedProperty ? (matchedProperty.title || matchedProperty.addressLine1) : '';
     let suggestedTenantId = matchedTenant ? matchedTenant._id : null;
@@ -726,6 +730,37 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       classificationReason = 'Requires operator review';
     }
 
+    // Derive Head & Sub Head from category hierarchy if not already populated
+    if (suggestedCategoryId) {
+      const selectedCat = categories.find((c) => c._id?.toString() === suggestedCategoryId?.toString());
+      if (selectedCat) {
+        if (selectedCat.parentCategoryId) {
+          suggestedSubHeadId = selectedCat._id;
+          suggestedSubHead = selectedCat.name;
+          const parent = categories.find(
+            (c) => c._id?.toString() === (selectedCat.parentCategoryId?._id || selectedCat.parentCategoryId)?.toString()
+          );
+          if (parent) {
+            suggestedHeadId = parent._id;
+            suggestedHead = parent.name;
+          } else if (!suggestedHead) {
+            suggestedHead = selectedCat.name;
+          }
+        } else if (selectedCat.isMainHead) {
+          suggestedHeadId = selectedCat._id;
+          suggestedHead = selectedCat.name;
+          if (!suggestedSubHead) {
+            suggestedSubHead = (row.subHead || '').trim();
+          }
+        } else if (!suggestedHead) {
+          suggestedHead = selectedCat.name;
+        }
+      }
+    }
+
+    const finalHead = (row.head || suggestedHead || '').trim();
+    const finalSubHead = (row.subHead || suggestedSubHead || '').trim();
+
     // Determine row status
     let status = 'NEW';
     if (isDuplicate) {
@@ -738,6 +773,12 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
 
     return {
       ...row,
+      head: finalHead,
+      subHead: finalSubHead,
+      suggestedHeadId: suggestedHeadId || null,
+      suggestedHead: finalHead,
+      suggestedSubHeadId: suggestedSubHeadId || null,
+      suggestedSubHead: finalSubHead,
       suggestedType,
       suggestedPropertyId,
       suggestedPropertyName,
@@ -819,8 +860,12 @@ export const saveStatementBatch = async ({
     companyId,
     accountId,
     excelRowNumber: r.rowIndex,
-    head: r.head || '',
-    subHead: r.subHead || '',
+    head: r.head || r.suggestedHead || '',
+    subHead: r.subHead || r.suggestedSubHead || '',
+    suggestedHeadId: r.suggestedHeadId || null,
+    suggestedHead: r.suggestedHead || r.head || '',
+    suggestedSubHeadId: r.suggestedSubHeadId || null,
+    suggestedSubHead: r.suggestedSubHead || r.subHead || '',
     transactionDate: r.transactionDate || new Date(),
     amount: r.amount > 0 ? r.amount : 0,
     suggestedPropertyId: r.suggestedPropertyId || null,
@@ -900,8 +945,10 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, userId = n
         accountId: batch.accountId,
         counterAccountId: row.suggestedCounterAccountId || null,
         categoryId: row.suggestedCategoryId || null,
-        head: row.head || '',
-        subHead: row.subHead || '',
+        headId: row.suggestedHeadId || null,
+        subHeadId: row.suggestedSubHeadId || null,
+        head: row.head || row.suggestedHead || '',
+        subHead: row.subHead || row.suggestedSubHead || '',
         amount: row.amount,
         direction: row.direction,
         propertyId: row.suggestedPropertyId || null,
@@ -1055,6 +1102,55 @@ export const reverseBatchTransactions = async ({ batchId, companyId, userId = nu
     failedCount: errors.length,
     errors,
     batchStatus: batch.status,
+  };
+};
+
+/**
+ * Permanently delete an imported statement batch, safely reversing any posted transactions first
+ */
+export const deleteStatementBatch = async ({ batchId, companyId, userId = null, userName = 'System Operator' }) => {
+  const batch = await StatementImportBatch.findOne({ _id: batchId, companyId });
+  if (!batch) throw new Error('Statement import batch not found in active company.');
+
+  // 1. If any rows were posted, delete/reverse ledger transactions first
+  const postedRows = await StatementImportRow.find({
+    batchId,
+    status: 'POSTED',
+    postedTransactionId: { $ne: null },
+  });
+
+  let reversedCount = 0;
+  const reversalErrors = [];
+
+  for (const row of postedRows) {
+    try {
+      await deleteLedgerTransaction({
+        transactionId: row.postedTransactionId,
+        companyId,
+        userId,
+        userName,
+        reason: `Batch Deletion for Statement Import #${batch._id} (${batch.filename})`,
+      });
+      reversedCount++;
+    } catch (err) {
+      console.warn(`Failed to reverse transaction ${row.postedTransactionId} during batch deletion:`, err.message);
+      reversalErrors.push({ rowIndex: row.rowIndex, error: err.message });
+    }
+  }
+
+  // 2. Remove all staging rows for this batch
+  const deleteRowsResult = await StatementImportRow.deleteMany({ batchId: batch._id, companyId });
+
+  // 3. Remove the batch itself
+  await StatementImportBatch.deleteOne({ _id: batch._id, companyId });
+
+  return {
+    success: true,
+    deletedBatchId: batchId,
+    deletedRowsCount: deleteRowsResult.deletedCount,
+    reversedTransactionsCount: reversedCount,
+    reversalErrors,
+    message: `Batch "${batch.filename}" deleted successfully.${reversedCount > 0 ? ` Reversed ${reversedCount} posted transaction(s).` : ''}`,
   };
 };
 
