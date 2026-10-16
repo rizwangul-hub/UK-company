@@ -93,10 +93,17 @@ export const processStatementUpload = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please upload a bank statement file.' });
     }
 
-    // Verify account belongs to company
-    const account = await Account.findOne({ _id: accountId, companyId });
+    // Verify account belongs to company (or legacy unassigned)
+    let account = await Account.findOne({
+      _id: accountId,
+      $or: [{ companyId }, { companyId: null }, { companyId: { $exists: false } }],
+    });
     if (!account) {
       return res.status(404).json({ success: false, message: 'Selected bank account was not found in active company.' });
+    }
+    if (!account.companyId) {
+      account.companyId = companyId;
+      await account.save();
     }
 
     const customMapping = rawMapping ? (typeof rawMapping === 'string' ? JSON.parse(rawMapping) : rawMapping) : {};

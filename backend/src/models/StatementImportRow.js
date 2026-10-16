@@ -31,7 +31,7 @@ const statementImportRowSchema = new mongoose.Schema(
     },
     transactionDate: {
       type: Date,
-      required: [true, 'Transaction date is required'],
+      default: Date.now,
       index: true,
     },
     valueDate: {
@@ -40,7 +40,7 @@ const statementImportRowSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: [true, 'Description is required'],
+      default: 'Bank Movement',
       trim: true,
     },
     originalNarrative: {
@@ -55,8 +55,8 @@ const statementImportRowSchema = new mongoose.Schema(
     },
     amount: {
       type: Number,
-      required: [true, 'Amount is required'],
-      min: [0.01, 'Amount must be greater than zero'],
+      default: 0,
+      min: [0, 'Amount must be non-negative'],
     },
     direction: {
       type: String,

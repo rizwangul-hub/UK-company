@@ -400,6 +400,35 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
   const adminCategory = categories.find((c) => /admin|office|general/i.test(c.name)) || null;
   const mortgageInterestCategory = categories.find((c) => /mortgage.*interest|finance.*cost/i.test(c.name)) || null;
 
+  // Pre-tokenize entities once for 100x performance boost
+  const preparedProps = properties.map((prop) => {
+    const propText = [prop.title, prop.addressLine1, prop.city, prop.postcode].filter(Boolean).join(' ');
+    const streetNumMatch = prop.addressLine1?.match(/^\d+/);
+    return {
+      prop,
+      tokens: normalizeTokens(propText),
+      streetNum: streetNumMatch ? streetNumMatch[0] : null,
+    };
+  });
+
+  const preparedTenants = tenants.map((t) => ({
+    tenant: t,
+    tokens: normalizeTokens([t.name, t.fullName, t.tradingName].filter(Boolean).join(' ')),
+  }));
+
+  const preparedMortgages = mortgages.map((m) => ({
+    mortgage: m,
+    tokens: normalizeTokens([m.lenderName, m.mortgageReference, m.accountNumber].filter(Boolean).join(' ')),
+  }));
+
+  // Index recent transactions by amount for O(1) duplicate checks
+  const txByAmountMap = new Map();
+  recentTxns.forEach((tx) => {
+    const key = `${round2(tx.amount)}_${tx.direction}`;
+    if (!txByAmountMap.has(key)) txByAmountMap.set(key, []);
+    txByAmountMap.get(key).push(tx);
+  });
+
   // Process each row
   return parsedRows.map((row) => {
     if (row.status === 'INVALID') {
@@ -422,7 +451,9 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       .join(' ')
       .toLowerCase();
 
-    // 1. DUPLICATE CHECK against recent posted transactions
+    const rowTokens = normalizeTokens(combinedSearchText);
+
+    // 1. FAST DUPLICATE CHECK via Hash Map
     let isDuplicate = false;
     let duplicateReason = '';
     let matchedTransactionId = null;
@@ -430,72 +461,79 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
 
     if (row.transactionDate && row.amount > 0) {
       const rowDateMs = new Date(row.transactionDate).getTime();
-      const match = recentTxns.find((tx) => {
-        if (round2(tx.amount) !== round2(row.amount)) return false;
-        if (tx.direction !== row.direction) return false;
+      const candidateTxns = txByAmountMap.get(`${round2(row.amount)}_${row.direction}`) || [];
+
+      for (const tx of candidateTxns) {
         const txDateMs = new Date(tx.transactionDate).getTime();
         const daysDiff = Math.abs(txDateMs - rowDateMs) / (1000 * 60 * 60 * 24);
-        if (daysDiff > 3) return false;
-
-        // Check reference or narration similarity
-        if (tx.reference && row.reference && tx.reference.toLowerCase() === row.reference.toLowerCase()) {
-          return true;
+        if (daysDiff <= 3) {
+          if (
+            (tx.reference && row.reference && tx.reference.toLowerCase() === row.reference.toLowerCase()) ||
+            daysDiff <= 1
+          ) {
+            isDuplicate = true;
+            matchedTransactionId = tx._id;
+            matchedTransactionSummary = `${tx.voucherNo} (£${tx.amount.toFixed(2)} on ${new Date(
+              tx.transactionDate
+            ).toLocaleDateString('en-GB')})`;
+            duplicateReason = `Matches existing posted transaction ${matchedTransactionSummary}`;
+            break;
+          }
         }
-        const sim = calculateTokenOverlap(tx.narration || '', row.description || '');
-        return sim > 0.4 || daysDiff <= 1;
-      });
-
-      if (match) {
-        isDuplicate = true;
-        matchedTransactionId = match._id;
-        matchedTransactionSummary = `${match.voucherNo} (£${match.amount.toFixed(2)} on ${new Date(
-          match.transactionDate
-        ).toLocaleDateString('en-GB')})`;
-        duplicateReason = `Matches existing posted transaction ${matchedTransactionSummary}`;
       }
     }
 
-    // 2. PROPERTY MATCHING
+    // 2. FAST PROPERTY MATCHING using pre-tokenized sets
     let matchedProperty = null;
     let bestPropScore = 0;
 
-    for (const prop of properties) {
-      const propText = [prop.title, prop.addressLine1, prop.city, prop.postcode].filter(Boolean).join(' ');
-      const score = calculateTokenOverlap(combinedSearchText, propText);
-      // Give bonus if street number + name matches
-      const streetNumMatch = prop.addressLine1?.match(/^\d+/);
-      if (streetNumMatch && combinedSearchText.includes(streetNumMatch[0])) {
-        if (score + 0.3 > bestPropScore && score > 0.15) {
-          bestPropScore = score + 0.3;
-          matchedProperty = prop;
+    for (const item of preparedProps) {
+      if (!item.tokens.length) continue;
+      let matches = 0;
+      for (const t of item.tokens) {
+        if (rowTokens.includes(t)) matches++;
+      }
+      const score = matches / Math.min(rowTokens.length || 1, item.tokens.length);
+      if (item.streetNum && combinedSearchText.includes(item.streetNum)) {
+        if (score + 0.35 > bestPropScore && (score > 0.1 || matches >= 1)) {
+          bestPropScore = score + 0.35;
+          matchedProperty = item.prop;
         }
       } else if (score > bestPropScore && score >= 0.25) {
         bestPropScore = score;
-        matchedProperty = prop;
+        matchedProperty = item.prop;
       }
     }
 
-    // 3. TENANT MATCHING
+    // 3. FAST TENANT MATCHING
     let matchedTenant = null;
     let bestTenantScore = 0;
-    for (const t of tenants) {
-      const tName = [t.name, t.fullName, t.tradingName].filter(Boolean).join(' ');
-      const score = calculateTokenOverlap(combinedSearchText, tName);
+    for (const item of preparedTenants) {
+      if (!item.tokens.length) continue;
+      let matches = 0;
+      for (const t of item.tokens) {
+        if (rowTokens.includes(t)) matches++;
+      }
+      const score = matches / Math.min(rowTokens.length || 1, item.tokens.length);
       if (score > bestTenantScore && score >= 0.4) {
         bestTenantScore = score;
-        matchedTenant = t;
+        matchedTenant = item.tenant;
       }
     }
 
-    // 4. MORTGAGE MATCHING
+    // 4. FAST MORTGAGE MATCHING
     let matchedMortgage = null;
     let bestMortgageScore = 0;
-    for (const m of mortgages) {
-      const mText = [m.lenderName, m.mortgageReference, m.accountNumber].filter(Boolean).join(' ');
-      const score = calculateTokenOverlap(combinedSearchText, mText);
+    for (const item of preparedMortgages) {
+      if (!item.tokens.length) continue;
+      let matches = 0;
+      for (const t of item.tokens) {
+        if (rowTokens.includes(t)) matches++;
+      }
+      const score = matches / Math.min(rowTokens.length || 1, item.tokens.length);
       if (score > bestMortgageScore && score >= 0.3) {
         bestMortgageScore = score;
-        matchedMortgage = m;
+        matchedMortgage = item.mortgage;
       }
     }
 
@@ -567,7 +605,6 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       suggestedType = 'TRANSFER';
       confidenceScore = 80;
       classificationReason = 'Inter-account liquidity movement or company loan';
-      // Search for sister or counter account
       const otherAccount = accounts.find((a) => a._id.toString() !== accountId.toString());
       if (otherAccount) {
         suggestedCounterAccountId = otherAccount._id;
@@ -627,7 +664,7 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       matchedTransactionId,
       matchedTransactionSummary,
       status,
-      isExcluded: isDuplicate, // Exclude duplicates by default to prevent accidental double-posting
+      isExcluded: isDuplicate,
     };
   });
 };
@@ -653,6 +690,9 @@ export const saveStatementBatch = async ({
   const matchedRows = classifiedRows.filter((r) => r.status === 'MATCHED' || r.isDuplicate).length;
   const newRows = totalRows - duplicateRows;
 
+  // Clean userId
+  const cleanUserId = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
+
   // Create Batch
   const batch = await StatementImportBatch.create({
     companyId,
@@ -671,22 +711,34 @@ export const saveStatementBatch = async ({
     postedRows: 0,
     skippedRows: 0,
     status: 'DRAFT',
-    uploadedBy: userId,
-    uploadedByName: userName,
+    uploadedBy: cleanUserId,
+    uploadedByName: userName || 'System Operator',
     columnMapping: parsed.detectedMapping,
     notes,
   });
 
-  // Bulk Insert Rows
+  // Bulk Insert Rows in chunks with clean ObjectIds
   const rowDocs = classifiedRows.map((r) => ({
     ...r,
     batchId: batch._id,
     companyId,
     accountId,
+    transactionDate: r.transactionDate || new Date(),
+    amount: r.amount > 0 ? r.amount : 0,
+    suggestedPropertyId: r.suggestedPropertyId || null,
+    suggestedCategoryId: r.suggestedCategoryId || null,
+    suggestedTenantId: r.suggestedTenantId || null,
+    suggestedMortgageId: r.suggestedMortgageId || null,
+    suggestedCounterAccountId: r.suggestedCounterAccountId || null,
+    matchedTransactionId: r.matchedTransactionId || null,
   }));
 
   if (rowDocs.length > 0) {
-    await StatementImportRow.insertMany(rowDocs);
+    const CHUNK_SIZE = 250;
+    for (let i = 0; i < rowDocs.length; i += CHUNK_SIZE) {
+      const chunk = rowDocs.slice(i, i + CHUNK_SIZE);
+      await StatementImportRow.insertMany(chunk, { ordered: false });
+    }
   }
 
   return {

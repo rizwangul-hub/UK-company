@@ -140,6 +140,11 @@ api.interceptors.request.use((config) => {
     config.headers['x-company-id'] = companyId;
   }
 
+  // If sending FormData, delete Content-Type so Axios & browser automatically compute boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   return config;
 });
 
@@ -754,15 +759,11 @@ export const propertyChargesAPI = {
 
 export const statementImportAPI = {
   previewStatement: async (formData) => {
-    const res = await api.post('/statement-import/parse-preview', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const res = await api.post('/statement-import/parse-preview', formData);
     return res.data;
   },
   processBatch: async (formData) => {
-    const res = await api.post('/statement-import/process-batch', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const res = await api.post('/statement-import/process-batch', formData);
     return res.data;
   },
   getBatches: async (config = {}) => {
