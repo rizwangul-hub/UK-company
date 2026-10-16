@@ -8,6 +8,7 @@ import {
   updateBatchRow,
   bulkUpdateRows,
   postBatch,
+  reverseBatch,
   cancelBatch,
   getReconciliation,
 } from '../controllers/statementImportController.js';
@@ -28,6 +29,7 @@ router.get('/batches/:id', getBatchById);
 router.put('/batches/:batchId/rows/:rowId', updateBatchRow);
 router.put('/batches/:batchId/rows', bulkUpdateRows);
 router.post('/batches/:batchId/post', postBatch);
+router.post('/batches/:batchId/reverse', reverseBatch);
 router.post('/batches/:batchId/cancel', cancelBatch);
 
 // Reconciliation

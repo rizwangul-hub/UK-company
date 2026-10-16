@@ -191,3 +191,58 @@ test('RECONCILIATION: Variance alerts operator when statement and ledger differ'
   assert.equal(variance, 150.0, 'Variance detected correctly');
   assert.ok(Math.abs(variance) >= 0.01, 'Flags discrepancy');
 });
+
+// -----------------------------------------------------------------------------
+// 5. MULTI-SHEET WORKBOOK PARSING & HEAD/SUB-HEAD CLASSIFICATION
+// -----------------------------------------------------------------------------
+test('PARSER: Multi-sheet Excel workbook lists all sheets and allows sheet selection', async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet1 = workbook.addWorksheet('Summary');
+  sheet1.addRow(['Summary Only', 'Not Data']);
+
+  const sheet2 = workbook.addWorksheet('Transactions Feb 2025');
+  sheet2.addRow(['Date', 'Memo', 'Head', 'Sub Head', 'Payments', 'Receipts', 'Balance']);
+  sheet2.addRow(['01/02/2025', 'Rent 229 Commercial Road', 'Income', 'Rent', '', 1500.0, 1500.0]);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  // Test detection of sheets
+  const preview = await parseStatementBuffer(buffer, 'multi-sheet.xlsx');
+  assert.equal(preview.sheetsList.length, 2, 'Should list both sheets');
+  assert.ok(preview.sheetsList.includes('Summary'));
+  assert.ok(preview.sheetsList.includes('Transactions Feb 2025'));
+
+  // Test selecting specific sheet
+  const selectedSheet = await parseStatementBuffer(buffer, 'multi-sheet.xlsx', {}, { sheetName: 'Transactions Feb 2025' });
+  assert.equal(selectedSheet.sheetName, 'Transactions Feb 2025');
+  assert.equal(selectedSheet.totalParsedRows, 1);
+  assert.equal(selectedSheet.parsedRows[0].head, 'Income');
+  assert.equal(selectedSheet.parsedRows[0].subHead, 'Rent');
+  assert.equal(selectedSheet.parsedRows[0].amount, 1500.0);
+  assert.equal(selectedSheet.parsedRows[0].direction, 'IN');
+});
+
+test('PARSER: detectColumnMapping detects Head, Sub Head, Memo Original, and Running Balance', () => {
+  const headers = ['Date', 'Memo', 'Head', 'Sub Head', 'Payments', 'Receipts', 'Balance', 'Memo Original'];
+  const mapping = detectColumnMapping(headers);
+
+  assert.equal(mapping.dateCol, 0);
+  assert.equal(mapping.descCol, 1);
+  assert.equal(mapping.headCol, 2);
+  assert.equal(mapping.subHeadCol, 3);
+  assert.equal(mapping.debitCol, 4);
+  assert.equal(mapping.creditCol, 5);
+  assert.equal(mapping.balanceCol, 6);
+  assert.equal(mapping.originalNarrativeCol, 7);
+});
+
+test('SCHEMA: StatementImportBatch and StatementImportRow have sheet and head/subhead fields', () => {
+  const batchPaths = StatementImportBatch.schema.paths;
+  assert.ok(batchPaths.sheetName, 'Batch must have sheetName');
+  assert.ok(batchPaths.sheetsList, 'Batch must have sheetsList');
+
+  const rowPaths = StatementImportRow.schema.paths;
+  assert.ok(rowPaths.excelRowNumber, 'Row must have excelRowNumber');
+  assert.ok(rowPaths.head, 'Row must have head');
+  assert.ok(rowPaths.subHead, 'Row must have subHead');
+});

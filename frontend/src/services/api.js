@@ -784,6 +784,10 @@ export const statementImportAPI = {
     const res = await api.post(`/statement-import/batches/${batchId}/post`, data);
     return res.data;
   },
+  reverseBatch: async (batchId) => {
+    const res = await api.post(`/statement-import/batches/${batchId}/reverse`);
+    return res.data;
+  },
   cancelBatch: async (batchId) => {
     const res = await api.post(`/statement-import/batches/${batchId}/cancel`);
     return res.data;

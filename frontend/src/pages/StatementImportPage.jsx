@@ -53,6 +53,7 @@ export function StatementImportPage({ selectedCompany }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState(null);
   const [uploadError, setUploadError] = useState('');
+  const [selectedSheetName, setSelectedSheetName] = useState('');
 
   // Column Mapping State
   const [columnMapping, setColumnMapping] = useState({
@@ -187,7 +188,7 @@ export function StatementImportPage({ selectedCompany }) {
   );
 
   // Trigger preview when file selected
-  const handleFileSelect = async (file) => {
+  const handleFileSelect = async (file, sheetOverride = null) => {
     if (!file) return;
     const name = file.name.toLowerCase();
     if (!name.endsWith('.xlsx') && !name.endsWith('.xls') && !name.endsWith('.csv')) {
@@ -202,10 +203,14 @@ export function StatementImportPage({ selectedCompany }) {
     try {
       const formData = new FormData();
       formData.append('statementFile', file);
+      if (sheetOverride) {
+        formData.append('sheetName', sheetOverride);
+      }
 
       const res = await statementImportAPI.previewStatement(formData);
       if (res?.success && res.data) {
         setPreviewData(res.data);
+        setSelectedSheetName(res.data.sheetName || sheetOverride || '');
         if (res.data.detectedMapping) {
           setColumnMapping(res.data.detectedMapping);
         }
@@ -214,6 +219,13 @@ export function StatementImportPage({ selectedCompany }) {
       setUploadError(err.response?.data?.message || err.message || 'Failed to parse file preview.');
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const handleSheetChange = (sheet) => {
+    setSelectedSheetName(sheet);
+    if (uploadFile) {
+      handleFileSelect(uploadFile, sheet);
     }
   };
 
@@ -256,6 +268,9 @@ export function StatementImportPage({ selectedCompany }) {
       formData.append('statementFile', uploadFile);
       formData.append('accountId', selectedAccountId);
       formData.append('customMapping', JSON.stringify(columnMapping));
+      if (selectedSheetName) {
+        formData.append('sheetName', selectedSheetName);
+      }
 
       const res = await statementImportAPI.processBatch(formData);
       if (res?.success && res.data) {
@@ -416,6 +431,29 @@ export function StatementImportPage({ selectedCompany }) {
       await loadBatchHistory();
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to cancel batch.');
+    }
+  };
+
+  // Reverse Batch
+  const handleReverseBatch = async (batchId) => {
+    if (!window.confirm('Are you sure you want to reverse all posted transactions from this statement batch? All created ledger entries will be securely voided and bank balances will be restored.')) {
+      return;
+    }
+    try {
+      setPostingLoading(true);
+      const res = await statementImportAPI.reverseBatch(batchId);
+      if (res?.success) {
+        alert(res.message || 'Statement batch reversed successfully.');
+        if (activeBatchId === batchId) {
+          await loadBatchRows(batchId);
+          await loadReconciliation();
+        }
+        await loadBatchHistory();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to reverse batch.');
+    } finally {
+      setPostingLoading(false);
     }
   };
 
@@ -672,6 +710,28 @@ export function StatementImportPage({ selectedCompany }) {
                 </div>
               </div>
 
+              {/* Multi-Sheet Selector if multiple worksheets exist */}
+              {previewData.sheetsList && previewData.sheetsList.length > 1 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60">
+                  <div className="flex items-center gap-2.5">
+                    <Layers className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-white">Workbook Worksheet</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Multiple worksheets found. Select sheet to process:</div>
+                    </div>
+                  </div>
+                  <select
+                    value={selectedSheetName || previewData.sheetName}
+                    onChange={(e) => handleSheetChange(e.target.value)}
+                    className="bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-xl px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {previewData.sheetsList.map((s, idx) => (
+                      <option key={idx} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Column Selectors Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
                 <div>
@@ -702,6 +762,46 @@ export function StatementImportPage({ selectedCompany }) {
                     value={columnMapping.descCol}
                     onChange={(e) =>
                       setColumnMapping({ ...columnMapping, descCol: parseInt(e.target.value, 10) })
+                    }
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold"
+                  >
+                    <option value={-1}>-- Not Mapped --</option>
+                    {previewData.detectedHeaders.map((h, idx) => (
+                      <option key={idx} value={idx}>
+                        Col {idx + 1}: {h || `(Column ${idx + 1})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Head Column
+                  </label>
+                  <select
+                    value={columnMapping.headCol}
+                    onChange={(e) =>
+                      setColumnMapping({ ...columnMapping, headCol: parseInt(e.target.value, 10) })
+                    }
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold"
+                  >
+                    <option value={-1}>-- Not Mapped --</option>
+                    {previewData.detectedHeaders.map((h, idx) => (
+                      <option key={idx} value={idx}>
+                        Col {idx + 1}: {h || `(Column ${idx + 1})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Sub Head Column
+                  </label>
+                  <select
+                    value={columnMapping.subHeadCol}
+                    onChange={(e) =>
+                      setColumnMapping({ ...columnMapping, subHeadCol: parseInt(e.target.value, 10) })
                     }
                     className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold"
                   >
@@ -949,6 +1049,17 @@ export function StatementImportPage({ selectedCompany }) {
                       </button>
                     )}
 
+                    {batchData?.postedRows > 0 && (
+                      <button
+                        onClick={() => handleReverseBatch(activeBatchId)}
+                        disabled={postingLoading}
+                        className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${postingLoading ? 'animate-spin' : ''}`} />
+                        Reverse Posted ({batchData.postedRows})
+                      </button>
+                    )}
+
                     <button
                       onClick={() => setShowPostModal(true)}
                       disabled={selectedRowIds.size === 0}
@@ -1031,14 +1142,19 @@ export function StatementImportPage({ selectedCompany }) {
                               className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                             />
                           </th>
+                          <th className="px-2 py-3 w-12 text-slate-400 font-mono text-[10px]">#Row</th>
                           <th className="px-3 py-3 w-24">Date</th>
-                          <th className="px-3 py-3 min-w-[220px]">Narrative / Memo</th>
-                          <th className="px-3 py-3 text-right w-28">Amount</th>
-                          <th className="px-3 py-3 w-36">Type</th>
-                          <th className="px-3 py-3 min-w-[180px]">Property</th>
-                          <th className="px-3 py-3 min-w-[160px]">Category</th>
-                          <th className="px-3 py-3 w-32">Status</th>
-                          <th className="px-3 py-3 text-center w-16">Include</th>
+                          <th className="px-3 py-3 min-w-[200px]">Memo</th>
+                          <th className="px-3 py-3 w-28">Head</th>
+                          <th className="px-3 py-3 w-28">Sub Head</th>
+                          <th className="px-3 py-3 text-right w-24">Payments</th>
+                          <th className="px-3 py-3 text-right w-24">Receipts</th>
+                          <th className="px-3 py-3 text-right w-24">Balance</th>
+                          <th className="px-3 py-3 w-32">Type</th>
+                          <th className="px-3 py-3 min-w-[150px]">Property</th>
+                          <th className="px-3 py-3 min-w-[140px]">Category</th>
+                          <th className="px-3 py-3 w-28">Status</th>
+                          <th className="px-3 py-3 text-center w-12">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
@@ -1071,6 +1187,11 @@ export function StatementImportPage({ selectedCompany }) {
                                 />
                               </td>
 
+                              {/* Row Index */}
+                              <td className="px-2 py-3 text-slate-400 font-mono text-[11px]">
+                                #{row.excelRowNumber || row.rowIndex}
+                              </td>
+
                               {/* Date */}
                               <td className="px-3 py-3 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                                 {row.transactionDate ? formatUKDate(row.transactionDate) : '—'}
@@ -1078,11 +1199,11 @@ export function StatementImportPage({ selectedCompany }) {
 
                               {/* Narrative & Original Description */}
                               <td className="px-3 py-3 max-w-sm">
-                                <div className="font-bold text-slate-900 dark:text-white truncate">
+                                <div className="font-bold text-slate-900 dark:text-white truncate" title={row.description}>
                                   {row.description}
                                 </div>
                                 {row.originalNarrative && row.originalNarrative !== row.description && (
-                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate" title={row.originalNarrative}>
                                     {row.originalNarrative}
                                   </div>
                                 )}
@@ -1093,18 +1214,33 @@ export function StatementImportPage({ selectedCompany }) {
                                 )}
                               </td>
 
-                              {/* Amount (In/Out) */}
-                              <td className="px-3 py-3 text-right whitespace-nowrap">
-                                <span
-                                  className={`font-mono text-sm font-extrabold ${
-                                    row.direction === 'IN'
-                                      ? 'text-emerald-600 dark:text-emerald-400'
-                                      : 'text-rose-600 dark:text-rose-400'
-                                  }`}
-                                >
-                                  {row.direction === 'IN' ? '+' : '-'}
-                                  {formatGBP(row.amount)}
+                              {/* Head */}
+                              <td className="px-3 py-3 text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">
+                                <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold">
+                                  {row.head || '—'}
                                 </span>
+                              </td>
+
+                              {/* Sub Head */}
+                              <td className="px-3 py-3 text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
+                                <span className="text-[11px]">
+                                  {row.subHead || '—'}
+                                </span>
+                              </td>
+
+                              {/* Payments (Debit/Out) */}
+                              <td className="px-3 py-3 text-right font-mono text-rose-600 dark:text-rose-400 font-semibold whitespace-nowrap">
+                                {row.direction === 'OUT' ? formatGBP(row.amount) : '—'}
+                              </td>
+
+                              {/* Receipts (Credit/In) */}
+                              <td className="px-3 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold whitespace-nowrap">
+                                {row.direction === 'IN' ? formatGBP(row.amount) : '—'}
+                              </td>
+
+                              {/* Statement Balance */}
+                              <td className="px-3 py-3 text-right font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                                {row.runningBalance !== null && row.runningBalance !== undefined ? formatGBP(row.runningBalance) : '—'}
                               </td>
 
                               {/* Classification Type Selector */}
@@ -1489,7 +1625,15 @@ export function StatementImportPage({ selectedCompany }) {
                             >
                               Review
                             </button>
-                            {b.status !== 'POSTED' && b.status !== 'CANCELLED' && (
+                            {b.postedRows > 0 && (
+                              <button
+                                onClick={() => handleReverseBatch(b._id)}
+                                className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 font-semibold hover:bg-amber-100 transition cursor-pointer"
+                              >
+                                Reverse
+                              </button>
+                            )}
+                            {b.status !== 'POSTED' && b.status !== 'CANCELLED' && b.postedRows === 0 && (
                               <button
                                 onClick={() => handleCancelBatch(b._id)}
                                 className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 font-semibold hover:bg-rose-100 transition cursor-pointer"

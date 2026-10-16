@@ -33,6 +33,14 @@ const statementImportBatchSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    sheetName: {
+      type: String,
+      default: '',
+    },
+    sheetsList: {
+      type: [String],
+      default: [],
+    },
     statementPeriodStart: {
       type: Date,
       default: null,

@@ -38,12 +38,26 @@ const statementImportRowSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    excelRowNumber: {
+      type: Number,
+      default: null,
+    },
     description: {
       type: String,
       default: 'Bank Movement',
       trim: true,
     },
     originalNarrative: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    head: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    subHead: {
       type: String,
       trim: true,
       default: '',

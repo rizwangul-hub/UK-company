@@ -12,7 +12,7 @@ import Mortgage from '../models/Mortgage.js';
 import RentSchedule from '../models/RentSchedule.js';
 import RentPayment from '../models/RentPayment.js';
 import MortgagePayment from '../models/MortgagePayment.js';
-import { postLedgerTransaction, round2 } from './ledgerService.js';
+import { postLedgerTransaction, deleteLedgerTransaction, round2 } from './ledgerService.js';
 
 /**
  * Tokenize string into alphanumeric search tokens for fuzzy matching
@@ -173,22 +173,36 @@ export const detectColumnMapping = (headerCells) => {
 /**
  * Parse an uploaded statement file buffer (Excel .xlsx/.xls or CSV)
  */
-export const parseStatementBuffer = async (fileBuffer, filename, customMapping = {}) => {
+export const parseStatementBuffer = async (fileBuffer, filename, customMapping = {}, options = {}) => {
   const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
   const isCSV = filename.toLowerCase().endsWith('.csv');
 
   let rawRows = [];
+  let sheetsList = [];
+  let sheetName = '';
 
   if (isCSV) {
     const text = fileBuffer.toString('utf8');
     rawRows = parseCSVRows(text);
+    sheetsList = ['CSV Data'];
+    sheetName = 'CSV Data';
   } else {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuffer);
-    const worksheet = workbook.worksheets.find((ws) => ws.rowCount > 0) || workbook.worksheets[0];
+    sheetsList = workbook.worksheets.map((ws) => ws.name);
+
+    let worksheet = null;
+    if (options.sheetName) {
+      worksheet = workbook.getWorksheet(options.sheetName);
+    }
+    if (!worksheet) {
+      worksheet = workbook.worksheets.find((ws) => ws.rowCount > 0) || workbook.worksheets[0];
+    }
+
     if (!worksheet) {
       throw new Error('The uploaded Excel spreadsheet contains no visible worksheets or data.');
     }
+    sheetName = worksheet.name;
 
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       const rowValues = [];
@@ -356,6 +370,8 @@ export const parseStatementBuffer = async (fileBuffer, filename, customMapping =
   return {
     fileHash,
     fileSize: fileBuffer.length,
+    sheetsList,
+    sheetName,
     detectedHeaders,
     detectedMapping: activeMapping,
     openingBalance,
@@ -393,12 +409,18 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
   ]);
 
   // Known Category Heads Cache
-  const rentCategory = categories.find((c) => /rent/i.test(c.name)) || null;
+  const rentCategory = categories.find((c) => /rent.*income|^rental/i.test(c.name)) || categories.find((c) => /rent/i.test(c.name)) || null;
+  const storageCategory = categories.find((c) => /storage|parking/i.test(c.name)) || null;
   const bankChargesCategory = categories.find((c) => /bank.*charge/i.test(c.name)) || null;
   const repairsCategory = categories.find((c) => /repair|maintenance/i.test(c.name)) || null;
   const utilitiesCategory = categories.find((c) => /utilit|electric|water|gas|council/i.test(c.name)) || null;
   const adminCategory = categories.find((c) => /admin|office|general/i.test(c.name)) || null;
+  const insuranceCategory = categories.find((c) => /insurance/i.test(c.name)) || null;
+  const legalCategory = categories.find((c) => /legal|eviction|professional/i.test(c.name)) || null;
+  const managementCategory = categories.find((c) => /management|letting.*agent|commission/i.test(c.name)) || null;
   const mortgageInterestCategory = categories.find((c) => /mortgage.*interest|finance.*cost/i.test(c.name)) || null;
+  const mortgageFeesCategory = categories.find((c) => /mortgage.*fee|arrangement|valuation|broker/i.test(c.name)) || null;
+  const taxCategory = categories.find((c) => /tax/i.test(c.name)) || null;
 
   // Pre-tokenize entities once for 100x performance boost
   const preparedProps = properties.map((prop) => {
@@ -575,8 +597,13 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
 
     if (row.direction === 'IN' && isRentSignal) {
       suggestedType = 'RENT';
-      suggestedCategoryId = rentCategory ? rentCategory._id : null;
-      suggestedCategoryName = rentCategory ? rentCategory.name : 'Rental Income';
+      if (/storage/i.test(combinedSearchText) && storageCategory) {
+        suggestedCategoryId = storageCategory._id;
+        suggestedCategoryName = storageCategory.name;
+      } else {
+        suggestedCategoryId = rentCategory ? rentCategory._id : null;
+        suggestedCategoryName = rentCategory ? rentCategory.name : 'Rental Income';
+      }
       confidenceScore = matchedProperty ? 90 : 75;
       classificationReason = matchedProperty
         ? `Identified rental receipt matched to ${suggestedPropertyName}`
@@ -591,8 +618,13 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       classificationReason = 'Bank account servicing commission or service fee';
     } else if (row.direction === 'OUT' && isMortgageSignal) {
       suggestedType = 'MORTGAGE_PAYMENT';
-      suggestedCategoryId = mortgageInterestCategory ? mortgageInterestCategory._id : null;
-      suggestedCategoryName = mortgageInterestCategory ? mortgageInterestCategory.name : 'Mortgage Servicing';
+      if (/broker|valuation|arrangement|legal.*charge|fee/i.test(combinedSearchText) && mortgageFeesCategory) {
+        suggestedCategoryId = mortgageFeesCategory._id;
+        suggestedCategoryName = mortgageFeesCategory.name;
+      } else {
+        suggestedCategoryId = mortgageInterestCategory ? mortgageInterestCategory._id : null;
+        suggestedCategoryName = mortgageInterestCategory ? mortgageInterestCategory.name : 'Mortgage Servicing';
+      }
       if (matchedMortgage && matchedMortgage.propertyId) {
         suggestedPropertyId = matchedMortgage.propertyId._id || matchedMortgage.propertyId;
         suggestedPropertyName = matchedMortgage.propertyId.title || matchedMortgage.propertyId.addressLine1 || suggestedPropertyName;
@@ -619,6 +651,31 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
         classificationReason = matchedProperty
           ? `Property repair allocated to ${suggestedPropertyName}`
           : 'Property repair / contractor payment';
+      } else if (/electric|water|gas|power|utilities|bill/i.test(combinedSearchText)) {
+        suggestedCategoryId = utilitiesCategory ? utilitiesCategory._id : null;
+        suggestedCategoryName = utilitiesCategory ? utilitiesCategory.name : 'Utilities (Gas, Electric & Water)';
+        confidenceScore = matchedProperty ? 85 : 75;
+        classificationReason = 'Property utility service';
+      } else if (/insurance|deposit insurance/i.test(combinedSearchText)) {
+        suggestedCategoryId = insuranceCategory ? insuranceCategory._id : null;
+        suggestedCategoryName = insuranceCategory ? insuranceCategory.name : 'Landlord & Building Insurance';
+        confidenceScore = 85;
+        classificationReason = 'Building or tenancy deposit insurance';
+      } else if (/legal|solicitor|court|eviction|audit|accountan|companies house/i.test(combinedSearchText)) {
+        suggestedCategoryId = legalCategory ? legalCategory._id : null;
+        suggestedCategoryName = legalCategory ? legalCategory.name : 'Legal, Eviction & Professional Fees';
+        confidenceScore = 85;
+        classificationReason = 'Legal, statutory filing or professional fee';
+      } else if (/commission|management/i.test(combinedSearchText)) {
+        suggestedCategoryId = managementCategory ? managementCategory._id : null;
+        suggestedCategoryName = managementCategory ? managementCategory.name : 'Letting Agent & Management Fees';
+        confidenceScore = 85;
+        classificationReason = 'Letting management fee or agency commission';
+      } else if (/corporation tax|hmrc.*tax|tax payment/i.test(combinedSearchText)) {
+        suggestedCategoryId = taxCategory ? taxCategory._id : null;
+        suggestedCategoryName = taxCategory ? taxCategory.name : 'Taxation / Corporation Tax';
+        confidenceScore = 90;
+        classificationReason = 'HMRC Statutory Tax payment';
       } else if (/post|nisa|vision|subscription|software|tech|telecom/i.test(combinedSearchText)) {
         suggestedCategoryId = adminCategory ? adminCategory._id : null;
         suggestedCategoryName = adminCategory ? adminCategory.name : 'Administrative Expenses';
@@ -678,11 +735,12 @@ export const saveStatementBatch = async ({
   filename,
   fileBuffer,
   customMapping = {},
+  sheetName = null,
   userId = null,
   userName = 'System Operator',
   notes = '',
 }) => {
-  const parsed = await parseStatementBuffer(fileBuffer, filename, customMapping);
+  const parsed = await parseStatementBuffer(fileBuffer, filename, customMapping, { sheetName });
   const classifiedRows = await classifyAndMatchRows(companyId, accountId, parsed.parsedRows);
 
   const totalRows = classifiedRows.length;
@@ -700,6 +758,8 @@ export const saveStatementBatch = async ({
     filename,
     fileHash: parsed.fileHash,
     fileSize: parsed.fileSize,
+    sheetName: parsed.sheetName || '',
+    sheetsList: parsed.sheetsList || [],
     statementPeriodStart: parsed.statementPeriodStart,
     statementPeriodEnd: parsed.statementPeriodEnd,
     openingBalance: parsed.openingBalance,
@@ -723,6 +783,9 @@ export const saveStatementBatch = async ({
     batchId: batch._id,
     companyId,
     accountId,
+    excelRowNumber: r.rowIndex,
+    head: r.head || '',
+    subHead: r.subHead || '',
     transactionDate: r.transactionDate || new Date(),
     amount: r.amount > 0 ? r.amount : 0,
     suggestedPropertyId: r.suggestedPropertyId || null,
@@ -889,6 +952,69 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, userId = n
   return {
     success: true,
     postedCount,
+    failedCount: errors.length,
+    errors,
+    batchStatus: batch.status,
+  };
+};
+
+/**
+ * Reverse all posted transactions of an import batch using the authoritative soft-delete/void workflow
+ */
+export const reverseBatchTransactions = async ({ batchId, companyId, userId = null, userName = 'System Operator' }) => {
+  const batch = await StatementImportBatch.findOne({ _id: batchId, companyId });
+  if (!batch) throw new Error('Statement import batch not found in active company.');
+
+  const postedRows = await StatementImportRow.find({
+    batchId,
+    status: 'POSTED',
+    postedTransactionId: { $ne: null },
+  });
+
+  if (!postedRows.length) {
+    return {
+      success: true,
+      reversedCount: 0,
+      message: 'No posted transactions found to reverse for this batch.',
+    };
+  }
+
+  let reversedCount = 0;
+  const errors = [];
+
+  for (const row of postedRows) {
+    try {
+      await deleteLedgerTransaction({
+        transactionId: row.postedTransactionId,
+        companyId,
+        userId,
+        userName,
+        reason: `Batch Reversal for Statement Import #${batch._id} (${batch.filename})`,
+      });
+
+      // Reset staging row status so operator can review/re-edit
+      row.status = 'APPROVED';
+      row.postedTransactionId = null;
+      row.postedVoucherNo = null;
+      row.postedAt = null;
+      await row.save();
+
+      reversedCount++;
+    } catch (err) {
+      errors.push({ rowIndex: row.rowIndex, error: err.message });
+      row.validationErrors.push(`Reversal error: ${err.message}`);
+      await row.save();
+    }
+  }
+
+  const remainingPosted = await StatementImportRow.countDocuments({ batchId, status: 'POSTED' });
+  batch.postedRows = remainingPosted;
+  batch.status = remainingPosted === 0 ? 'DRAFT' : 'PARTIALLY_POSTED';
+  await batch.save();
+
+  return {
+    success: true,
+    reversedCount,
     failedCount: errors.length,
     errors,
     batchStatus: batch.status,

@@ -7,6 +7,7 @@ import {
   classifyAndMatchRows,
   saveStatementBatch,
   postBatchTransactions,
+  reverseBatchTransactions,
   getReconciliationReport,
 } from '../services/statementImportService.js';
 
@@ -40,7 +41,8 @@ export const previewStatement = async (req, res) => {
     }
 
     const customMapping = req.body.customMapping ? JSON.parse(req.body.customMapping) : {};
-    const parsed = await parseStatementBuffer(req.file.buffer, req.file.originalname, customMapping);
+    const sheetName = req.body.sheetName || null;
+    const parsed = await parseStatementBuffer(req.file.buffer, req.file.originalname, customMapping, { sheetName });
 
     // Check if duplicate file already uploaded
     const existingBatch = await StatementImportBatch.findOne({
@@ -54,6 +56,8 @@ export const previewStatement = async (req, res) => {
         filename: req.file.originalname,
         fileHash: parsed.fileHash,
         fileSize: parsed.fileSize,
+        sheetName: parsed.sheetName,
+        sheetsList: parsed.sheetsList,
         isDuplicateFile: !!existingBatch,
         existingBatchId: existingBatch?._id || null,
         existingBatchDate: existingBatch?.createdAt || null,
@@ -81,7 +85,7 @@ export const previewStatement = async (req, res) => {
 export const processStatementUpload = async (req, res) => {
   try {
     const companyId = req.companyId;
-    const { accountId, customMapping: rawMapping, notes } = req.body;
+    const { accountId, customMapping: rawMapping, sheetName, notes } = req.body;
 
     if (!companyId) {
       return res.status(400).json({ success: false, message: 'Company context is required.' });
@@ -114,6 +118,7 @@ export const processStatementUpload = async (req, res) => {
       filename: req.file.originalname,
       fileBuffer: req.file.buffer,
       customMapping,
+      sheetName: sheetName || null,
       userId: req.user?._id || null,
       userName: req.user?.name || 'System Operator',
       notes: notes || '',
@@ -356,6 +361,32 @@ export const cancelBatch = async (req, res) => {
       message: 'Statement batch cancelled successfully.',
     });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Reverse all posted transactions of an import batch
+ */
+export const reverseBatch = async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const { batchId } = req.params;
+
+    const result = await reverseBatchTransactions({
+      batchId,
+      companyId,
+      userId: req.user?._id || null,
+      userName: req.user?.name || 'System Operator',
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully reversed ${result.reversedCount} posted transactions from the Central Ledger.`,
+      data: result,
+    });
+  } catch (error) {
+    console.error('[Reverse Batch Error]:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
