@@ -90,7 +90,17 @@ async function loadCategoryMaps(companyId) {
 /**
  * Generates preview of backfill operations for unlinked or partially linked transactions
  */
-export async function previewBackfill(companyId) {
+export async function previewBackfill(companyIdOrOptions) {
+  const companyId =
+    typeof companyIdOrOptions === 'object' && companyIdOrOptions !== null
+      ? companyIdOrOptions.companyId
+      : companyIdOrOptions;
+
+  const limit =
+    typeof companyIdOrOptions === 'object' && companyIdOrOptions !== null && companyIdOrOptions.limit
+      ? companyIdOrOptions.limit
+      : null;
+
   const { headByName, subByNameAndHead, catById } = await loadCategoryMaps(companyId);
 
   const adminExpensesHead = headByName.get('admin expenses');
@@ -100,10 +110,15 @@ export async function previewBackfill(companyId) {
   const othersHead = headByName.get('others');
   const propertyPurchaseHead = headByName.get('property purchase');
 
-  const transactions = await Transaction.find({ companyId, isDeleted: { $ne: true } })
+  let query = Transaction.find({ companyId, isDeleted: { $ne: true } })
     .populate('propertyId', 'name addressLine1')
-    .sort({ transactionDate: -1 })
-    .lean();
+    .sort({ transactionDate: -1 });
+
+  if (limit && Number(limit) > 0) {
+    query = query.limit(Number(limit));
+  }
+
+  const transactions = await query.lean();
 
   const previewItems = [];
   let correctlyCategorizedCount = 0;
@@ -307,8 +322,10 @@ export async function previewBackfill(companyId) {
         currentSubHeadName: tx.subHead || '',
         suggestedHeadId: suggestedHead ? suggestedHead._id : null,
         suggestedHeadName: suggestedHead ? suggestedHead.name : '',
+        suggestedHead: suggestedHead ? suggestedHead.name : '',
         suggestedSubHeadId: suggestedSubHead ? suggestedSubHead._id : null,
         suggestedSubHeadName: suggestedSubHead ? suggestedSubHead.name : '',
+        suggestedSubHead: suggestedSubHead ? suggestedSubHead.name : '',
         status: 'SUGGESTED',
         confidence,
         ruleMatched,
@@ -344,21 +361,33 @@ export async function previewBackfill(companyId) {
     unclassifiedCount,
     invalidCount,
     previewItems,
+    rows: previewItems,
   };
 }
 
 /**
  * Applies backfill updates to transactions
  */
-export async function applyBackfill(companyId, itemOverrides = []) {
-  const { catById } = await loadCategoryMaps(companyId);
-
-  // If specific item overrides provided, apply those. Otherwise preview and apply all valid suggestions.
+export async function applyBackfill(companyIdOrOptions, itemOverrides = []) {
+  let companyId = companyIdOrOptions;
   let itemsToApply = [];
 
-  if (Array.isArray(itemOverrides) && itemOverrides.length > 0) {
+  if (typeof companyIdOrOptions === 'object' && companyIdOrOptions !== null) {
+    companyId = companyIdOrOptions.companyId;
+    if (Array.isArray(companyIdOrOptions.updates)) {
+      itemsToApply = companyIdOrOptions.updates;
+    } else if (Array.isArray(companyIdOrOptions.items)) {
+      itemsToApply = companyIdOrOptions.items;
+    } else if (Array.isArray(companyIdOrOptions.itemOverrides)) {
+      itemsToApply = companyIdOrOptions.itemOverrides;
+    }
+  } else if (Array.isArray(itemOverrides) && itemOverrides.length > 0) {
     itemsToApply = itemOverrides;
-  } else {
+  }
+
+  const { catById } = await loadCategoryMaps(companyId);
+
+  if (itemsToApply.length === 0) {
     const preview = await previewBackfill(companyId);
     itemsToApply = preview.previewItems.filter(
       (item) => item.status === 'SUGGESTED' || item.status === 'INVALID_RELATIONSHIP'
@@ -415,6 +444,7 @@ export async function applyBackfill(companyId, itemOverrides = []) {
   return {
     success: true,
     totalAttempted: itemsToApply.length,
+    updated: updatedCount,
     updatedCount,
     errors,
   };

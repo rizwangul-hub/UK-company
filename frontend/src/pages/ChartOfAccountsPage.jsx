@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import { ledgerAPI, accountsAPI, mortgagesAPI, propertiesAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
+import { HeadSubHeadHierarchyView } from '../components/HeadSubHeadHierarchyView.jsx';
+import { CategoryBackfillReviewView } from '../components/CategoryBackfillReviewView.jsx';
 import pixxLogo from '../assets/logo.png';
 
 // Standard UK Property Operational Heads for 1-Click Setup
@@ -727,6 +729,8 @@ export function ChartOfAccountsPage({ selectedCompany }) {
           {/* Segmented Tab Filter */}
           <div className="flex flex-wrap items-center gap-1.5">
             {[
+              { id: 'HIERARCHY', label: '★ Head & Sub Head Management', icon: FolderTree },
+              { id: 'BACKFILL', label: '★ Category Linker & Backfill', icon: Sparkles },
               { id: 'EXPENSE', label: '1. Expense Heads & Properties', count: expenseCategories.length, icon: Receipt },
               { id: 'LIQUIDITY', label: '2. Bank & Cash Accounts', count: accounts.length, icon: Landmark },
               { id: 'INCOME', label: '3. Other Income Heads', count: incomeCategories.length, icon: ArrowDownLeft },
@@ -783,6 +787,25 @@ export function ChartOfAccountsPage({ selectedCompany }) {
           </div>
         </div>
       </div>
+
+      {/* ===================================================================== */}
+      {/* TAB 0A: DEDICATED HEAD & SUB HEAD CATEGORY HIERARCHY MANAGEMENT        */}
+      {/* ===================================================================== */}
+      {activeTab === 'HIERARCHY' && (
+        <HeadSubHeadHierarchyView selectedCompany={selectedCompany} />
+      )}
+
+      {/* ===================================================================== */}
+      {/* TAB 0B: DEDICATED TRANSACTION LINKER & BACKFILL REVIEW SCREEN          */}
+      {/* ===================================================================== */}
+      {activeTab === 'BACKFILL' && (
+        <CategoryBackfillReviewView
+          selectedCompany={selectedCompany}
+          onBackfillApplied={() => {
+            loadData(true);
+          }}
+        />
+      )}
 
       {/* ===================================================================== */}
       {/* TAB 1: EXPENSE HEADS WITH PROPERTY & HIERARCHICAL ARRANGEMENT         */}

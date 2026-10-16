@@ -595,7 +595,42 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       /intra.*company|transfer|intral ft|loan return|director loan|dlr ft/i.test(combinedSearchText) ||
       (row.head && /loan/i.test(row.head));
 
-    if (row.direction === 'IN' && isRentSignal) {
+    // Direct Workbook Head / Sub Head Resolution
+    let workbookMatched = false;
+    if (row.head || row.subHead) {
+      const normHead = (row.head || '').toLowerCase().trim();
+      const normSub = (row.subHead || '').toLowerCase().trim();
+
+      const matchedCat = categories.find((c) => {
+        const cName = c.name.toLowerCase().trim();
+        if (normSub && cName === normSub) return true;
+        if (Array.isArray(c.aliases) && c.aliases.some((a) => a.toLowerCase().trim() === normHead || a.toLowerCase().trim() === normSub)) return true;
+        if (!normSub && normHead && cName === normHead) return true;
+        return false;
+      });
+
+      if (matchedCat) {
+        workbookMatched = true;
+        suggestedCategoryId = matchedCat._id;
+        suggestedCategoryName = matchedCat.name;
+        confidenceScore = 95;
+        classificationReason = `Matched statement workbook Head/Sub Head: "${row.head || ''}${row.subHead ? ` -> ${row.subHead}` : ''}"`;
+
+        if (matchedCat.type === 'INCOME') {
+          suggestedType = normSub === 'rent' || /rent/i.test(row.subHead) ? 'RENT' : 'INCOME';
+        } else if (matchedCat.type === 'FINANCE_COST' || /interest/i.test(normHead)) {
+          suggestedType = 'MORTGAGE_PAYMENT';
+        } else if (matchedCat.type === 'TRANSFER' || /loan|other/i.test(normHead)) {
+          suggestedType = 'TRANSFER';
+        } else {
+          suggestedType = 'EXPENSE';
+        }
+      }
+    }
+
+    if (workbookMatched) {
+      // Workbook explicitly classified
+    } else if (row.direction === 'IN' && isRentSignal) {
       suggestedType = 'RENT';
       if (/storage/i.test(combinedSearchText) && storageCategory) {
         suggestedCategoryId = storageCategory._id;
@@ -865,6 +900,8 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, userId = n
         accountId: batch.accountId,
         counterAccountId: row.suggestedCounterAccountId || null,
         categoryId: row.suggestedCategoryId || null,
+        head: row.head || '',
+        subHead: row.subHead || '',
         amount: row.amount,
         direction: row.direction,
         propertyId: row.suggestedPropertyId || null,

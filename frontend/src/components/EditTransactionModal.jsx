@@ -43,6 +43,8 @@ export function EditTransactionModal({
   const [accountId, setAccountId] = useState('');
   const [counterAccountId, setCounterAccountId] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [headId, setHeadId] = useState('');
+  const [subHeadId, setSubHeadId] = useState('');
   const [propertyId, setPropertyId] = useState('');
   const [payeePayer, setPayeePayer] = useState('');
 
@@ -73,9 +75,13 @@ export function EditTransactionModal({
     const counterAccId = tx.counterAccountId?._id || tx.counterAccountId || '';
     setCounterAccountId(counterAccId);
 
-    // Category ID
+    // Category / Head / Sub Head IDs
     const catId = tx.categoryId?._id || tx.categoryId || '';
     setCategoryId(catId);
+    const hId = tx.headId?._id || tx.headId || '';
+    setHeadId(hId);
+    const sId = tx.subHeadId?._id || tx.subHeadId || '';
+    setSubHeadId(sId);
 
     // Property ID
     const propId = tx.propertyId?._id || tx.propertyId || '';
@@ -125,6 +131,8 @@ export function EditTransactionModal({
             if (fullTx.accountId) setAccountId(fullTx.accountId._id || fullTx.accountId);
             if (fullTx.counterAccountId) setCounterAccountId(fullTx.counterAccountId._id || fullTx.counterAccountId);
             if (fullTx.categoryId) setCategoryId(fullTx.categoryId._id || fullTx.categoryId);
+            if (fullTx.headId) setHeadId(fullTx.headId._id || fullTx.headId);
+            if (fullTx.subHeadId) setSubHeadId(fullTx.subHeadId._id || fullTx.subHeadId);
             if (fullTx.propertyId) setPropertyId(fullTx.propertyId._id || fullTx.propertyId);
             if (fullTx.interestAmount !== undefined) setInterestAmount(String(fullTx.interestAmount));
             if (fullTx.principalAmount !== undefined) setPrincipalAmount(String(fullTx.principalAmount));
@@ -162,6 +170,46 @@ export function EditTransactionModal({
   const mortgageSplitTotal = numInterest + numPrincipal + numFee;
   const mortgageSplitDiff = Math.abs(numAmount - mortgageSplitTotal);
   const isMortgageSplitValid = !isMortgage || mortgageSplitDiff < 0.05;
+
+  const mainHeads = React.useMemo(() => {
+    return categories.filter((c) => c.isMainHead || (!c.parentCategoryId && !c.propertyId && !c.unitId));
+  }, [categories]);
+
+  const availableSubHeads = React.useMemo(() => {
+    if (!headId) {
+      return categories.filter((c) => c.parentCategoryId);
+    }
+    return categories.filter((c) => {
+      const pId = c.parentCategoryId?._id || c.parentCategoryId;
+      return pId && pId.toString() === headId.toString();
+    });
+  }, [categories, headId]);
+
+  const handleHeadChange = (newHeadId) => {
+    setHeadId(newHeadId);
+    if (subHeadId) {
+      const currentSub = categories.find((c) => c._id === subHeadId);
+      const parentId = (currentSub?.parentCategoryId?._id || currentSub?.parentCategoryId)?.toString();
+      if (parentId && parentId !== newHeadId) {
+        setSubHeadId('');
+        setCategoryId(newHeadId);
+      }
+    } else {
+      setCategoryId(newHeadId);
+    }
+  };
+
+  const handleSubHeadChange = (newSubHeadId) => {
+    setSubHeadId(newSubHeadId);
+    if (newSubHeadId) {
+      setCategoryId(newSubHeadId);
+      const sub = categories.find((c) => c._id === newSubHeadId);
+      const parentId = (sub?.parentCategoryId?._id || sub?.parentCategoryId)?.toString();
+      if (parentId) {
+        setHeadId(parentId);
+      }
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -201,14 +249,13 @@ export function EditTransactionModal({
       narration: narration.trim(),
       reference: reference.trim(),
       accountId,
+      headId: headId || null,
+      subHeadId: subHeadId || null,
+      categoryId: subHeadId || categoryId || headId || null,
     };
 
     if (isTransfer) {
       payload.counterAccountId = counterAccountId;
-    }
-
-    if (categoryId) {
-      payload.categoryId = categoryId;
     }
 
     if (propertyId) {
@@ -367,23 +414,54 @@ export function EditTransactionModal({
                 </select>
               </div>
             ) : (
-              <div>
-                <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Nominal Category</span>
-                </label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-medium focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="">-- Select Category --</option>
-                  {categories.map((cat) => (
-                    <option key={cat._id} value={cat._id}>
-                      {cat.name} ({cat.type})
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:col-span-2">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Main Head Category</span>
+                    </span>
+                    {headId && (
+                      <span className="text-[10px] text-indigo-400 font-semibold font-mono">Selected</span>
+                    )}
+                  </label>
+                  <select
+                    value={headId}
+                    onChange={(e) => handleHeadChange(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-medium focus:outline-none focus:border-indigo-500 cursor-pointer text-xs"
+                  >
+                    <option value="">-- Select Main Head --</option>
+                    {mainHeads.map((h) => (
+                      <option key={h._id} value={h._id}>
+                        {h.name} ({h.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Sub Head Category</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {availableSubHeads.length} available
+                    </span>
+                  </label>
+                  <select
+                    value={subHeadId}
+                    onChange={(e) => handleSubHeadChange(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 font-medium focus:outline-none focus:border-emerald-500 cursor-pointer text-xs"
+                  >
+                    <option value="">-- Select Sub Head --</option>
+                    {availableSubHeads.map((sub) => (
+                      <option key={sub._id} value={sub._id}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
           </div>

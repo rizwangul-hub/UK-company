@@ -271,6 +271,8 @@ export const queryEntityLedger = async (req, res) => {
           .populate('accountId', 'name bankName')
           .populate('counterAccountId', 'name bankName')
           .populate('categoryId', 'name type code')
+          .populate('headId', 'name')
+          .populate('subHeadId', 'name')
           .populate('propertyId', 'name postcode')
           .populate('unitId', 'unitName')
           .populate('mortgageId', 'lenderName accountReference')
@@ -294,7 +296,9 @@ export const queryEntityLedger = async (req, res) => {
             voucherNo: tx.voucherNo,
             detail: tx.narration,
             transactionType: tx.transactionType,
-            categoryName: tx.categoryId?.name || tx.transactionType,
+            head: tx.head || tx.headId?.name || '',
+            subHead: tx.subHead || tx.subHeadId?.name || '',
+            categoryName: tx.head && tx.subHead ? `${tx.head} · ${tx.subHead}` : (tx.subHead || tx.head || tx.categoryId?.name || tx.transactionType),
             drAccount: isInflow ? account.name : (tx.counterAccountId?.name || tx.categoryId?.name || 'Payee'),
             crAccount: !isInflow ? account.name : (tx.counterAccountId?.name || 'Receipt'),
             propertyName: tx.propertyId?.name || '',
@@ -649,6 +653,8 @@ export const queryEntityLedger = async (req, res) => {
         .populate('accountId', 'name')
         .populate('counterAccountId', 'name')
         .populate('categoryId', 'name')
+        .populate('headId', 'name')
+        .populate('subHeadId', 'name')
         .populate('propertyId', 'name')
         .populate('unitId', 'unitName')
         .lean();
@@ -669,7 +675,9 @@ export const queryEntityLedger = async (req, res) => {
           voucherNo: tx.voucherNo,
           detail: tx.narration,
           transactionType: tx.transactionType,
-          categoryName: tx.categoryId?.name || tx.transactionType,
+          head: tx.head || tx.headId?.name || '',
+          subHead: tx.subHead || tx.subHeadId?.name || '',
+          categoryName: tx.head && tx.subHead ? `${tx.head} · ${tx.subHead}` : (tx.subHead || tx.head || tx.categoryId?.name || tx.transactionType),
           drAccount: tx.accountId?.name || 'Account',
           crAccount: tx.counterAccountId?.name || (isDebit ? 'Income Revenue' : (tx.categoryId?.name || 'Outflow')),
           propertyName: tx.propertyId?.name || '',

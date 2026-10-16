@@ -820,9 +820,24 @@ export function LedgerPage({ selectedCompany }) {
                           )}
                         </td>
                         <td className="p-3 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700">
-                            {tx.categoryName || 'General'}
-                          </span>
+                          {tx.head || tx.subHead ? (
+                            <div className="flex flex-col gap-0.5">
+                              {tx.head && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-extrabold text-[10px] border border-indigo-200 dark:border-indigo-800/60 w-fit">
+                                  {tx.head}
+                                </span>
+                              )}
+                              {tx.subHead && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] border border-emerald-200 dark:border-emerald-800/60 w-fit">
+                                  &rarr; {tx.subHead}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700">
+                              {tx.categoryName || 'General'}
+                            </span>
+                          )}
                         </td>
                         <td className="p-3 whitespace-nowrap text-slate-600 dark:text-slate-400">
                           {tx.drAccount || '-'}

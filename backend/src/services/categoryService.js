@@ -193,13 +193,8 @@ export async function getCategoryHierarchy(companyId) {
   const unparentedCategories = [];
 
   for (const cat of allCategories) {
-    if (cat.isMainHead || (!cat.parentCategoryId && !cat.propertyId && !cat.unitId)) {
-      // Considered a Head if flagged as mainHead or top-level
-      if (cat.isMainHead || !cat.parentCategoryId) {
-        mainHeads.push(cat);
-      } else {
-        unparentedCategories.push(cat);
-      }
+    if (cat.isMainHead) {
+      mainHeads.push(cat);
     } else if (cat.parentCategoryId) {
       const pId = cat.parentCategoryId.toString();
       if (!subHeadsByParent.has(pId)) {
@@ -286,16 +281,18 @@ export async function createHeadCategory({ companyId, name, code, type, aliases 
 export async function createSubHeadCategory({
   companyId,
   headId,
+  parentCategoryId,
   name,
   code,
   type,
   isRentalHead = false,
 }) {
+  const targetHeadId = headId || parentCategoryId;
   const trimmedName = (name || '').trim();
   if (!trimmedName) throw new Error('Sub Head category name is required.');
-  if (!headId) throw new Error('Parent Head is required for Sub Head.');
+  if (!targetHeadId) throw new Error('Parent Head is required for Sub Head.');
 
-  const headDoc = await Category.findOne({ _id: headId, companyId });
+  const headDoc = await Category.findOne({ _id: targetHeadId, companyId });
   if (!headDoc) {
     throw new Error('Parent Head category not found in active company.');
   }
@@ -412,22 +409,13 @@ export async function deleteCategoryHierarchy({ companyId, categoryId }) {
     );
   }
 
-  // If Main Head, check if child subheads exist and if any child is used
+  // If Main Head, prevent deletion if it still contains child Sub Heads
   if (category.isMainHead || !category.parentCategoryId) {
-    const childCategories = await Category.find({ companyId, parentCategoryId: category._id });
-    if (childCategories.length > 0) {
-      const childIds = childCategories.map((c) => c._id);
-      const childTxCount = await Transaction.countDocuments({
-        companyId,
-        $or: [{ subHeadId: { $in: childIds } }, { categoryId: { $in: childIds } }],
-      });
-      if (childTxCount > 0) {
-        throw new Error(
-          `Cannot delete Head "${category.name}" because its child Sub Heads are linked to ${childTxCount} transaction(s).`
-        );
-      }
-      // If no transactions in children, delete children first
-      await Category.deleteMany({ companyId, parentCategoryId: category._id });
+    const childCount = await Category.countDocuments({ companyId, parentCategoryId: category._id });
+    if (childCount > 0) {
+      throw new Error(
+        `Cannot delete Head "${category.name}" because it still contains ${childCount} Sub Head(s). Please delete or move the Sub Heads first.`
+      );
     }
   }
 

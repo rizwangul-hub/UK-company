@@ -387,6 +387,8 @@ export const buildLedgerReportData = async (filters = {}) => {
     .populate('accountId', 'name bankName accountType sortCode accountNumber')
     .populate('counterAccountId', 'name bankName accountType sortCode accountNumber')
     .populate('categoryId', 'name type code isRentalHead isAllowableTaxDeduction')
+    .populate('headId', 'name type code')
+    .populate('subHeadId', 'name type code')
     .populate('propertyId', 'name postcode addressLine1 city')
     .populate('unitId', 'unitName unitType')
     .populate('mortgageId', 'lenderName accountReference outstandingPrincipalBalance')
@@ -482,7 +484,9 @@ export const buildLedgerReportData = async (filters = {}) => {
       reference: tx.reference || '-',
       narration: tx.narration,
       transactionType: tx.transactionType,
-      categoryName: catName,
+      head: tx.head || tx.headId?.name || '',
+      subHead: tx.subHead || tx.subHeadId?.name || '',
+      categoryName: tx.head && tx.subHead ? `${tx.head} · ${tx.subHead}` : (tx.subHead || tx.head || catName),
       categoryCode: tx.categoryId?.code || '-',
       categoryType: catType,
       propertyName: tx.propertyId?.name || '-',

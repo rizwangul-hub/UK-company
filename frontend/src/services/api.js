@@ -462,16 +462,50 @@ export const ledgerAPI = {
   getCategories: async (params, config = {}) => {
     return cachedGet('/ledger/categories', { params, ...config });
   },
+  getCategoryHierarchy: async (params, config = {}) => {
+    return cachedGet('/ledger/categories/hierarchy', { params, ...config });
+  },
+  createHeadCategory: async (data) => {
+    const res = await api.post('/ledger/categories/heads', data);
+    clearApiCache();
+    return res.data;
+  },
+  createSubHeadCategory: async (data) => {
+    const res = await api.post('/ledger/categories/subheads', data);
+    clearApiCache();
+    return res.data;
+  },
+  updateCategoryHierarchy: async (id, data) => {
+    const res = await api.put(`/ledger/categories/${id}`, data);
+    clearApiCache();
+    return res.data;
+  },
+  deleteCategoryHierarchy: async (id) => {
+    const res = await api.delete(`/ledger/categories/${id}`);
+    clearApiCache();
+    return res.data;
+  },
+  previewCategoryBackfill: async (params, config = {}) => {
+    return cachedGet('/ledger/categories/backfill/preview', { params, ...config });
+  },
+  applyCategoryBackfill: async (data = {}) => {
+    const res = await api.post('/ledger/categories/backfill/apply', data);
+    clearApiCache();
+    return res.data;
+  },
   createCategory: async (data) => {
     const res = await api.post('/ledger/categories', data);
+    clearApiCache();
     return res.data;
   },
   updateCategory: async (id, data) => {
     const res = await api.put(`/ledger/categories/${id}`, data);
+    clearApiCache();
     return res.data;
   },
   deleteCategory: async (id) => {
     const res = await api.delete(`/ledger/categories/${id}`);
+    clearApiCache();
     return res.data;
   },
   uploadReceipt: async (formData) => {
