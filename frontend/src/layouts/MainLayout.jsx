@@ -20,6 +20,7 @@ import {
   ListTree,
   Sparkles,
   Trash2,
+  FileUp,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import pixxLogo from '../assets/logo.png';
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { id: 'rent', label: 'Rent Invoicing', icon: Receipt },
   { id: 'mortgages', label: 'Mortgage Facilities', icon: Landmark, badge: 'UK' },
   { id: 'accounts', label: 'Bank Accounts', icon: CreditCard },
+  { id: 'statement-import', label: 'Bank Statement Import', icon: FileUp, badge: 'IMPORT' },
   { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: ListTree, badge: 'COA' },
   { id: 'ledger', label: 'Central Ledger', icon: Layers },
   { id: 'reports', label: 'Financial Reports', icon: FileSpreadsheet },

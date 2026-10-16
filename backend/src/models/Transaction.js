@@ -132,6 +132,26 @@ const transactionSchema = new mongoose.Schema(
       default: 'POSTED',
       index: true,
     },
+    importBatchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'StatementImportBatch',
+      default: null,
+      index: true,
+    },
+    statementRef: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    reconciled: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    reconciledAt: {
+      type: Date,
+      default: null,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

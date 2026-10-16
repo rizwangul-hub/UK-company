@@ -19,6 +19,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import applianceRoutes from './routes/applianceRoutes.js';
 import complianceRoutes from './routes/complianceRoutes.js';
 import propertyChargeRoutes from './routes/propertyChargeRoutes.js';
+import statementImportRoutes from './routes/statementImportRoutes.js';
 
 // Configure UK Cloudinary if credentials are present in UK .env
 configureCloudinary();
@@ -187,6 +188,7 @@ app.use('/api/ledger', ledgerRoutes);
 app.use('/api/appliances', applianceRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api/property-charges', propertyChargeRoutes);
+app.use('/api/statement-import', statementImportRoutes);
 app.use('/api', tenancyRoutes); // exposes /api/tenants and /api/tenancies
 
 // 404 Handler

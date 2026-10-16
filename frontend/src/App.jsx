@@ -17,6 +17,7 @@ import { DataEntryPage } from './pages/DataEntryPage.jsx';
 import { ChartOfAccountsPage } from './pages/ChartOfAccountsPage.jsx';
 import { GroupPortfolioDashboard } from './pages/GroupPortfolioDashboard.jsx';
 import { RecycleBinPage } from './pages/RecycleBinPage.jsx';
+import { StatementImportPage } from './pages/StatementImportPage.jsx';
 import { authAPI, clearApiCache } from './services/api.js';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { PWAInstallBanner } from './components/PWAInstallBanner.jsx';
@@ -367,6 +368,7 @@ export function App() {
           {currentView === 'rent' && <RentManagerPage selectedCompany={selectedCompany} />}
           {currentView === 'mortgages' && <MortgagesPage selectedCompany={selectedCompany} />}
           {currentView === 'accounts' && <AccountsPage selectedCompany={selectedCompany} />}
+          {currentView === 'statement-import' && <StatementImportPage selectedCompany={selectedCompany} />}
           {currentView === 'chart-of-accounts' && <ChartOfAccountsPage selectedCompany={selectedCompany} />}
           {currentView === 'ledger' && <LedgerPage selectedCompany={selectedCompany} />}
           {currentView === 'reports' && <ReportsPage selectedCompany={selectedCompany} />}

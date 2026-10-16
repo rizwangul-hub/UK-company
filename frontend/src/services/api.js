@@ -752,6 +752,46 @@ export const propertyChargesAPI = {
   },
 };
 
+export const statementImportAPI = {
+  previewStatement: async (formData) => {
+    const res = await api.post('/statement-import/parse-preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  processBatch: async (formData) => {
+    const res = await api.post('/statement-import/process-batch', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  getBatches: async (config = {}) => {
+    return cachedGet('/statement-import/batches', config);
+  },
+  getBatchById: async (id, params = {}, config = {}) => {
+    return cachedGet(`/statement-import/batches/${id}`, { params, ...config });
+  },
+  updateBatchRow: async (batchId, rowId, data) => {
+    const res = await api.put(`/statement-import/batches/${batchId}/rows/${rowId}`, data);
+    return res.data;
+  },
+  bulkUpdateRows: async (batchId, data) => {
+    const res = await api.put(`/statement-import/batches/${batchId}/rows`, data);
+    return res.data;
+  },
+  postBatch: async (batchId, data = {}) => {
+    const res = await api.post(`/statement-import/batches/${batchId}/post`, data);
+    return res.data;
+  },
+  cancelBatch: async (batchId) => {
+    const res = await api.post(`/statement-import/batches/${batchId}/cancel`);
+    return res.data;
+  },
+  getReconciliation: async (params, config = {}) => {
+    return cachedGet('/statement-import/reconciliation', { params, ...config });
+  },
+};
+
 export default api;
 
 
