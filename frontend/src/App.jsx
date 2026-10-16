@@ -56,7 +56,11 @@ const getInitialViewState = () => {
   const path = window.location.pathname;
   if (path.startsWith('/company/')) {
     const parts = path.replace(/^\/company\//, '').split('/');
-    return parts[1] || 'dashboard';
+    const rawView = parts[1] || 'dashboard';
+    if (rawView.startsWith('statement-impor') || rawView === 'import' || rawView === 'bank-statement-import') {
+      return 'statement-import';
+    }
+    return rawView;
   }
   return 'dashboard';
 };
@@ -108,7 +112,11 @@ export function App() {
     if (path.startsWith('/company/')) {
       const parts = path.replace(/^\/company\//, '').split('/');
       const slug = parts[0];
-      const view = parts[1] || 'dashboard';
+      const rawView = parts[1] || 'dashboard';
+      const view =
+        rawView.startsWith('statement-impor') || rawView === 'import' || rawView === 'bank-statement-import'
+          ? 'statement-import'
+          : rawView;
       const matchedCompany = getCompanyBySlug(slug);
 
       if (matchedCompany) {
@@ -374,6 +382,27 @@ export function App() {
           {currentView === 'reports' && <ReportsPage selectedCompany={selectedCompany} />}
           {currentView === 'recycle-bin' && <RecycleBinPage selectedCompany={selectedCompany} />}
           {currentView === 'settings' && <SettingsPage user={user} selectedCompany={selectedCompany} />}
+          {![
+            'dashboard',
+            'data-entry',
+            'properties',
+            'appliances',
+            'tenants',
+            'rent',
+            'mortgages',
+            'accounts',
+            'statement-import',
+            'chart-of-accounts',
+            'ledger',
+            'reports',
+            'recycle-bin',
+            'settings',
+          ].includes(currentView) && (
+            <DashboardPage
+              onNavigate={handleViewChange}
+              selectedCompany={selectedCompany}
+            />
+          )}
         </MainLayout>
       )}
 
