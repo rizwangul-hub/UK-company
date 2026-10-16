@@ -103,6 +103,17 @@ const propertyChargePaymentSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    status: {
+      type: String,
+      enum: ['POSTED', 'VOID'],
+      default: 'POSTED',
+      index: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,

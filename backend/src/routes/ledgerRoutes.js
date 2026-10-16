@@ -9,6 +9,11 @@ import {
   updateCategory,
   deleteCategory,
   updateTransaction,
+  deleteTransaction,
+  restoreTransaction,
+  getDeletedTransactions,
+  getTransactionAudit,
+  getTransactionById,
   getLedgerEntities,
   queryEntityLedger,
   uploadLedgerReceipt,
@@ -40,8 +45,16 @@ router.get('/export/excel', exportLedgerExcel);
 router.post('/export/excel', exportLedgerExcel);
 router.get('/export/pdf', exportLedgerPdf);
 router.post('/export/pdf', exportLedgerPdf);
+
+// Transaction Management & Recycle Bin
+router.get('/transactions/recycle-bin', getDeletedTransactions);
 router.get('/transactions', getTransactions);
+router.get('/transactions/:id', getTransactionById);
+router.get('/transactions/:id/audit', getTransactionAudit);
 router.put('/transactions/:id', updateTransaction);
+router.delete('/transactions/:id', deleteTransaction);
+router.post('/transactions/:id/restore', restoreTransaction);
+
 router.post('/expenses', recordExpense);
 router.post('/income', recordIncome);
 router.post('/upload-receipt', upload.single('file'), uploadLedgerReceipt);

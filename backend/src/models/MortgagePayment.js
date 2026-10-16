@@ -97,6 +97,17 @@ const mortgagePaymentSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    status: {
+      type: String,
+      enum: ['POSTED', 'VOID'],
+      default: 'POSTED',
+      index: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -117,6 +128,7 @@ mortgagePaymentSchema.pre('validate', function () {
 
 mortgagePaymentSchema.index({ companyId: 1, mortgageId: 1 });
 mortgagePaymentSchema.index({ companyId: 1, paymentDate: 1 });
+mortgagePaymentSchema.index({ companyId: 1, isDeleted: 1, paymentDate: -1 });
 
 export const MortgagePayment = mongoose.model('MortgagePayment', mortgagePaymentSchema);
 export default MortgagePayment;

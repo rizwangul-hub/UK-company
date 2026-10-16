@@ -105,6 +105,17 @@ const rentPaymentSchema = new mongoose.Schema(
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
+    status: {
+      type: String,
+      enum: ['POSTED', 'VOID'],
+      default: 'POSTED',
+      index: true,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -114,6 +125,7 @@ const rentPaymentSchema = new mongoose.Schema(
 rentPaymentSchema.index({ companyId: 1, receiptRef: 1 }, { unique: true });
 rentPaymentSchema.index({ companyId: 1, paymentDate: 1 });
 rentPaymentSchema.index({ companyId: 1, propertyId: 1 });
+rentPaymentSchema.index({ companyId: 1, isDeleted: 1, paymentDate: -1 });
 
 export const RentPayment = mongoose.model('RentPayment', rentPaymentSchema);
 export default RentPayment;

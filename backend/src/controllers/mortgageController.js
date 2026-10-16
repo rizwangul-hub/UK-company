@@ -54,7 +54,12 @@ export const getMortgageById = async (req, res) => {
 
     if (!mortgage) return apiError(res, 'Mortgage not found', 404);
 
-    const payments = await MortgagePayment.find({ mortgageId: mortgage._id, companyId: req.companyId })
+    const payments = await MortgagePayment.find({
+      mortgageId: mortgage._id,
+      companyId: req.companyId,
+      status: { $ne: 'VOID' },
+      isDeleted: { $ne: true },
+    })
       .populate('paymentAccountId', 'name sortCode accountNumber')
       .sort({ paymentDate: -1 })
       .lean();
@@ -152,8 +157,14 @@ export const postMortgagePayment = async (req, res) => {
 
 export const getMortgagePayments = async (req, res) => {
   try {
-    const payments = await MortgagePayment.find({ mortgageId: req.params.id, companyId: req.companyId })
+    const payments = await MortgagePayment.find({
+      mortgageId: req.params.id,
+      companyId: req.companyId,
+      status: { $ne: 'VOID' },
+      isDeleted: { $ne: true },
+    })
       .populate('paymentAccountId', 'name sortCode accountNumber')
+      .populate('transactionId')
       .sort({ paymentDate: -1 })
       .lean();
 

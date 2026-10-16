@@ -64,18 +64,21 @@ export const getDashboardStats = async (req, res) => {
       Transaction.find({
         companyId: req.companyId,
         status: 'POSTED',
+        isDeleted: { $ne: true },
         transactionType: 'EXPENSE',
         transactionDate: { $gte: startOfMonth, $lt: nextMonth },
       }).lean(),
       Transaction.find({
         companyId: req.companyId,
         status: 'POSTED',
+        isDeleted: { $ne: true },
         transactionType: 'INCOME',
         transactionDate: { $gte: startOfMonth, $lt: nextMonth },
       }).lean(),
       Transaction.find({
         companyId: req.companyId,
         status: 'POSTED',
+        isDeleted: { $ne: true },
       })
         .sort({ transactionDate: -1, createdAt: -1 })
         .limit(6)
@@ -93,6 +96,8 @@ export const getDashboardStats = async (req, res) => {
     // 4. Mortgage Payments in selected month
     const mortgagePayments = await MortgagePayment.find({
       companyId: req.companyId,
+      status: { $ne: 'VOID' },
+      isDeleted: { $ne: true },
       paymentDate: { $gte: startOfMonth, $lt: nextMonth },
     }).lean();
 
@@ -131,12 +136,14 @@ export const getDashboardStats = async (req, res) => {
           Transaction.find({
             companyId: req.companyId,
             status: 'POSTED',
+            isDeleted: { $ne: true },
             transactionType: 'EXPENSE',
             transactionDate: { $gte: mStart, $lt: mEnd },
           }).lean(),
           Transaction.find({
             companyId: req.companyId,
             status: 'POSTED',
+            isDeleted: { $ne: true },
             transactionType: 'INCOME',
             transactionDate: { $gte: mStart, $lt: mEnd },
           }).lean(),
@@ -197,7 +204,7 @@ export const getPropertyProfitability = async (req, res) => {
     if (startDate) dateFilter.$gte = new Date(startDate);
     if (endDate) dateFilter.$lte = new Date(endDate);
 
-    const txQuery = { companyId: req.companyId, status: 'POSTED' };
+    const txQuery = { companyId: req.companyId, status: 'POSTED', isDeleted: { $ne: true } };
     if (startDate || endDate) txQuery.transactionDate = dateFilter;
 
     const [txns, mortgages] = await Promise.all([

@@ -425,9 +425,26 @@ export const ledgerAPI = {
   getTransactions: async (params, config = {}) => {
     return cachedGet('/ledger/transactions', { params, ...config });
   },
+  getTransactionById: async (id, config = {}) => {
+    return cachedGet(`/ledger/transactions/${id}`, config);
+  },
   updateTransaction: async (id, data) => {
     const res = await api.put(`/ledger/transactions/${id}`, data);
     return res.data;
+  },
+  deleteTransaction: async (id, data = {}) => {
+    const res = await api.delete(`/ledger/transactions/${id}`, { data });
+    return res.data;
+  },
+  restoreTransaction: async (id, data = {}) => {
+    const res = await api.post(`/ledger/transactions/${id}/restore`, data);
+    return res.data;
+  },
+  getRecycleBin: async (params, config = {}) => {
+    return cachedGet('/ledger/transactions/recycle-bin', { params, ...config });
+  },
+  getTransactionAudit: async (id, config = {}) => {
+    return cachedGet(`/ledger/transactions/${id}/audit`, config);
   },
   recordExpense: async (data) => {
     const res = await api.post('/ledger/expenses', data);

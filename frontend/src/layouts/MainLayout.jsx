@@ -19,6 +19,7 @@ import {
   Code2,
   ListTree,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import pixxLogo from '../assets/logo.png';
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { id: 'chart-of-accounts', label: 'Chart of Accounts', icon: ListTree, badge: 'COA' },
   { id: 'ledger', label: 'Central Ledger', icon: Layers },
   { id: 'reports', label: 'Financial Reports', icon: FileSpreadsheet },
+  { id: 'recycle-bin', label: 'Recycle Bin', icon: Trash2, badge: 'VOID' },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 

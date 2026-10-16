@@ -172,7 +172,12 @@ export const buildLedgerReportData = async (filters = {}) => {
   // Base Transaction Query
   const query = {};
   if (companyId) query.companyId = companyId;
-  if (status && status !== 'ALL') query.status = status;
+  if (status && status !== 'ALL') {
+    query.status = status;
+  } else {
+    query.status = 'POSTED';
+    query.isDeleted = { $ne: true };
+  }
 
   // If specific records selected
   if (Array.isArray(selectedIds) && selectedIds.length > 0) {
@@ -283,6 +288,7 @@ export const buildLedgerReportData = async (filters = {}) => {
         if (periodStart) {
           const priorQuery = {
             status: 'POSTED',
+            isDeleted: { $ne: true },
             $or: [{ accountId: acc._id }, { counterAccountId: acc._id }],
             transactionDate: { $lt: periodStart },
           };

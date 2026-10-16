@@ -132,6 +132,64 @@ const transactionSchema = new mongoose.Schema(
       default: 'POSTED',
       index: true,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    deletionReason: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    restoredAt: {
+      type: Date,
+      default: null,
+    },
+    restoredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    auditHistory: [
+      {
+        action: {
+          type: String,
+          enum: ['CREATED', 'EDITED', 'DELETED', 'RESTORED', 'REVERSED'],
+          required: true,
+        },
+        performedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          default: null,
+        },
+        performedByName: {
+          type: String,
+          default: 'System Operator',
+        },
+        performedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        reason: {
+          type: String,
+          default: '',
+        },
+        changes: {
+          type: mongoose.Schema.Types.Mixed,
+          default: {},
+        },
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -149,6 +207,7 @@ transactionSchema.index({ companyId: 1, transactionDate: 1, propertyId: 1 });
 transactionSchema.index({ companyId: 1, transactionType: 1, transactionDate: 1 });
 transactionSchema.index({ companyId: 1, voucherNo: 1 });
 transactionSchema.index({ companyId: 1, status: 1 });
+transactionSchema.index({ companyId: 1, isDeleted: 1, transactionDate: -1 });
 
 export const Transaction = mongoose.model('Transaction', transactionSchema);
 export default Transaction;

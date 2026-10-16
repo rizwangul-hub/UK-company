@@ -10,7 +10,15 @@ import RentPayment from '../models/RentPayment.js';
 import Mortgage from '../models/Mortgage.js';
 import MortgagePayment from '../models/MortgagePayment.js';
 import Unit from '../models/Unit.js';
-import { postLedgerTransaction, round2 } from '../services/ledgerService.js';
+import {
+  postLedgerTransaction,
+  deleteLedgerTransaction,
+  restoreLedgerTransaction,
+  updateComprehensiveTransaction,
+  getRecycleBinTransactions,
+  getTransactionAuditHistory,
+  round2,
+} from '../services/ledgerService.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
 import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 
@@ -215,6 +223,7 @@ export const queryEntityLedger = async (req, res) => {
           const priorTxs = await Transaction.find({
             companyId: req.companyId,
             status: 'POSTED',
+            isDeleted: { $ne: true },
             $or: [{ accountId: effectiveId }, { counterAccountId: effectiveId }],
             transactionDate: { $lt: periodStart },
           }).lean();
@@ -234,6 +243,7 @@ export const queryEntityLedger = async (req, res) => {
         const txQuery = {
           companyId: req.companyId,
           status: 'POSTED',
+          isDeleted: { $ne: true },
           $or: [{ accountId: effectiveId }, { counterAccountId: effectiveId }],
         };
         if (periodStart && periodEnd) txQuery.transactionDate = { $gte: periodStart, $lte: periodEnd };
@@ -315,6 +325,7 @@ export const queryEntityLedger = async (req, res) => {
         const txQuery = {
           companyId: req.companyId,
           status: 'POSTED',
+          isDeleted: { $ne: true },
           propertyId: effectivePropId,
         };
         if (periodStart && periodEnd) txQuery.transactionDate = { $gte: periodStart, $lte: periodEnd };
@@ -391,7 +402,7 @@ export const queryEntityLedger = async (req, res) => {
 
         const [schedules, payments] = await Promise.all([
           RentSchedule.find({ companyId: req.companyId, tenantId: effectiveTenantId }).populate('propertyId', 'name').populate('unitId', 'unitName').lean(),
-          RentPayment.find({ companyId: req.companyId, tenantId: effectiveTenantId }).populate('propertyId', 'name').populate('receivingAccountId', 'name').lean(),
+          RentPayment.find({ companyId: req.companyId, tenantId: effectiveTenantId, status: { $ne: 'VOID' }, isDeleted: { $ne: true } }).populate('propertyId', 'name').populate('receivingAccountId', 'name').lean(),
         ]);
 
         const combined = [];
@@ -478,7 +489,12 @@ export const queryEntityLedger = async (req, res) => {
         ledgerTitle = `Mortgage Ledger: ${mortgage.lenderName} (${mortgage.accountReference})`;
         entitySubtext = `Property: ${mortgage.propertyId?.name || 'N/A'} · Rate: ${mortgage.interestRate}% · Type: ${mortgage.repaymentType}`;
 
-        const payments = await MortgagePayment.find({ companyId: req.companyId, mortgageId: effectiveMortgageId })
+        const payments = await MortgagePayment.find({
+          companyId: req.companyId,
+          mortgageId: effectiveMortgageId,
+          status: { $ne: 'VOID' },
+          isDeleted: { $ne: true },
+        })
           .sort({ paymentDate: 1, createdAt: 1 })
           .populate('paymentAccountId', 'name')
           .lean();
@@ -531,6 +547,7 @@ export const queryEntityLedger = async (req, res) => {
       const txQuery = {
         companyId: req.companyId,
         status: 'POSTED',
+        isDeleted: { $ne: true },
         transactionType: 'EXPENSE',
       };
       if (cat) txQuery.categoryId = cat._id;
@@ -591,7 +608,7 @@ export const queryEntityLedger = async (req, res) => {
 
       entitySubtext = 'Official Double-Entry Transaction Ledger';
 
-      const txQuery = { companyId: req.companyId, status: 'POSTED' };
+      const txQuery = { companyId: req.companyId, status: 'POSTED', isDeleted: { $ne: true } };
       if (type === 'RENT') {
         txQuery.transactionType = 'INCOME';
         txQuery.periodMonth = { $exists: true };
@@ -684,8 +701,13 @@ export const queryEntityLedger = async (req, res) => {
 
 export const getTransactions = async (req, res) => {
   try {
-    const { propertyId, categoryId, accountId, type, startDate, endDate, search } = req.query;
-    const query = { companyId: req.companyId, status: 'POSTED' };
+    const { propertyId, categoryId, accountId, type, startDate, endDate, search, includeDeleted } = req.query;
+    const query = { companyId: req.companyId };
+
+    if (includeDeleted !== 'true') {
+      query.status = 'POSTED';
+      query.isDeleted = { $ne: true };
+    }
 
     if (propertyId) query.propertyId = propertyId;
     if (categoryId) query.categoryId = categoryId;
@@ -980,113 +1002,137 @@ export const deleteCategory = async (req, res) => {
 export const updateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      amount,
-      narration,
-      reference,
-      transactionDate,
-      categoryId,
-      accountId,
-      propertyId,
-      unitId,
-    } = req.body;
+    const updateData = req.body;
+    const reason = req.body.reason || req.body.editReason || 'Updated via Ledger';
 
-    const transaction = await Transaction.findOne({ _id: id, companyId: req.companyId });
-    if (!transaction) return apiError(res, 'Transaction not found in active company', 404);
+    const transaction = await updateComprehensiveTransaction({
+      transactionId: id,
+      companyId: req.companyId,
+      updateData,
+      userId: req.user?._id || req.user?.id,
+      userName: req.user?.name || 'System Operator',
+      reason,
+    });
 
-    const oldAmount = transaction.amount;
-    const newAmount = amount !== undefined ? round2(amount) : oldAmount;
-    if (newAmount <= 0) {
-      return apiError(res, 'Amount must be greater than 0', 400);
-    }
+    const populatedTx = await Transaction.findOne({ _id: transaction._id, companyId: req.companyId })
+      .populate('accountId', 'name sortCode accountNumber accountType')
+      .populate('counterAccountId', 'name sortCode accountNumber')
+      .populate('categoryId', 'name type code')
+      .populate('propertyId', 'name addressLine1 postcode')
+      .populate('unitId', 'unitName')
+      .populate('mortgageId', 'lenderName accountReference')
+      .lean();
 
-    const oldAccountId = transaction.accountId ? transaction.accountId.toString() : null;
-    const newAccountId = accountId ? accountId.toString() : oldAccountId;
-
-    // Handle bank balance adjustments
-    if (oldAccountId && newAccountId && oldAccountId !== newAccountId) {
-      // Revert from old account
-      const oldAcc = await Account.findOne({ _id: oldAccountId, companyId: req.companyId });
-      if (oldAcc) {
-        if (transaction.direction === 'OUT') {
-          oldAcc.currentBalance = round2(oldAcc.currentBalance + oldAmount);
-        } else {
-          oldAcc.currentBalance = round2(oldAcc.currentBalance - oldAmount);
-        }
-        await oldAcc.save();
-      }
-
-      // Apply to new account
-      const newAcc = await Account.findOne({ _id: newAccountId, companyId: req.companyId });
-      if (newAcc) {
-        if (transaction.direction === 'OUT') {
-          newAcc.currentBalance = round2(newAcc.currentBalance - newAmount);
-        } else {
-          newAcc.currentBalance = round2(newAcc.currentBalance + newAmount);
-        }
-        await newAcc.save();
-      }
-      transaction.accountId = newAccountId;
-    } else if (oldAccountId && newAmount !== oldAmount) {
-      // Same account, adjusted amount
-      const delta = round2(newAmount - oldAmount);
-      const acc = await Account.findOne({ _id: oldAccountId, companyId: req.companyId });
-      if (acc) {
-        if (transaction.direction === 'OUT') {
-          acc.currentBalance = round2(acc.currentBalance - delta);
-        } else {
-          acc.currentBalance = round2(acc.currentBalance + delta);
-        }
-        await acc.save();
-      }
-    }
-
-    // Cross-company validation on relational references
-    if (categoryId) {
-      const cat = await Category.findOne({ _id: categoryId, companyId: req.companyId });
-      if (!cat) return apiError(res, 'Category Head not found in active company.', 400);
-    }
-    if (propertyId) {
-      const prop = await Property.findOne({ _id: propertyId, companyId: req.companyId });
-      if (!prop) return apiError(res, 'Property not found in active company.', 400);
-    }
-    if (unitId) {
-      const u = await Unit.findOne({ _id: unitId, companyId: req.companyId });
-      if (!u) return apiError(res, 'Unit not found in active company.', 400);
-    }
-
-    transaction.amount = newAmount;
-    if (narration !== undefined) transaction.narration = narration.trim();
-    if (reference !== undefined) transaction.reference = reference.trim();
-    if (transactionDate !== undefined) transaction.transactionDate = new Date(transactionDate);
-    if (categoryId !== undefined) transaction.categoryId = categoryId || null;
-    if (propertyId !== undefined) transaction.propertyId = propertyId || null;
-    if (unitId !== undefined) transaction.unitId = unitId || null;
-    if (req.body.receiptUrl !== undefined) transaction.receiptUrl = req.body.receiptUrl.trim();
-    if (req.body.receiptFilename !== undefined) transaction.receiptFilename = req.body.receiptFilename.trim();
-    if (Array.isArray(req.body.documents)) transaction.documents = req.body.documents;
-
-    await transaction.save();
-
-    // If associated voucher exists, update its totalAmount and description
-    if (transaction.voucherId) {
-      await Voucher.findOneAndUpdate(
-        { _id: transaction.voucherId, companyId: req.companyId },
-        {
-          totalAmount: newAmount,
-          description: transaction.narration,
-          reference: transaction.reference,
-          voucherDate: transaction.transactionDate,
-          receiptUrl: transaction.receiptUrl,
-          receiptFilename: transaction.receiptFilename,
-          documents: transaction.documents,
-        }
-      );
-    }
-
-    return apiSuccess(res, transaction, `Voucher / Transaction ${transaction.voucherNo} updated successfully`);
+    return apiSuccess(res, populatedTx, `Transaction ${transaction.voucherNo} updated and synchronized successfully.`);
   } catch (error) {
     return apiError(res, error.message || 'Failed to update transaction', 400, error);
+  }
+};
+
+export const deleteTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = '' } = req.body;
+
+    const voidedTx = await deleteLedgerTransaction({
+      transactionId: id,
+      companyId: req.companyId,
+      userId: req.user?._id || req.user?.id,
+      userName: req.user?.name || 'System Operator',
+      reason,
+    });
+
+    return apiSuccess(
+      res,
+      voidedTx,
+      `Transaction ${voidedTx.voucherNo} (£${voidedTx.amount.toFixed(2)}) voided and moved to Recycle Bin.`
+    );
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to delete transaction', 400, error);
+  }
+};
+
+export const restoreTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = '' } = req.body;
+
+    const restoredTx = await restoreLedgerTransaction({
+      transactionId: id,
+      companyId: req.companyId,
+      userId: req.user?._id || req.user?.id,
+      userName: req.user?.name || 'System Operator',
+      reason,
+    });
+
+    const populatedTx = await Transaction.findOne({ _id: restoredTx._id, companyId: req.companyId })
+      .populate('accountId', 'name sortCode accountNumber accountType')
+      .populate('counterAccountId', 'name sortCode accountNumber')
+      .populate('categoryId', 'name type code')
+      .populate('propertyId', 'name addressLine1 postcode')
+      .populate('unitId', 'unitName')
+      .populate('mortgageId', 'lenderName accountReference')
+      .lean();
+
+    return apiSuccess(
+      res,
+      populatedTx,
+      `Transaction ${restoredTx.voucherNo} (£${restoredTx.amount.toFixed(2)}) restored successfully.`
+    );
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to restore transaction', 400, error);
+  }
+};
+
+export const getDeletedTransactions = async (req, res) => {
+  try {
+    const transactions = await getRecycleBinTransactions({
+      companyId: req.companyId,
+      query: req.query,
+    });
+
+    return apiSuccess(res, {
+      transactions,
+      total: transactions.length,
+    });
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to fetch deleted transactions', 500, error);
+  }
+};
+
+export const getTransactionAudit = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const auditData = await getTransactionAuditHistory({
+      transactionId: id,
+      companyId: req.companyId,
+    });
+
+    return apiSuccess(res, auditData);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to fetch transaction audit history', 400, error);
+  }
+};
+
+export const getTransactionById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tx = await Transaction.findOne({ _id: id, companyId: req.companyId })
+      .populate('accountId', 'name sortCode accountNumber accountType currentBalance')
+      .populate('counterAccountId', 'name sortCode accountNumber currentBalance')
+      .populate('categoryId', 'name type code')
+      .populate('propertyId', 'name addressLine1 postcode')
+      .populate('unitId', 'unitName')
+      .populate('mortgageId', 'lenderName accountReference outstandingPrincipalBalance')
+      .lean();
+
+    if (!tx) {
+      return apiError(res, 'Transaction not found in active company', 404);
+    }
+
+    return apiSuccess(res, tx);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to fetch transaction', 500, error);
   }
 };
 

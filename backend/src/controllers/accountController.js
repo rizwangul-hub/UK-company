@@ -87,6 +87,7 @@ export const getAccountStatement = async (req, res) => {
     const query = {
       companyId: req.companyId,
       status: 'POSTED',
+      isDeleted: { $ne: true },
       $or: [{ accountId: id }, { counterAccountId: id }],
     };
     if (startDate || endDate) {

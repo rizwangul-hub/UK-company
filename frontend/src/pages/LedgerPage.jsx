@@ -31,11 +31,16 @@ import {
   Check,
   Paperclip,
   Sparkles,
+  Trash2,
+  History,
 } from 'lucide-react';
 import { ledgerAPI, accountsAPI, reportsAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import SingleVoucherPrintModal from '../components/SingleVoucherPrintModal.jsx';
 import ReportExportModal from '../components/ReportExportModal.jsx';
+import EditTransactionModal from '../components/EditTransactionModal.jsx';
+import DeleteConfirmModal from '../components/DeleteConfirmModal.jsx';
+import TransactionAuditModal from '../components/TransactionAuditModal.jsx';
 import pixxLogo from '../assets/logo.png';
 
 const LEDGER_TYPES = [
@@ -77,22 +82,14 @@ export function LedgerPage({ selectedCompany }) {
   // Active Voucher Modal
   const [activeVoucher, setActiveVoucher] = useState(null);
 
-  // Auxiliary data for Voucher editing
+  // Auxiliary data
   const [categoriesList, setCategoriesList] = useState([]);
   const [accountsList, setAccountsList] = useState([]);
 
-  // Edit Voucher Modal
-  const [editingVoucher, setEditingVoucher] = useState(null);
-  const [editVoucherSubmitting, setEditVoucherSubmitting] = useState(false);
-  const [editVoucherError, setEditVoucherError] = useState('');
-  const [editVoucherForm, setEditVoucherForm] = useState({
-    amount: '',
-    narration: '',
-    reference: '',
-    transactionDate: '',
-    categoryId: '',
-    accountId: '',
-  });
+  // Transaction Management Modals (Edit, Delete, Audit)
+  const [editModalTx, setEditModalTx] = useState(null);
+  const [deleteModalTx, setDeleteModalTx] = useState(null);
+  const [auditModalTx, setAuditModalTx] = useState(null);
 
   // Load all entities
   const loadEntities = async (force = false) => {
@@ -130,45 +127,6 @@ export function LedgerPage({ selectedCompany }) {
     loadEntities();
     loadAuxData();
   }, []);
-
-  const handleOpenEditVoucher = (tx) => {
-    setEditingVoucher(tx);
-    setEditVoucherError('');
-    setEditVoucherForm({
-      amount: String(tx.amount || tx.debit || tx.credit || ''),
-      narration: tx.detail || tx.narration || '',
-      reference: tx.reference || '',
-      transactionDate: tx.date ? new Date(tx.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-      categoryId: tx.categoryId || '',
-      accountId: tx.accountId || '',
-    });
-  };
-
-  const handleEditVoucherSubmit = async (e) => {
-    e.preventDefault();
-    if (!editingVoucher) return;
-    setEditVoucherSubmitting(true);
-    setEditVoucherError('');
-    try {
-      await ledgerAPI.updateTransaction(editingVoucher._id, {
-        amount: Number(editVoucherForm.amount) || 0,
-        narration: editVoucherForm.narration,
-        reference: editVoucherForm.reference,
-        transactionDate: editVoucherForm.transactionDate,
-        categoryId: editVoucherForm.categoryId || undefined,
-        accountId: editVoucherForm.accountId || undefined,
-      });
-      setEditingVoucher(null);
-      if (activeVoucher && activeVoucher._id === editingVoucher._id) {
-        setActiveVoucher(null);
-      }
-      fetchLedger();
-    } catch (err) {
-      setEditVoucherError(err.response?.data?.message || 'Failed to update voucher.');
-    } finally {
-      setEditVoucherSubmitting(false);
-    }
-  };
 
   // Determine selectable list based on ledgerType
   const getCurrentEntityList = () => {
@@ -902,13 +860,29 @@ export function LedgerPage({ selectedCompany }) {
                               <Eye size={13} />
                             </button>
                             {tx._id && !String(tx._id).startsWith('TENANT_ROW_') && (
-                              <button
-                                onClick={() => handleOpenEditVoucher(tx)}
-                                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-600 dark:text-slate-300 transition cursor-pointer"
-                                title="Edit Voucher"
-                              >
-                                <Edit3 size={13} />
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => setEditModalTx(tx)}
+                                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                                  title="Edit Transaction & Recalculate"
+                                >
+                                  <Edit3 size={13} />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteModalTx(tx)}
+                                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-600 hover:text-white text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                                  title="Void & Delete Transaction (Reverses Balance)"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                                <button
+                                  onClick={() => setAuditModalTx(tx)}
+                                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-600 dark:text-slate-300 transition cursor-pointer"
+                                  title="Inspect Audit History"
+                                >
+                                  <History size={13} />
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -931,161 +905,51 @@ export function LedgerPage({ selectedCompany }) {
           onClose={() => setActiveVoucher(null)}
           onEdit={
             activeVoucher._id && !String(activeVoucher._id).startsWith('TENANT_ROW_')
-              ? (v) => handleOpenEditVoucher(v)
+              ? (v) => {
+                  setActiveVoucher(null);
+                  setEditModalTx(v);
+                }
               : undefined
           }
         />
       )}
 
-      {/* Edit Voucher Modal */}
-      {editingVoucher && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-                  <Edit3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Edit Financial Voucher</h2>
-                  <p className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                    {editingVoucher.voucherNo}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setEditingVoucher(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* Transaction Edit Modal */}
+      {editModalTx && (
+        <EditTransactionModal
+          isOpen={Boolean(editModalTx)}
+          transaction={editModalTx}
+          onClose={() => setEditModalTx(null)}
+          onSuccess={() => {
+            setEditModalTx(null);
+            fetchLedger(false);
+            loadEntities(true);
+          }}
+        />
+      )}
 
-            {editVoucherError && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
-                {editVoucherError}
-              </div>
-            )}
+      {/* Transaction Void & Delete Modal */}
+      {deleteModalTx && (
+        <DeleteConfirmModal
+          isOpen={Boolean(deleteModalTx)}
+          transaction={deleteModalTx}
+          onClose={() => setDeleteModalTx(null)}
+          onSuccess={() => {
+            setDeleteModalTx(null);
+            fetchLedger(false);
+            loadEntities(true);
+          }}
+        />
+      )}
 
-            <form onSubmit={handleEditVoucherSubmit} className="mt-4 space-y-3.5 text-xs">
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                <label className="block text-emerald-600 dark:text-emerald-400 font-bold mb-1">
-                  Voucher Amount (£)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={editVoucherForm.amount}
-                  onChange={(e) => setEditVoucherForm({ ...editVoucherForm, amount: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-emerald-500/30 rounded-lg px-3 py-2 text-emerald-600 dark:text-emerald-300 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500"
-                />
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                  Account balance will be automatically adjusted based on amount difference.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
-                  Narration / Detail
-                </label>
-                <textarea
-                  rows="2"
-                  required
-                  value={editVoucherForm.narration}
-                  onChange={(e) => setEditVoucherForm({ ...editVoucherForm, narration: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
-                    Transaction Date
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={editVoucherForm.transactionDate}
-                    onChange={(e) => setEditVoucherForm({ ...editVoucherForm, transactionDate: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
-                    Reference / Invoice #
-                  </label>
-                  <input
-                    type="text"
-                    value={editVoucherForm.reference}
-                    onChange={(e) => setEditVoucherForm({ ...editVoucherForm, reference: e.target.value })}
-                    placeholder="INV-1234"
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              {categoriesList.length > 0 && (
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
-                    Nominal Category Head
-                  </label>
-                  <select
-                    value={editVoucherForm.categoryId}
-                    onChange={(e) => setEditVoucherForm({ ...editVoucherForm, categoryId: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">-- Keep Current Category --</option>
-                    {categoriesList.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.name} ({c.type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {accountsList.length > 0 && (
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
-                    Bank / Liquidity Account
-                  </label>
-                  <select
-                    value={editVoucherForm.accountId}
-                    onChange={(e) => setEditVoucherForm({ ...editVoucherForm, accountId: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
-                  >
-                    <option value="">-- Keep Current Bank Account --</option>
-                    {accountsList.map((a) => (
-                      <option key={a._id} value={a._id}>
-                        {a.name} ({a.bankName || a.accountType})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingVoucher(null)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editVoucherSubmitting}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {editVoucherSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Save Voucher Changes</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Transaction Audit Modal */}
+      {auditModalTx && (
+        <TransactionAuditModal
+          isOpen={Boolean(auditModalTx)}
+          transactionId={auditModalTx._id}
+          voucherNo={auditModalTx.voucherNo}
+          onClose={() => setAuditModalTx(null)}
+        />
       )}
 
       {/* Upgraded Multi-Scope Report & Pre-Export Preview Modal */}

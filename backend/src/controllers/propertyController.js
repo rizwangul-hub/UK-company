@@ -88,7 +88,7 @@ export const getPropertyById = async (req, res) => {
       Mortgage.find({ companyId: req.companyId, propertyId: property._id }).populate('paymentAccountId', 'name sortCode accountNumber').lean(),
       TenancyAgreement.findOne({ companyId: req.companyId, propertyId: property._id, status: 'ACTIVE' }).populate('tenantId', 'fullName email phone').lean(),
       RentSchedule.find({ companyId: req.companyId, propertyId: property._id }).sort({ billingMonth: -1 }).limit(12).lean(),
-      Transaction.find({ companyId: req.companyId, propertyId: property._id }).populate('accountId', 'name').populate('categoryId', 'name code').sort({ transactionDate: -1 }).limit(10).lean(),
+      Transaction.find({ companyId: req.companyId, propertyId: property._id, status: 'POSTED', isDeleted: { $ne: true } }).populate('accountId', 'name').populate('categoryId', 'name code').sort({ transactionDate: -1 }).limit(10).lean(),
       Appliance.find({ companyId: req.companyId, propertyId: property._id }).sort({ createdAt: -1 }).lean(),
     ]);
 

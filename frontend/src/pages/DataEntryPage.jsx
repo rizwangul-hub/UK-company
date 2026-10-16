@@ -22,6 +22,9 @@ import {
   ExternalLink,
   Paperclip,
   X,
+  Edit3,
+  Trash2,
+  History,
 } from 'lucide-react';
 import {
   accountsAPI,
@@ -34,6 +37,9 @@ import {
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import pixxLogo from '../assets/logo.png';
 import { ModalPortal } from '../components/ModalPortal.jsx';
+import EditTransactionModal from '../components/EditTransactionModal.jsx';
+import DeleteConfirmModal from '../components/DeleteConfirmModal.jsx';
+import TransactionAuditModal from '../components/TransactionAuditModal.jsx';
 
 // Reusable Receipt / Document Attachment Field
 function ReceiptUploadField({ file, setFile, label = "Upload Receipt / Document (Optional)", colorScheme = "indigo" }) {
@@ -204,6 +210,11 @@ export function DataEntryPage({ selectedCompany }) {
   const [attachModalFile, setAttachModalFile] = useState(null);
   const [attachModalUploading, setAttachModalUploading] = useState(false);
   const [attachModalError, setAttachModalError] = useState('');
+
+  // Transaction Management Modals (Edit, Delete, Audit)
+  const [editModalTx, setEditModalTx] = useState(null);
+  const [deleteModalTx, setDeleteModalTx] = useState(null);
+  const [auditModalTx, setAuditModalTx] = useState(null);
 
   // Helper to upload receipt file if selected
   const uploadReceiptIfPresent = async (file) => {
@@ -2013,12 +2024,13 @@ export function DataEntryPage({ selectedCompany }) {
                   <th className="py-2.5 px-3">Narration</th>
                   <th className="py-2.5 px-3 text-right">Amount</th>
                   <th className="py-2.5 px-3 text-center">Receipt</th>
+                  <th className="py-2.5 px-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {filteredRecent.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500 font-medium">
+                    <td colSpan={8} className="py-8 text-center text-slate-500 font-medium">
                       No matching transaction entries found.
                     </td>
                   </tr>
@@ -2097,6 +2109,34 @@ export function DataEntryPage({ selectedCompany }) {
                               title={tx.receiptUrl ? 'Replace or Manage Receipt' : 'Attach Receipt'}
                             >
                               <Paperclip className="w-3.5 h-3.5 text-indigo-400" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditModalTx(tx)}
+                              className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-amber-600 hover:text-white text-slate-400 transition cursor-pointer"
+                              title="Edit Transaction"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteModalTx(tx)}
+                              className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-600 hover:text-white text-slate-400 transition cursor-pointer"
+                              title="Void & Delete Transaction"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAuditModalTx(tx)}
+                              className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-indigo-600 hover:text-white text-slate-400 transition cursor-pointer"
+                              title="Inspect Audit History"
+                            >
+                              <History className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -2211,6 +2251,42 @@ export function DataEntryPage({ selectedCompany }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Transaction Edit Modal */}
+      {editModalTx && (
+        <EditTransactionModal
+          isOpen={Boolean(editModalTx)}
+          transaction={editModalTx}
+          onClose={() => setEditModalTx(null)}
+          onSuccess={() => {
+            setEditModalTx(null);
+            loadData(true);
+          }}
+        />
+      )}
+
+      {/* Transaction Void & Delete Modal */}
+      {deleteModalTx && (
+        <DeleteConfirmModal
+          isOpen={Boolean(deleteModalTx)}
+          transaction={deleteModalTx}
+          onClose={() => setDeleteModalTx(null)}
+          onSuccess={() => {
+            setDeleteModalTx(null);
+            loadData(true);
+          }}
+        />
+      )}
+
+      {/* Transaction Audit Modal */}
+      {auditModalTx && (
+        <TransactionAuditModal
+          isOpen={Boolean(auditModalTx)}
+          transactionId={auditModalTx._id}
+          voucherNo={auditModalTx.voucherNo}
+          onClose={() => setAuditModalTx(null)}
+        />
       )}
     </div>
   );

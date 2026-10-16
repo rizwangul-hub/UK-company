@@ -15,10 +15,16 @@ import {
   Loader2,
   RefreshCw,
   Clock,
+  History,
+  Edit3,
+  Trash2,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { mortgagesAPI, propertiesAPI, accountsAPI, getApiCache } from '../services/api.js';
 import { ModalPortal } from '../components/ModalPortal.jsx';
+import EditTransactionModal from '../components/EditTransactionModal.jsx';
+import DeleteConfirmModal from '../components/DeleteConfirmModal.jsx';
+import TransactionAuditModal from '../components/TransactionAuditModal.jsx';
 
 export function MortgagesPage({ selectedCompany }) {
   const cachedMortgages = getApiCache('/mortgages');
@@ -78,6 +84,39 @@ export function MortgagesPage({ selectedCompany }) {
     statementDate: new Date().toISOString().slice(0, 10),
     notes: '',
   });
+
+  // Payment History & Transaction Management
+  const [historyMortgage, setHistoryMortgage] = useState(null);
+  const [historyPayments, setHistoryPayments] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+
+  // Transaction Edit / Delete / Audit modals
+  const [editModalTx, setEditModalTx] = useState(null);
+  const [deleteModalTx, setDeleteModalTx] = useState(null);
+  const [auditModalTx, setAuditModalTx] = useState(null);
+
+  const fetchHistoryPayments = async (mortgageId) => {
+    setLoadingHistory(true);
+    setHistoryError('');
+    try {
+      const res = await mortgagesAPI.getPayments(mortgageId, {}, { forceRefresh: true });
+      if (res?.success) {
+        setHistoryPayments(res.data.payments || []);
+      } else {
+        setHistoryError(res?.message || 'Failed to load payments');
+      }
+    } catch (err) {
+      setHistoryError(err.response?.data?.message || err.message);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleOpenHistory = (mortgage) => {
+    setHistoryMortgage(mortgage);
+    fetchHistoryPayments(mortgage._id);
+  };
 
   const loadMortgages = async (force = false) => {
     if (mortgages.length === 0 || force) {
@@ -446,6 +485,14 @@ export function MortgagesPage({ selectedCompany }) {
                     title="Reconcile with lender statement"
                   >
                     Reconcile
+                  </button>
+                  <button
+                    onClick={() => handleOpenHistory(m)}
+                    className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition cursor-pointer flex items-center gap-1"
+                    title="View, edit, or void payment history"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>History</span>
                   </button>
                 </div>
               </div>
@@ -997,6 +1044,195 @@ export function MortgagesPage({ selectedCompany }) {
             </form>
           </div>
         </ModalPortal>
+      )}
+
+      {/* Modal: Mortgage Payment History */}
+      {historyMortgage && (
+        <ModalPortal isOpen={Boolean(historyMortgage)} onClose={() => setHistoryMortgage(null)}>
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-400">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>Payment Servicing History</span>
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/30">
+                      {historyMortgage.accountReference}
+                    </span>
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    {historyMortgage.lenderName} &bull; Outstanding Principal: <span className="text-rose-400 font-bold">{formatGBP(historyMortgage.outstandingPrincipalBalance)}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryMortgage(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar text-xs">
+              {loadingHistory ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                  <span>Loading payment records...</span>
+                </div>
+              ) : historyPayments.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+                  <Landmark className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+                  <p className="font-semibold text-slate-400">No payment records found for this facility</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Use the "Record Payment" button to log monthly servicing payments.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-slate-800 rounded-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
+                      <tr>
+                        <th className="py-2.5 px-3">Date</th>
+                        <th className="py-2.5 px-3">Paying Account</th>
+                        <th className="py-2.5 px-3 text-right">Total Paid (£)</th>
+                        <th className="py-2.5 px-3 text-right">Interest (£)</th>
+                        <th className="py-2.5 px-3 text-right">Principal (£)</th>
+                        <th className="py-2.5 px-3 text-right">Fee (£)</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-medium text-slate-300">
+                      {historyPayments.map((p) => {
+                        const tx = p.transactionId || {
+                          _id: p._id,
+                          voucherNo: p.paymentReference || 'MORTGAGE',
+                          transactionType: 'MORTGAGE_PAYMENT',
+                          amount: p.totalAmountPaid,
+                          interestAmount: p.interestAmount,
+                          principalAmount: p.principalAmount,
+                          feeAmount: p.feeAmount,
+                          transactionDate: p.paymentDate,
+                          accountId: p.paymentAccountId?._id || p.paymentAccountId,
+                          reference: p.paymentReference,
+                          narration: `Mortgage servicing payment - ${historyMortgage.lenderName}`,
+                        };
+
+                        return (
+                          <tr key={p._id} className="hover:bg-slate-800/40 transition">
+                            <td className="py-2.5 px-3 font-mono text-slate-200">
+                              {formatUKDate(p.paymentDate)}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-300">
+                              {p.paymentAccountId?.name || 'Bank Account'}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-100">
+                              {formatGBP(p.totalAmountPaid)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-amber-400">
+                              {formatGBP(p.interestAmount)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-emerald-400 font-bold">
+                              {formatGBP(p.principalAmount)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-slate-400">
+                              {formatGBP(p.feeAmount || 0)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                POSTED
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditModalTx(tx)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-amber-600 hover:text-white text-slate-400 transition cursor-pointer"
+                                  title="Edit Payment & Allocation"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteModalTx(tx)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 hover:text-white text-slate-400 transition cursor-pointer"
+                                  title="Void & Delete Payment (Restores Principal)"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAuditModalTx(tx)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 hover:text-white text-slate-400 transition cursor-pointer"
+                                  title="Inspect Audit History"
+                                >
+                                  <History className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setHistoryMortgage(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Transaction Edit Modal */}
+      {editModalTx && (
+        <EditTransactionModal
+          isOpen={Boolean(editModalTx)}
+          transaction={editModalTx}
+          onClose={() => setEditModalTx(null)}
+          onSuccess={() => {
+            setEditModalTx(null);
+            loadMortgages(true);
+            if (historyMortgage) fetchHistoryPayments(historyMortgage._id);
+          }}
+        />
+      )}
+
+      {/* Transaction Void & Delete Modal */}
+      {deleteModalTx && (
+        <DeleteConfirmModal
+          isOpen={Boolean(deleteModalTx)}
+          transaction={deleteModalTx}
+          onClose={() => setDeleteModalTx(null)}
+          onSuccess={() => {
+            setDeleteModalTx(null);
+            loadMortgages(true);
+            if (historyMortgage) fetchHistoryPayments(historyMortgage._id);
+          }}
+        />
+      )}
+
+      {/* Transaction Audit Modal */}
+      {auditModalTx && (
+        <TransactionAuditModal
+          isOpen={Boolean(auditModalTx)}
+          transactionId={auditModalTx._id}
+          voucherNo={auditModalTx.voucherNo}
+          onClose={() => setAuditModalTx(null)}
+        />
       )}
     </div>
   );
