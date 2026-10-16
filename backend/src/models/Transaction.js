@@ -59,6 +59,29 @@ const transactionSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    // Explicit Parent-Child Head & Sub Head hierarchy links
+    headId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+      index: true,
+    },
+    subHeadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      default: null,
+      index: true,
+    },
+    head: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    subHead: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     amount: {
       type: Number,
       required: [true, 'Transaction amount is required'],
@@ -228,6 +251,7 @@ transactionSchema.index({ companyId: 1, transactionType: 1, transactionDate: 1 }
 transactionSchema.index({ companyId: 1, voucherNo: 1 });
 transactionSchema.index({ companyId: 1, status: 1 });
 transactionSchema.index({ companyId: 1, isDeleted: 1, transactionDate: -1 });
+transactionSchema.index({ companyId: 1, headId: 1, subHeadId: 1 });
 
 export const Transaction = mongoose.model('Transaction', transactionSchema);
 export default Transaction;

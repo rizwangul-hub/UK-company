@@ -2,6 +2,7 @@ import Category from '../models/Category.js';
 import Account from '../models/Account.js';
 import { VALID_COMPANY_IDS, isValidCompanyId } from '../config/companies.js';
 import { seedDefaultPayees } from '../services/propertyChargeService.js';
+import { seedHeadsAndSubHeadsForCompany } from './seedHeadsAndSubHeads.js';
 
 export const STANDARD_UK_CATEGORIES = [
   // Rental & General Income
@@ -79,6 +80,11 @@ export const seedCompanyDefaults = async (companyId) => {
 
   // Seed default payees (e.g. Zircon Holdings Limited)
   await seedDefaultPayees(companyId).catch(() => {});
+
+  // Seed authoritative 6 Heads and Sub Heads hierarchy
+  await seedHeadsAndSubHeadsForCompany(companyId).catch((err) => {
+    console.warn(`Notice: seedHeadsAndSubHeadsForCompany (${companyId}):`, err.message);
+  });
 };
 
 /**

@@ -9,9 +9,9 @@ import Mortgage from '../models/Mortgage.js';
 import MortgagePayment from '../models/MortgagePayment.js';
 import PropertyDemand from '../models/PropertyDemand.js';
 import PropertyChargePayment from '../models/PropertyChargePayment.js';
-import Property from '../models/Property.js';
 import Category from '../models/Category.js';
 import Unit from '../models/Unit.js';
+import { resolveAndValidateCategoryHierarchy } from './categoryService.js';
 
 export const round2 = (num) => Math.round((Number(num) + Number.EPSILON) * 100) / 100;
 
@@ -105,6 +105,10 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
     accountId,
     counterAccountId = null,
     categoryId = null,
+    headId = null,
+    subHeadId = null,
+    head = '',
+    subHead = '',
     amount,
     direction = 'OUT',
     propertyId = null,
@@ -123,6 +127,16 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
   if (!companyId) {
     throw new Error('Company context is required for ledger transaction.');
   }
+
+  // Validate and resolve parent-child Head & Sub Head hierarchy
+  const resolvedCategory = await resolveAndValidateCategoryHierarchy({
+    companyId,
+    headId,
+    subHeadId,
+    head,
+    subHead,
+    categoryId,
+  });
 
   const numericAmount = round2(amount);
   if (numericAmount <= 0) {
@@ -231,7 +245,11 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
           transactionType,
           accountId,
           counterAccountId,
-          categoryId,
+          categoryId: resolvedCategory.categoryId,
+          headId: resolvedCategory.headId,
+          subHeadId: resolvedCategory.subHeadId,
+          head: resolvedCategory.head,
+          subHead: resolvedCategory.subHead,
           amount: numericAmount,
           direction,
           propertyId,
@@ -878,9 +896,43 @@ export const updateComprehensiveTransaction = async ({
     transaction.transactionDate = new Date(updateData.transactionDate);
     changes.transactionDate = { from: previousSnapshot.transactionDate, to: transaction.transactionDate };
   }
-  if (updateData.categoryId !== undefined) {
-    transaction.categoryId = updateData.categoryId || null;
-    changes.categoryId = { from: previousSnapshot.categoryId, to: transaction.categoryId };
+  if (
+    updateData.categoryId !== undefined ||
+    updateData.headId !== undefined ||
+    updateData.subHeadId !== undefined ||
+    updateData.head !== undefined ||
+    updateData.subHead !== undefined
+  ) {
+    const resolvedCategory = await resolveAndValidateCategoryHierarchy({
+      companyId,
+      headId: updateData.headId !== undefined ? updateData.headId : transaction.headId,
+      subHeadId: updateData.subHeadId !== undefined ? updateData.subHeadId : transaction.subHeadId,
+      head: updateData.head !== undefined ? updateData.head : transaction.head,
+      subHead: updateData.subHead !== undefined ? updateData.subHead : transaction.subHead,
+      categoryId: updateData.categoryId !== undefined ? updateData.categoryId : transaction.categoryId,
+    });
+
+    if (String(transaction.categoryId || '') !== String(resolvedCategory.categoryId || '')) {
+      changes.categoryId = { from: transaction.categoryId, to: resolvedCategory.categoryId };
+    }
+    if (String(transaction.headId || '') !== String(resolvedCategory.headId || '')) {
+      changes.headId = { from: transaction.headId, to: resolvedCategory.headId };
+    }
+    if (String(transaction.subHeadId || '') !== String(resolvedCategory.subHeadId || '')) {
+      changes.subHeadId = { from: transaction.subHeadId, to: resolvedCategory.subHeadId };
+    }
+    if (transaction.head !== resolvedCategory.head) {
+      changes.head = { from: transaction.head, to: resolvedCategory.head };
+    }
+    if (transaction.subHead !== resolvedCategory.subHead) {
+      changes.subHead = { from: transaction.subHead, to: resolvedCategory.subHead };
+    }
+
+    transaction.categoryId = resolvedCategory.categoryId;
+    transaction.headId = resolvedCategory.headId;
+    transaction.subHeadId = resolvedCategory.subHeadId;
+    transaction.head = resolvedCategory.head;
+    transaction.subHead = resolvedCategory.subHead;
   }
   if (updateData.propertyId !== undefined) {
     transaction.propertyId = updateData.propertyId || null;

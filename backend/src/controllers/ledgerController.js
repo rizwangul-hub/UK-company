@@ -19,6 +19,17 @@ import {
   getTransactionAuditHistory,
   round2,
 } from '../services/ledgerService.js';
+import {
+  getCategoryHierarchy,
+  createHeadCategory,
+  createSubHeadCategory,
+  updateCategoryHierarchy,
+  deleteCategoryHierarchy,
+} from '../services/categoryService.js';
+import {
+  previewBackfill,
+  applyBackfill,
+} from '../services/categoryBackfillService.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
 import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 
@@ -701,7 +712,18 @@ export const queryEntityLedger = async (req, res) => {
 
 export const getTransactions = async (req, res) => {
   try {
-    const { propertyId, categoryId, accountId, type, startDate, endDate, search, includeDeleted } = req.query;
+    const {
+      propertyId,
+      categoryId,
+      headId,
+      subHeadId,
+      accountId,
+      type,
+      startDate,
+      endDate,
+      search,
+      includeDeleted,
+    } = req.query;
     const query = { companyId: req.companyId };
 
     if (includeDeleted !== 'true') {
@@ -711,6 +733,8 @@ export const getTransactions = async (req, res) => {
 
     if (propertyId) query.propertyId = propertyId;
     if (categoryId) query.categoryId = categoryId;
+    if (headId) query.headId = headId;
+    if (subHeadId) query.subHeadId = subHeadId;
     if (accountId) query.$or = [{ accountId }, { counterAccountId: accountId }];
     if (type) query.transactionType = type;
 
@@ -725,6 +749,8 @@ export const getTransactions = async (req, res) => {
         { narration: { $regex: search, $options: 'i' } },
         { voucherNo: { $regex: search, $options: 'i' } },
         { reference: { $regex: search, $options: 'i' } },
+        { head: { $regex: search, $options: 'i' } },
+        { subHead: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -732,6 +758,8 @@ export const getTransactions = async (req, res) => {
       .populate('accountId', 'name sortCode accountNumber accountType')
       .populate('counterAccountId', 'name sortCode accountNumber')
       .populate('categoryId', 'name type code')
+      .populate('headId', 'name type code isMainHead')
+      .populate('subHeadId', 'name type code isRentalHead')
       .populate('propertyId', 'name addressLine1 postcode')
       .populate('unitId', 'unitName')
       .populate('mortgageId', 'lenderName accountReference')
@@ -751,6 +779,10 @@ export const recordExpense = async (req, res) => {
       transactionDate = new Date(),
       accountId,
       categoryId,
+      headId = null,
+      subHeadId = null,
+      head = '',
+      subHead = '',
       amount,
       propertyId = null,
       unitId = null,
@@ -763,16 +795,14 @@ export const recordExpense = async (req, res) => {
     } = req.body;
 
     const numAmount = round2(amount);
-    if (!accountId || !categoryId || numAmount <= 0 || !narration) {
+    const effectiveCatId = categoryId || subHeadId || headId;
+    if (!accountId || (!effectiveCatId && !head && !subHead) || numAmount <= 0 || !narration) {
       return apiError(res, 'Bank Account, Category Head, Amount (£), and Narration are required.', 400);
     }
 
-    // Verify account and category belong to active company
+    // Verify account belongs to active company
     const acc = await Account.findOne({ _id: accountId, companyId: req.companyId });
     if (!acc) return apiError(res, 'Bank Account not found in active company.', 400);
-
-    const cat = await Category.findOne({ _id: categoryId, companyId: req.companyId });
-    if (!cat) return apiError(res, 'Category Head not found in active company.', 400);
 
     if (propertyId) {
       const prop = await Property.findOne({ _id: propertyId, companyId: req.companyId });
@@ -788,7 +818,11 @@ export const recordExpense = async (req, res) => {
       transactionDate,
       transactionType: 'EXPENSE',
       accountId,
-      categoryId,
+      categoryId: effectiveCatId,
+      headId,
+      subHeadId,
+      head,
+      subHead,
       amount: numAmount,
       direction: 'OUT',
       propertyId,
@@ -819,6 +853,10 @@ export const recordIncome = async (req, res) => {
       transactionDate = new Date(),
       accountId,
       categoryId,
+      headId = null,
+      subHeadId = null,
+      head = '',
+      subHead = '',
       amount,
       propertyId = null,
       unitId = null,
@@ -831,16 +869,14 @@ export const recordIncome = async (req, res) => {
     } = req.body;
 
     const numAmount = round2(amount);
-    if (!accountId || !categoryId || numAmount <= 0 || !narration) {
+    const effectiveCatId = categoryId || subHeadId || headId;
+    if (!accountId || (!effectiveCatId && !head && !subHead) || numAmount <= 0 || !narration) {
       return apiError(res, 'Bank Account, Income Head Category, Amount (£), and Narration are required.', 400);
     }
 
-    // Verify account and category belong to active company
+    // Verify account belongs to active company
     const acc = await Account.findOne({ _id: accountId, companyId: req.companyId });
     if (!acc) return apiError(res, 'Bank Account not found in active company.', 400);
-
-    const cat = await Category.findOne({ _id: categoryId, companyId: req.companyId });
-    if (!cat) return apiError(res, 'Category Head not found in active company.', 400);
 
     if (propertyId) {
       const prop = await Property.findOne({ _id: propertyId, companyId: req.companyId });
@@ -856,7 +892,11 @@ export const recordIncome = async (req, res) => {
       transactionDate,
       transactionType: 'INCOME',
       accountId,
-      categoryId,
+      categoryId: effectiveCatId,
+      headId,
+      subHeadId,
+      head,
+      subHead,
       amount: numAmount,
       direction: 'IN',
       propertyId,
@@ -977,8 +1017,12 @@ export const updateCategory = async (req, res) => {
     if (isMainHead !== undefined) category.isMainHead = Boolean(isMainHead);
     if (expenseClassification !== undefined) category.expenseClassification = expenseClassification;
 
-    await category.save();
-    return apiSuccess(res, category, 'Nominal head category updated successfully');
+    const updated = await updateCategoryHierarchy({
+      companyId: req.companyId,
+      categoryId: req.params.id,
+      updateData: req.body,
+    });
+    return apiSuccess(res, updated, 'Category updated successfully');
   } catch (error) {
     return apiError(res, error.message || 'Failed to update category', 400, error);
   }
@@ -986,16 +1030,89 @@ export const updateCategory = async (req, res) => {
 
 export const deleteCategory = async (req, res) => {
   try {
-    const { id } = req.params;
-    const usedCount = await Transaction.countDocuments({ companyId: req.companyId, categoryId: id });
-    if (usedCount > 0) {
-      await Category.findOneAndUpdate({ _id: id, companyId: req.companyId }, { isActive: false });
-      return apiSuccess(res, null, `Category has ${usedCount} associated transactions and was marked inactive.`);
-    }
-    await Category.findOneAndDelete({ _id: id, companyId: req.companyId });
-    return apiSuccess(res, null, 'Category head deleted successfully');
+    const result = await deleteCategoryHierarchy({
+      companyId: req.companyId,
+      categoryId: req.params.id,
+    });
+    return apiSuccess(res, null, result.message);
   } catch (error) {
     return apiError(res, error.message || 'Failed to delete category', 400, error);
+  }
+};
+
+export const getCategoryHierarchyController = async (req, res) => {
+  try {
+    const hierarchy = await getCategoryHierarchy(req.companyId);
+    return apiSuccess(res, hierarchy);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to fetch category hierarchy', 500, error);
+  }
+};
+
+export const createHeadCategoryController = async (req, res) => {
+  try {
+    const head = await createHeadCategory({
+      companyId: req.companyId,
+      ...req.body,
+    });
+    return apiSuccess(res, head, 'Head category created successfully', 201);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to create head category', 400, error);
+  }
+};
+
+export const createSubHeadCategoryController = async (req, res) => {
+  try {
+    const subHead = await createSubHeadCategory({
+      companyId: req.companyId,
+      ...req.body,
+    });
+    return apiSuccess(res, subHead, 'Sub Head category created successfully', 201);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to create sub head category', 400, error);
+  }
+};
+
+export const updateCategoryHierarchyController = async (req, res) => {
+  try {
+    const category = await updateCategoryHierarchy({
+      companyId: req.companyId,
+      categoryId: req.params.id,
+      updateData: req.body,
+    });
+    return apiSuccess(res, category, 'Category updated successfully');
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to update category', 400, error);
+  }
+};
+
+export const deleteCategoryHierarchyController = async (req, res) => {
+  try {
+    const result = await deleteCategoryHierarchy({
+      companyId: req.companyId,
+      categoryId: req.params.id,
+    });
+    return apiSuccess(res, null, result.message);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to delete category', 400, error);
+  }
+};
+
+export const previewCategoryBackfillController = async (req, res) => {
+  try {
+    const preview = await previewBackfill(req.companyId);
+    return apiSuccess(res, preview);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to preview category backfill', 500, error);
+  }
+};
+
+export const applyCategoryBackfillController = async (req, res) => {
+  try {
+    const result = await applyBackfill(req.companyId, req.body.items);
+    return apiSuccess(res, result, `Backfilled ${result.updatedCount} transaction(s) successfully.`);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to apply category backfill', 500, error);
   }
 };
 
@@ -1018,6 +1135,8 @@ export const updateTransaction = async (req, res) => {
       .populate('accountId', 'name sortCode accountNumber accountType')
       .populate('counterAccountId', 'name sortCode accountNumber')
       .populate('categoryId', 'name type code')
+      .populate('headId', 'name type code isMainHead')
+      .populate('subHeadId', 'name type code isRentalHead')
       .populate('propertyId', 'name addressLine1 postcode')
       .populate('unitId', 'unitName')
       .populate('mortgageId', 'lenderName accountReference')
@@ -1069,6 +1188,8 @@ export const restoreTransaction = async (req, res) => {
       .populate('accountId', 'name sortCode accountNumber accountType')
       .populate('counterAccountId', 'name sortCode accountNumber')
       .populate('categoryId', 'name type code')
+      .populate('headId', 'name type code isMainHead')
+      .populate('subHeadId', 'name type code isRentalHead')
       .populate('propertyId', 'name addressLine1 postcode')
       .populate('unitId', 'unitName')
       .populate('mortgageId', 'lenderName accountReference')
@@ -1121,6 +1242,8 @@ export const getTransactionById = async (req, res) => {
       .populate('accountId', 'name sortCode accountNumber accountType currentBalance')
       .populate('counterAccountId', 'name sortCode accountNumber currentBalance')
       .populate('categoryId', 'name type code')
+      .populate('headId', 'name type code isMainHead')
+      .populate('subHeadId', 'name type code isRentalHead')
       .populate('propertyId', 'name addressLine1 postcode')
       .populate('unitId', 'unitName')
       .populate('mortgageId', 'lenderName accountReference outstandingPrincipalBalance')

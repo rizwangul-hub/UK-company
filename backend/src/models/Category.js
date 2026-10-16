@@ -80,6 +80,12 @@ const categorySchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    aliases: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,

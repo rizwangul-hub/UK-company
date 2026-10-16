@@ -8,6 +8,13 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  getCategoryHierarchyController,
+  createHeadCategoryController,
+  createSubHeadCategoryController,
+  updateCategoryHierarchyController,
+  deleteCategoryHierarchyController,
+  previewCategoryBackfillController,
+  applyCategoryBackfillController,
   updateTransaction,
   deleteTransaction,
   restoreTransaction,
@@ -60,9 +67,14 @@ router.post('/income', recordIncome);
 router.post('/upload-receipt', upload.single('file'), uploadLedgerReceipt);
 router.post('/transactions/:id/receipt', upload.single('file'), attachTransactionReceipt);
 router.delete('/transactions/:id/receipt', removeTransactionReceipt);
+router.get('/categories/hierarchy', getCategoryHierarchyController);
+router.post('/categories/heads', createHeadCategoryController);
+router.post('/categories/subheads', createSubHeadCategoryController);
+router.get('/categories/backfill/preview', previewCategoryBackfillController);
+router.post('/categories/backfill/apply', applyCategoryBackfillController);
 router.get('/categories', getCategories);
 router.post('/categories', createCategory);
-router.put('/categories/:id', updateCategory);
-router.delete('/categories/:id', deleteCategory);
+router.put('/categories/:id', updateCategoryHierarchyController);
+router.delete('/categories/:id', deleteCategoryHierarchyController);
 
 export default router;

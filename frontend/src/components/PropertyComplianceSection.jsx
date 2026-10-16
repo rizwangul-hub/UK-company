@@ -432,6 +432,7 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
               { label: '+ Gas Safety CP12', cat: 'SAFETY_COMPLIANCE', type: 'GAS_SAFETY_CP12', title: 'Annual Gas Safety Certificate (CP12)' },
               { label: '+ EICR (5-Year)', cat: 'SAFETY_COMPLIANCE', type: 'EICR', title: '5-Year Electrical Installation Condition Report (EICR)' },
               { label: '+ EPC (10-Year)', cat: 'SAFETY_COMPLIANCE', type: 'EPC', title: 'Energy Performance Certificate (EPC)' },
+              { label: '+ Inspection Report', cat: 'OTHER', type: 'INSPECTION_REPORT', title: 'Property Inspection Report' },
               { label: '+ Building Insurance', cat: 'INSURANCE', type: 'BUILDING_INSURANCE', title: 'Building Insurance Policy & Schedule' },
               { label: '+ Title Deed', cat: 'LEGAL_PURCHASE', type: 'TITLE_DEED', title: 'Official Copy of Register of Title' },
               { label: '+ Floor Plan', cat: 'DRAWINGS_STRUCTURAL', type: 'FLOOR_PLAN', title: 'Architectural Floor & Layout Plans' },
