@@ -679,10 +679,28 @@ export const complianceAPI = {
     const res = await api.delete(`/compliance/documents/${id}`);
     return res.data;
   },
-  downloadDocument: (id) => {
-    const token = localStorage.getItem('token');
-    const companyId = localStorage.getItem('companyId') || 'old-street';
-    window.open(`/api/compliance/documents/${id}/download?token=${token}&companyId=${companyId}`, '_blank');
+  downloadDocument: async (id, versionIndex) => {
+    const path = versionIndex === undefined
+      ? `/compliance/documents/${id}/download`
+      : `/compliance/documents/${id}/versions/${versionIndex}/download`;
+    const newTab = window.open('', '_blank');
+    try {
+      const res = await api.get(path, { responseType: 'blob' });
+      const objectUrl = URL.createObjectURL(res.data);
+      if (newTab) {
+        newTab.location.href = objectUrl;
+      } else {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 300_000);
+    } catch (error) {
+      newTab?.close();
+      throw error;
+    }
   },
   getCouncilApplications: async (propertyId, params, config = {}) => {
     const url = propertyId
@@ -832,5 +850,3 @@ export const statementImportAPI = {
 };
 
 export default api;
-
-

@@ -159,6 +159,7 @@ export const createPropertyDocument = async (req, res) => {
 
     const missingBool = String(isMissing) === 'true';
     let fileUrl = '';
+    let cloudinaryAssetId = '';
     let fileName = '';
     let fileSize = 0;
     let mimeType = '';
@@ -183,6 +184,7 @@ export const createPropertyDocument = async (req, res) => {
           stream.end(req.file.buffer);
         });
         fileUrl = uploadResult.secure_url;
+        cloudinaryAssetId = uploadResult.asset_id || '';
       } else {
         fileUrl = `data:${mimeType || 'application/octet-stream'};base64,${req.file.buffer.toString('base64')}`;
       }
@@ -204,6 +206,7 @@ export const createPropertyDocument = async (req, res) => {
       subCategory: subCategory || '',
       title,
       fileUrl,
+      cloudinaryAssetId,
       fileName,
       fileSize,
       mimeType,
@@ -312,6 +315,7 @@ export const uploadDocumentVersion = async (req, res) => {
     document.versionHistory.push({
       version: document.version,
       fileUrl: document.fileUrl,
+      cloudinaryAssetId: document.cloudinaryAssetId,
       fileName: document.fileName,
       fileSize: document.fileSize,
       mimeType: document.mimeType,
@@ -325,6 +329,7 @@ export const uploadDocumentVersion = async (req, res) => {
     });
 
     let fileUrl = document.fileUrl;
+    let cloudinaryAssetId = document.cloudinaryAssetId;
     let fileName = document.fileName;
     let fileSize = document.fileSize;
     let mimeType = document.mimeType;
@@ -349,6 +354,7 @@ export const uploadDocumentVersion = async (req, res) => {
           stream.end(req.file.buffer);
         });
         fileUrl = uploadResult.secure_url;
+        cloudinaryAssetId = uploadResult.asset_id || '';
       } else {
         fileUrl = `data:${mimeType || 'application/octet-stream'};base64,${req.file.buffer.toString('base64')}`;
       }
@@ -356,6 +362,7 @@ export const uploadDocumentVersion = async (req, res) => {
 
     document.version += 1;
     document.fileUrl = fileUrl;
+    document.cloudinaryAssetId = cloudinaryAssetId;
     document.fileName = fileName;
     document.fileSize = fileSize;
     document.mimeType = mimeType;
@@ -386,7 +393,95 @@ export const uploadDocumentVersion = async (req, res) => {
 };
 
 /**
- * 5. Secure Authenticated Document Download / Redirection
+ * Download a Cloudinary asset through its authenticated API.
+ */
+const sendDocumentFile = async (res, { assetId, fileUrl, fileName, mimeType }) => {
+  if (fileUrl?.startsWith('data:')) {
+    const [metadata, encoded] = fileUrl.split(',');
+    if (!metadata || !encoded) {
+      return apiError(res, 'Stored document data is invalid', 500);
+    }
+    const contentType = metadata.slice(5).split(';')[0] || mimeType || 'application/octet-stream';
+    const buffer = Buffer.from(encoded, 'base64');
+    res.setHeader('Content-Type', contentType);
+    const safeFileName = String(fileName || 'document').replace(/[^\x20-\x7e]|["\\]/g, '_');
+    res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"`);
+    return res.send(buffer);
+  }
+
+  if (assetId) {
+    if (!isCloudinaryConfigured()) {
+      return apiError(res, 'Cloudinary is not configured for secure document delivery', 503);
+    }
+
+    const cloudName = cloudinary.config().cloud_name;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const safeFileName = String(fileName || 'document').replace(/[^\x20-\x7e]|["\\]/g, '_');
+    const params = {
+      asset_id: assetId,
+      attachment: false,
+      target_filename: safeFileName,
+      timestamp,
+    };
+    const signature = cloudinary.utils.api_sign_request(params, process.env.CLOUDINARY_API_SECRET);
+    const downloadUrl = new URL(`https://api.cloudinary.com/v1_1/${cloudName}/asset/download`);
+    Object.entries({ ...params, api_key: process.env.CLOUDINARY_API_KEY, signature }).forEach(([key, value]) => {
+      downloadUrl.searchParams.set(key, String(value));
+    });
+
+    const cloudinaryResponse = await fetch(downloadUrl);
+    if (!cloudinaryResponse.ok) {
+      const errorBody = await cloudinaryResponse.text();
+      console.error('[Cloudinary document download error]:', cloudinaryResponse.status, errorBody);
+      return apiError(res, 'Cloudinary could not provide this document. Check the Cloudinary API logs and account permissions.', 502);
+    }
+
+    const buffer = Buffer.from(await cloudinaryResponse.arrayBuffer());
+    res.setHeader('Content-Type', mimeType || cloudinaryResponse.headers.get('content-type') || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"`);
+    return res.send(buffer);
+  }
+
+  if (fileUrl && /^https?:\/\//i.test(fileUrl)) {
+    return res.redirect(fileUrl);
+  }
+
+  return apiError(res, 'No downloadable file is attached to this document', 404);
+};
+
+const getCloudinaryAssetId = async (fileUrl) => {
+  if (!isCloudinaryConfigured() || !fileUrl) return '';
+
+  const url = new URL(fileUrl);
+  const cloudName = cloudinary.config().cloud_name;
+  const segments = url.pathname.split('/').filter(Boolean);
+  if (
+    url.hostname !== 'res.cloudinary.com' ||
+    segments[0] !== cloudName ||
+    !['image', 'video', 'raw'].includes(segments[1]) ||
+    segments[2] !== 'upload'
+  ) {
+    return '';
+  }
+
+  const versionIndex = segments.findIndex((segment, index) => index > 2 && /^v\d+$/.test(segment));
+  if (versionIndex < 0 || versionIndex === segments.length - 1) return '';
+
+  const resourceType = segments[1];
+  const publicIdParts = segments.slice(versionIndex + 1);
+  if (resourceType !== 'raw') {
+    publicIdParts[publicIdParts.length - 1] = publicIdParts[publicIdParts.length - 1].replace(/\.[^.]+$/, '');
+  }
+
+  const resource = await cloudinary.api.resource(publicIdParts.join('/'), {
+    resource_type: resourceType,
+    type: 'upload',
+  });
+  return resource.asset_id || '';
+};
+
+/**
+ * Secure, company-scoped document download.
  */
 export const downloadDocument = async (req, res) => {
   try {
@@ -396,23 +491,54 @@ export const downloadDocument = async (req, res) => {
       return apiError(res, 'Document not found or does not belong to active company', 404);
     }
 
-    if (!document.fileUrl) {
-      return apiError(res, 'No file content attached to this document record', 404);
+    const assetId = document.cloudinaryAssetId || await getCloudinaryAssetId(document.fileUrl);
+    if (assetId && !document.cloudinaryAssetId) {
+      await PropertyDocument.updateOne(
+        { _id: document._id, companyId: req.companyId },
+        { $set: { cloudinaryAssetId: assetId } }
+      );
     }
-
-    if (document.fileUrl.startsWith('data:')) {
-      const parts = document.fileUrl.split(',');
-      const mime = parts[0].split(':')[1].split(';')[0];
-      const buffer = Buffer.from(parts[1], 'base64');
-      res.setHeader('Content-Type', mime);
-      res.setHeader('Content-Disposition', `inline; filename="${document.fileName || 'document.pdf'}"`);
-      return res.send(buffer);
-    }
-
-    // Cloudinary or remote storage: redirect securely
-    return res.redirect(document.fileUrl);
+    return await sendDocumentFile(res, {
+      assetId,
+      fileUrl: document.fileUrl,
+      fileName: document.fileName,
+      mimeType: document.mimeType,
+    });
   } catch (error) {
-    return apiError(res, 'Download failed', 500, error);
+    console.error('[Property document download error]:', error);
+    return apiError(res, 'Document download failed', 502);
+  }
+};
+
+export const downloadDocumentVersion = async (req, res) => {
+  try {
+    const { id, versionIndex } = req.params;
+    const document = await PropertyDocument.findOne({ _id: id, companyId: req.companyId }).lean();
+    if (!document) {
+      return apiError(res, 'Document not found or does not belong to active company', 404);
+    }
+
+    const version = document.versionHistory?.[Number(versionIndex)];
+    if (!version) {
+      return apiError(res, 'Document version not found', 404);
+    }
+
+    const assetId = version.cloudinaryAssetId || await getCloudinaryAssetId(version.fileUrl);
+    if (assetId && !version.cloudinaryAssetId) {
+      await PropertyDocument.updateOne(
+        { _id: document._id, companyId: req.companyId },
+        { $set: { [`versionHistory.${Number(versionIndex)}.cloudinaryAssetId`]: assetId } }
+      );
+    }
+    return await sendDocumentFile(res, {
+      assetId,
+      fileUrl: version.fileUrl,
+      fileName: version.fileName,
+      mimeType: version.mimeType,
+    });
+  } catch (error) {
+    console.error('[Property document version download error]:', error);
+    return apiError(res, 'Document version download failed', 502);
   }
 };
 

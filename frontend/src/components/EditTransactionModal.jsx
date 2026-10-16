@@ -154,6 +154,20 @@ export function EditTransactionModal({
     };
   }, [isOpen, transaction]);
 
+  const mainHeads = React.useMemo(() => {
+    return categories.filter((c) => c.isMainHead || (!c.parentCategoryId && !c.propertyId && !c.unitId));
+  }, [categories]);
+
+  const availableSubHeads = React.useMemo(() => {
+    if (!headId) {
+      return categories.filter((c) => c.parentCategoryId);
+    }
+    return categories.filter((c) => {
+      const pId = c.parentCategoryId?._id || c.parentCategoryId;
+      return pId && pId.toString() === headId.toString();
+    });
+  }, [categories, headId]);
+
   if (!isOpen || !transaction) return null;
 
   const type = transaction.transactionType || transaction.type || 'EXPENSE';
@@ -170,20 +184,6 @@ export function EditTransactionModal({
   const mortgageSplitTotal = numInterest + numPrincipal + numFee;
   const mortgageSplitDiff = Math.abs(numAmount - mortgageSplitTotal);
   const isMortgageSplitValid = !isMortgage || mortgageSplitDiff < 0.05;
-
-  const mainHeads = React.useMemo(() => {
-    return categories.filter((c) => c.isMainHead || (!c.parentCategoryId && !c.propertyId && !c.unitId));
-  }, [categories]);
-
-  const availableSubHeads = React.useMemo(() => {
-    if (!headId) {
-      return categories.filter((c) => c.parentCategoryId);
-    }
-    return categories.filter((c) => {
-      const pId = c.parentCategoryId?._id || c.parentCategoryId;
-      return pId && pId.toString() === headId.toString();
-    });
-  }, [categories, headId]);
 
   const handleHeadChange = (newHeadId) => {
     setHeadId(newHeadId);

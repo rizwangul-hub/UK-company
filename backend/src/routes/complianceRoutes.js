@@ -6,6 +6,7 @@ import {
   updatePropertyDocument,
   uploadDocumentVersion,
   downloadDocument,
+  downloadDocumentVersion,
   deletePropertyDocument,
   getCouncilApplications,
   createCouncilApplication,
@@ -52,6 +53,7 @@ router.post('/properties/:propertyId/documents', upload.single('file'), createPr
 router.put('/documents/:id', updatePropertyDocument);
 router.post('/documents/:id/version', upload.single('file'), uploadDocumentVersion);
 router.get('/documents/:id/download', downloadDocument);
+router.get('/documents/:id/versions/:versionIndex/download', downloadDocumentVersion);
 router.delete('/documents/:id', deletePropertyDocument);
 
 export default router;

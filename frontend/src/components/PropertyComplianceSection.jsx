@@ -809,15 +809,17 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
                 <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs gap-2">
                   <div className="flex items-center gap-1.5">
                     {doc.fileUrl ? (
-                      <a
-                        href={doc.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => complianceAPI.downloadDocument(doc._id).catch((error) => {
+                          console.error('Failed to view property document:', error);
+                          window.alert(error.response?.data?.message || 'Unable to open this document. Please try again.');
+                        })}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 font-bold transition text-[11px]"
                       >
                         <Eye className="w-3 h-3" />
                         <span>View</span>
-                      </a>
+                      </button>
                     ) : (
                       <span className="text-[10px] text-rose-400 font-bold">No file</span>
                     )}
@@ -998,15 +1000,17 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
                     Expiry: {ver.expiryDate ? formatUKDate(ver.expiryDate) : 'N/A'} &bull; Provider: {ver.provider || 'N/A'}
                   </div>
                   {ver.fileUrl && (
-                    <a
-                      href={ver.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => complianceAPI.downloadDocument(historyModalDoc._id, idx).catch((error) => {
+                        console.error('Failed to view historical property document:', error);
+                        window.alert(error.response?.data?.message || 'Unable to open this document version. Please try again.');
+                      })}
                       className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-bold text-[11px] pt-1"
                     >
                       <Download className="w-3 h-3" />
                       <span>Download Historical File ({ver.fileName || 'certificate.pdf'})</span>
-                    </a>
+                    </button>
                   )}
                 </div>
               ))}

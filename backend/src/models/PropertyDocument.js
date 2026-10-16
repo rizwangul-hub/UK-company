@@ -37,6 +37,7 @@ const documentVersionSchema = new mongoose.Schema(
   {
     version: { type: Number, required: true },
     fileUrl: { type: String, default: '' },
+    cloudinaryAssetId: { type: String, default: '' },
     fileName: { type: String, default: '' },
     fileSize: { type: Number, default: 0 },
     mimeType: { type: String, default: '' },
@@ -83,6 +84,11 @@ const propertyDocumentSchema = new mongoose.Schema(
       trim: true,
     },
     fileUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    cloudinaryAssetId: {
       type: String,
       trim: true,
       default: '',
