@@ -484,7 +484,19 @@ export function StatementImportPage({ selectedCompany }) {
         await loadReconciliation();
       }
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to delete statement batch.');
+      const msg = err.response?.data?.message || err.message || 'Failed to delete statement batch.';
+      if (msg.toLowerCase().includes('not found')) {
+        alert('This statement batch has already been deleted or does not exist.');
+        if (activeBatchId === batchId) {
+          setActiveBatchId(null);
+          setBatchData(null);
+          setStagedRows([]);
+          setActiveTab('history');
+        }
+        await loadBatchHistory();
+      } else {
+        alert(msg);
+      }
     } finally {
       setPostingLoading(false);
     }

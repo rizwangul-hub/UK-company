@@ -440,6 +440,9 @@ export const deleteBatch = async (req, res) => {
       data: result,
     });
   } catch (error) {
+    if (error.message.includes('not found')) {
+      return res.status(404).json({ success: false, message: error.message });
+    }
     console.error('[Delete Batch Error]:', error);
     res.status(500).json({ success: false, message: error.message });
   }
