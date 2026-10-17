@@ -845,8 +845,16 @@ export const statementImportAPI = {
     return res.data;
   },
   deleteBatch: async (batchId) => {
-    const res = await api.delete(`/statement-import/batches/${batchId}`);
-    return res.data;
+    try {
+      const res = await api.delete(`/statement-import/batches/${batchId}`);
+      return res.data;
+    } catch (err) {
+      if (err.response?.status === 404 || err.response?.status === 405) {
+        const res = await api.post(`/statement-import/batches/${batchId}/delete`);
+        return res.data;
+      }
+      throw err;
+    }
   },
   getReconciliation: async (params, config = {}) => {
     return cachedGet('/statement-import/reconciliation', { params, ...config });

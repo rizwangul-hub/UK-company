@@ -421,7 +421,7 @@ export const getReconciliation = async (req, res) => {
 export const deleteBatch = async (req, res) => {
   try {
     const companyId = req.companyId;
-    const { batchId } = req.params;
+    const batchId = req.params.batchId || req.params.id;
 
     if (!companyId) {
       return res.status(400).json({ success: false, message: 'Company context is required.' });

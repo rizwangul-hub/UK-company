@@ -28,6 +28,9 @@ router.post('/process-batch', uploadMiddleware.single('statementFile'), processS
 router.get('/batches', getBatches);
 router.get('/batches/:id', getBatchById);
 router.delete('/batches/:batchId', deleteBatch);
+router.delete('/batches/:id', deleteBatch);
+router.post('/batches/:batchId/delete', deleteBatch);
+router.post('/batches/:id/delete', deleteBatch);
 router.put('/batches/:batchId/rows/:rowId', updateBatchRow);
 router.put('/batches/:batchId/rows', bulkUpdateRows);
 router.post('/batches/:batchId/post', postBatch);
