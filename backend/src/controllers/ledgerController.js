@@ -126,6 +126,10 @@ export function formatPropertyType(p) {
   }
 
   switch (rawType.toUpperCase()) {
+    case 'COMMERCIAL_RESIDENTIAL_MIXED':
+      return 'Mixed (Shop & Flat)';
+    case 'MULTI_UNIT_RESIDENTIAL':
+      return 'Multi-Unit Flats';
     case 'SHOP':
       return 'Shop';
     case 'FLAT':
@@ -159,7 +163,7 @@ export function formatPropertyType(p) {
 
 export const getLedgerEntities = async (req, res) => {
   try {
-    const [accounts, properties, tenants, mortgages, categories] = await Promise.all([
+    const [accounts, properties, tenants, mortgages, categories, units] = await Promise.all([
       Account.find({ companyId: req.companyId, isActive: true }).sort({ accountType: 1, name: 1 }).lean(),
       Property.find({ companyId: req.companyId, isActive: true }).sort({ name: 1 }).lean(),
       Tenant.find({ companyId: req.companyId, isActive: true }).sort({ fullName: 1 }).lean(),
@@ -169,6 +173,7 @@ export const getLedgerEntities = async (req, res) => {
         .populate('parentCategoryId', 'name')
         .sort({ type: 1, name: 1 })
         .lean(),
+      Unit.find({ companyId: req.companyId, isActive: true }).sort({ unitName: 1 }).lean(),
     ]);
 
     const bankAccounts = accounts
@@ -191,12 +196,23 @@ export const getLedgerEntities = async (req, res) => {
 
     const propertyEntities = properties.map((p) => {
       const propType = formatPropertyType(p);
+      const propUnits = units.filter((u) => u.propertyId?.toString() === p._id.toString());
+      const subtext = propUnits.length > 1
+        ? `${propType} · ${propUnits.length} Units (${propUnits.map((u) => u.unitType === 'RETAIL_SHOP' ? 'Shop' : 'Flat').join(', ')})`
+        : propType;
       return {
         id: p._id,
         name: p.name,
         type: 'PROPERTY',
         propertyType: propType,
-        subtext: propType,
+        subtext,
+        unitsCount: propUnits.length,
+        units: propUnits.map((u) => ({
+          id: u._id,
+          name: u.unitName,
+          type: u.unitType === 'RETAIL_SHOP' ? 'Shop' : (u.unitType === 'FLAT' ? 'Flat' : 'Unit'),
+          targetRent: u.targetRent,
+        })),
       };
     });
 
@@ -469,6 +485,9 @@ export const queryEntityLedger = async (req, res) => {
           isDeleted: { $ne: true },
           propertyId: effectivePropId,
         };
+        if (req.query.unitId && mongoose.Types.ObjectId.isValid(req.query.unitId)) {
+          txQuery.unitId = new mongoose.Types.ObjectId(req.query.unitId);
+        }
         if (periodStart && periodEnd) txQuery.transactionDate = { $gte: periodStart, $lte: periodEnd };
         else if (periodStart) txQuery.transactionDate = { $gte: periodStart };
         else if (periodEnd) txQuery.transactionDate = { $lte: periodEnd };

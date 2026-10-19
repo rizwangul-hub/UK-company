@@ -388,6 +388,9 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                   {propDetail?.propertyType?.replace(/_/g, ' ')}
                 </span>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  {propDetail?.units?.length > 1 ? `${propDetail.units.length} Units` : '1 Unit'}
+                </span>
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                   {propDetail?.tenure?.replace(/_/g, ' ')}
                 </span>
@@ -519,6 +522,9 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
         <div className="flex items-center gap-0.5 border-b border-slate-800 overflow-x-auto bg-slate-900/60 rounded-t-2xl px-3">
           {[
             { id: 'overview',   label: 'Overview' },
+            ...(propDetail?.units && propDetail.units.length > 0
+              ? [{ id: 'units', label: `Units (${propDetail.units.length})` }]
+              : []),
             { id: 'rent',       label: 'Rent Ledger' },
             { id: 'financials', label: 'Financials' },
             { id: 'charges',    label: 'Service Charges' },
@@ -816,6 +822,70 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
           </div>
           </div>
           )} {/* end overview tab */}
+
+          {/* ── UNITS TAB ───────────────────────────── */}
+          {detailTab === 'units' && (
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Home className="w-4 h-4 text-indigo-400" />
+                    <span>Property Units Breakdown</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Individual lettable shops, flats, and studios within {propDetail?.name}.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  {propDetail?.units?.length || 0} Units Registered
+                </span>
+              </div>
+
+              {(!propDetail?.units || propDetail.units.length === 0) ? (
+                <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-500">
+                  This property is configured as a single standalone unit.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {propDetail.units.map((u) => (
+                    <div key={u._id} className="bg-slate-950/80 border border-slate-800 hover:border-slate-700/80 rounded-xl p-4 space-y-3 transition">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-white truncate" title={u.unitName}>{u.unitName}</h4>
+                          <span className="text-[10px] text-slate-500 block mt-0.5">Floor: {u.floor || 'Ground'}</span>
+                        </div>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
+                          u.unitType === 'RETAIL_SHOP'
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                        }`}>
+                          {u.unitType?.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+
+                      <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400 font-medium">Target Rent</span>
+                        <span className="text-sm font-extrabold text-emerald-400 tabular-nums">
+                          {formatGBP(u.targetRent || 0)} <span className="text-[10px] font-normal text-slate-400">/ mo</span>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/60">
+                        <span className="text-slate-400">Occupancy</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          u.status === 'OCCUPIED'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {u.status || 'OCCUPIED'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── RENT LEDGER TAB ─────────────────────── */}
           {detailTab === 'rent' && (
@@ -1155,6 +1225,11 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
                       {prop.propertyType?.replace(/_/g, ' ')}
                     </span>
+                    {prop.units && prop.units.length > 1 && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        {prop.units.length} Units
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1187,6 +1262,29 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                     )}
                   </div>
                 </div>
+
+                {/* Child Units Breakdown for Multi-Unit Properties */}
+                {prop.units && prop.units.length > 1 && (
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-slate-400 px-0.5">
+                      <span>Internal Units ({prop.units.length})</span>
+                      <span className="text-slate-500 font-normal">Monthly Rent</span>
+                    </div>
+                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                      {prop.units.map((u) => (
+                        <div key={u._id} className="flex items-center justify-between text-[11px] py-0.5 px-1 rounded bg-slate-900/60 border border-slate-800/40">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${u.unitType === 'RETAIL_SHOP' ? 'bg-amber-400' : 'bg-indigo-400'}`} />
+                            <span className="text-slate-200 font-medium truncate" title={u.unitName}>{u.unitName}</span>
+                          </div>
+                          <span className="text-emerald-400 font-semibold tabular-nums text-[10px] shrink-0 ml-2">
+                            {formatGBP(u.targetRent || 0)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Valuation & Debt Grid */}
                 <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-800/80 text-xs">

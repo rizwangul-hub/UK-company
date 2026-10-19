@@ -63,6 +63,8 @@ export function formatPropertyType(p) {
   if (!p) return 'Property';
   if (p.propertyType && !p.propertyType.includes('Units') && !p.propertyType.includes('London')) {
     const raw = p.propertyType.trim();
+    if (['COMMERCIAL_RESIDENTIAL_MIXED'].includes(raw.toUpperCase())) return 'Mixed (Shop & Flat)';
+    if (['MULTI_UNIT_RESIDENTIAL'].includes(raw.toUpperCase())) return 'Multi-Unit Flats';
     if (['FLAT', 'FLAT_APARTMENT', 'APARTMENT'].includes(raw.toUpperCase())) return 'Flat';
     if (['SHOP'].includes(raw.toUpperCase())) return 'Shop';
     if (['HOUSE', 'RESIDENTIAL_TERRACED', 'TERRACED_HOUSE', 'SEMI_DETACHED', 'DETACHED'].includes(raw.toUpperCase())) return 'House';
@@ -701,7 +703,9 @@ export function LedgerPage({ selectedCompany }) {
                 <option value="">{loadingEntities ? 'Loading UK entities...' : 'No entities configured'}</option>
               ) : (
                 currentEntityList.map((item) => {
-                  const subtext = ledgerType === 'PROPERTY' ? formatPropertyType(item) : item.subtext;
+                  const subtext = ledgerType === 'PROPERTY'
+                    ? (item.unitsCount > 1 ? item.subtext : formatPropertyType(item))
+                    : item.subtext;
                   return (
                     <option key={String(item.id)} value={String(item.id)}>
                       {item.name} {subtext ? ` — (${subtext})` : ''}
