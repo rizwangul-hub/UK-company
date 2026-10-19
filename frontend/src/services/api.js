@@ -424,6 +424,9 @@ export const ledgerAPI = {
   getEntities: async (params, config = {}) => {
     return cachedGet('/ledger/entities', { params, ...config });
   },
+  getHeadSummary: async (params, config = {}) => {
+    return cachedGet('/ledger/head-summary', { params, ...config });
+  },
   queryLedger: async (params, config = {}) => {
     return cachedGet('/ledger/query', { params, ...config });
   },

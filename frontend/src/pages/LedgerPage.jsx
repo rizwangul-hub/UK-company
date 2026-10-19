@@ -20,6 +20,9 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronRight,
+  ChevronDown,
+  ArrowLeft,
+  ExternalLink,
   Filter,
   Plus,
   Edit3,
@@ -44,6 +47,7 @@ import TransactionAuditModal from '../components/TransactionAuditModal.jsx';
 import pixxLogo from '../assets/logo.png';
 
 const LEDGER_TYPES = [
+  { id: 'HEAD', label: 'Heads & Sub Heads', icon: Layers, desc: 'Interactive Summary & Drilldown Ledger' },
   { id: 'BANK', label: 'Bank Accounts', icon: Landmark, desc: 'NatWest, Barclays, Lloyds' },
   { id: 'CASH', label: 'Cash in Hand', icon: Coins, desc: 'Petty Cash & Floats' },
   { id: 'PROPERTY', label: 'Properties', icon: Building2, desc: 'Property P&L & Cash Flow' },
@@ -57,7 +61,7 @@ const LEDGER_TYPES = [
 
 export function LedgerPage({ selectedCompany }) {
   const cachedEntities = getApiCache('/ledger/entities');
-  const [ledgerType, setLedgerType] = useState('BANK');
+  const [ledgerType, setLedgerType] = useState('HEAD');
   const [entitiesMap, setEntitiesMap] = useState(cachedEntities?.data || {
     bankAccounts: [],
     cashAccounts: [],
@@ -66,13 +70,23 @@ export function LedgerPage({ selectedCompany }) {
     mortgages: [],
     expenseHeads: [],
     incomeHeads: [],
+    heads: [],
+    subHeads: [],
   });
 
   const [selectedEntityId, setSelectedEntityId] = useState('');
-  const [datePreset, setDatePreset] = useState('THIS_MONTH');
+  const [datePreset, setDatePreset] = useState('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Head & Sub Head Interactive Summary & Drilldown State
+  const [headViewMode, setHeadViewMode] = useState('SUMMARY'); // 'SUMMARY' | 'DRILLDOWN'
+  const [drilldownHead, setDrilldownHead] = useState(null);
+  const [drilldownSubHead, setDrilldownSubHead] = useState(null);
+  const [headSummaryData, setHeadSummaryData] = useState(null);
+  const [loadingHeadSummary, setLoadingHeadSummary] = useState(false);
+  const [expandedHeads, setExpandedHeads] = useState(new Set());
 
   const [ledgerData, setLedgerData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -131,6 +145,8 @@ export function LedgerPage({ selectedCompany }) {
   // Determine selectable list based on ledgerType
   const getCurrentEntityList = () => {
     switch (ledgerType) {
+      case 'HEAD':
+        return entitiesMap.heads || [];
       case 'BANK':
         return entitiesMap.bankAccounts || [];
       case 'CASH':
@@ -156,7 +172,7 @@ export function LedgerPage({ selectedCompany }) {
 
   // Reset or select default entity when switching tabs
   useEffect(() => {
-    if (ledgerType === 'RENT' || ledgerType === 'CONSOLIDATED') {
+    if (ledgerType === 'RENT' || ledgerType === 'CONSOLIDATED' || ledgerType === 'HEAD') {
       setSelectedEntityId('');
     } else if (currentEntityList.length > 0) {
       // Keep selected if valid in new list, else pick first
@@ -169,8 +185,128 @@ export function LedgerPage({ selectedCompany }) {
     }
   }, [ledgerType, entitiesMap]);
 
+  // Load Head & Sub Head Summary
+  const loadHeadSummary = async () => {
+    try {
+      setLoadingHeadSummary(true);
+      setErrorMsg('');
+      const res = await ledgerAPI.getHeadSummary({
+        datePreset,
+        startDate: datePreset === 'CUSTOM' ? startDate : undefined,
+        endDate: datePreset === 'CUSTOM' ? endDate : undefined,
+        search: searchQuery || undefined,
+      });
+      if (res?.success && res.data) {
+        setHeadSummaryData(res.data);
+        // Expand all heads by default so user sees full hierarchy immediately
+        setExpandedHeads(new Set((res.data.heads || []).map((h) => h.head)));
+      } else {
+        setHeadSummaryData(null);
+        setErrorMsg(res?.message || 'Failed to load Head & Sub Head summary.');
+      }
+    } catch (err) {
+      console.error('Failed to load head summary:', err);
+      setErrorMsg(err.response?.data?.message || err.message || 'Error querying head summary.');
+      setHeadSummaryData(null);
+    } finally {
+      setLoadingHeadSummary(false);
+    }
+  };
+
+  // Fetch Drilldown Ledger for a specific Head or Sub Head
+  const fetchDrilldownLedger = async (headName, subHeadName) => {
+    try {
+      setLoading(true);
+      setErrorMsg('');
+      const res = await ledgerAPI.queryLedger({
+        type: subHeadName ? 'SUB_HEAD' : 'HEAD',
+        head: headName || undefined,
+        subHead: subHeadName || undefined,
+        datePreset,
+        startDate: datePreset === 'CUSTOM' ? startDate : undefined,
+        endDate: datePreset === 'CUSTOM' ? endDate : undefined,
+        search: searchQuery || undefined,
+      });
+      if (res?.success) {
+        setLedgerData(res.data);
+      } else {
+        setLedgerData(null);
+        setErrorMsg(res?.message || 'Failed to query drilldown ledger.');
+      }
+    } catch (err) {
+      console.error('Failed to query drilldown ledger:', err);
+      setErrorMsg(err.response?.data?.message || err.message || 'Error querying drilldown ledger.');
+      setLedgerData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDrilldown = (headName, subHeadName = null) => {
+    setDrilldownHead(headName || null);
+    setDrilldownSubHead(subHeadName || null);
+    setHeadViewMode('DRILLDOWN');
+    fetchDrilldownLedger(headName, subHeadName);
+  };
+
+  const handleBackToSummary = () => {
+    setHeadViewMode('SUMMARY');
+    setDrilldownHead(null);
+    setDrilldownSubHead(null);
+    setSelectedEntityId('');
+    loadHeadSummary();
+  };
+
+  const toggleHeadExpand = (headName) => {
+    setExpandedHeads((prev) => {
+      const next = new Set(prev);
+      if (next.has(headName)) next.delete(headName);
+      else next.add(headName);
+      return next;
+    });
+  };
+
+  const expandAllHeads = () => {
+    if (!headSummaryData?.heads) return;
+    setExpandedHeads(new Set(headSummaryData.heads.map((h) => h.head)));
+  };
+
+  const collapseAllHeads = () => {
+    setExpandedHeads(new Set());
+  };
+
+  const handleExportSummaryCSV = () => {
+    if (!headSummaryData || !headSummaryData.heads) return;
+    const headers = ['Head Category', 'Sub Head', 'Transactions Count', 'Payments (£)', 'Receipts (£)', 'Net Total (£)'];
+    const rows = [];
+    headSummaryData.heads.forEach((h) => {
+      rows.push([`"${h.head}"`, 'TOTAL (HEAD)', h.count, h.totalPayments.toFixed(2), h.totalReceipts.toFixed(2), h.net.toFixed(2)]);
+      (h.subHeads || []).forEach((sh) => {
+        rows.push([`"${h.head}"`, `"${sh.subHead}"`, sh.count, sh.payments.toFixed(2), sh.receipts.toFixed(2), sh.net.toFixed(2)]);
+      });
+    });
+    rows.push(['GRAND TOTAL', '', headSummaryData.grandTotalCount, headSummaryData.grandTotalPayments.toFixed(2), headSummaryData.grandTotalReceipts.toFixed(2), headSummaryData.netLiquidity.toFixed(2)]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    const compPrefix = selectedCompany?.slug ? `${selectedCompany.slug}_` : 'UK_';
+    link.setAttribute('download', `${compPrefix}Head_Summary_${datePreset}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Query Ledger
   const fetchLedger = async () => {
+    if (ledgerType === 'HEAD') {
+      if (headViewMode === 'SUMMARY') {
+        return loadHeadSummary();
+      } else {
+        return fetchDrilldownLedger(drilldownHead, drilldownSubHead);
+      }
+    }
+
     try {
       setLoading(true);
       setErrorMsg('');
@@ -202,6 +338,7 @@ export function LedgerPage({ selectedCompany }) {
   // Re-fetch when core filters change
   useEffect(() => {
     if (
+      ledgerType === 'HEAD' ||
       ledgerType === 'RENT' ||
       ledgerType === 'CONSOLIDATED' ||
       selectedEntityId ||
@@ -209,7 +346,7 @@ export function LedgerPage({ selectedCompany }) {
     ) {
       fetchLedger();
     }
-  }, [ledgerType, selectedEntityId, datePreset]);
+  }, [ledgerType, selectedEntityId, datePreset, headViewMode]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -218,6 +355,9 @@ export function LedgerPage({ selectedCompany }) {
 
   // Export current table view as CSV
   const handleExportCSV = () => {
+    if (ledgerType === 'HEAD' && headViewMode === 'SUMMARY') {
+      return handleExportSummaryCSV();
+    }
     if (!ledgerData || !ledgerData.entries || ledgerData.entries.length === 0) return;
 
     const headers = [
@@ -299,9 +439,16 @@ export function LedgerPage({ selectedCompany }) {
   const handleExportDirect = async (type, useSelected = false) => {
     try {
       setDirectExporting(true);
+      const isHead = ledgerType === 'HEAD';
       const payload = {
-        scope: useSelected ? 'SELECTED' : (ledgerType === 'CONSOLIDATED' ? 'COMPLETE' : ledgerType),
+        scope: useSelected
+          ? 'SELECTED'
+          : isHead
+          ? (drilldownSubHead ? 'SUB_HEAD' : 'HEAD')
+          : (ledgerType === 'CONSOLIDATED' ? 'COMPLETE' : ledgerType),
         entityId: useSelected ? undefined : (selectedEntityId || undefined),
+        head: isHead ? (drilldownHead || undefined) : undefined,
+        subHead: isHead ? (drilldownSubHead || undefined) : undefined,
         datePreset,
         startDate: datePreset === 'CUSTOM' ? startDate : undefined,
         endDate: datePreset === 'CUSTOM' ? endDate : undefined,
@@ -373,10 +520,16 @@ export function LedgerPage({ selectedCompany }) {
 
           {/* Quick Excel Export */}
           <button
-            onClick={() => handleExportDirect('excel', false)}
-            disabled={!ledgerData || directExporting}
+            onClick={() => {
+              if (ledgerType === 'HEAD' && headViewMode === 'SUMMARY') {
+                handleExportSummaryCSV();
+              } else {
+                handleExportDirect('excel', false);
+              }
+            }}
+            disabled={(!ledgerData && !headSummaryData) || directExporting}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs shadow-sm shadow-emerald-600/20 transition cursor-pointer"
-            title="Download formatted Excel (.xlsx) statement for current view"
+            title="Download formatted Excel statement for current view"
           >
             <FileSpreadsheet size={15} />
             <span>Excel (.xlsx)</span>
@@ -395,16 +548,16 @@ export function LedgerPage({ selectedCompany }) {
 
           <button
             onClick={fetchLedger}
-            disabled={loading}
+            disabled={loading || loadingHeadSummary}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold text-xs shadow-sm transition cursor-pointer"
           >
-            <RefreshCw size={13} className={loading ? 'animate-spin text-indigo-600' : ''} />
+            <RefreshCw size={13} className={loading || loadingHeadSummary ? 'animate-spin text-indigo-600' : ''} />
             Refresh
           </button>
 
           <button
             onClick={handleExportCSV}
-            disabled={!ledgerData}
+            disabled={!ledgerData && !headSummaryData}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 font-bold text-xs shadow-sm transition cursor-pointer"
           >
             <Download size={13} />
@@ -413,7 +566,7 @@ export function LedgerPage({ selectedCompany }) {
 
           <button
             onClick={() => window.print()}
-            disabled={!ledgerData}
+            disabled={!ledgerData && !headSummaryData}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 font-bold text-xs shadow-sm transition cursor-pointer"
           >
             <Printer size={13} />
@@ -424,14 +577,21 @@ export function LedgerPage({ selectedCompany }) {
 
       {/* Ledger Type Segmented Switcher */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 shadow-sm">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-1.5">
           {LEDGER_TYPES.map((tab) => {
             const Icon = tab.icon;
             const isActive = ledgerType === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setLedgerType(tab.id)}
+                onClick={() => {
+                  setLedgerType(tab.id);
+                  if (tab.id === 'HEAD') {
+                    setHeadViewMode('SUMMARY');
+                    setDrilldownHead(null);
+                    setDrilldownSubHead(null);
+                  }
+                }}
                 className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl text-center transition-all cursor-pointer ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
@@ -456,11 +616,28 @@ export function LedgerPage({ selectedCompany }) {
                 ? 'Rent Scope'
                 : ledgerType === 'CONSOLIDATED'
                 ? 'Master Journal Scope'
+                : ledgerType === 'HEAD'
+                ? 'Head & Sub Head View / Scope'
                 : `Select Specific ${LEDGER_TYPES.find((t) => t.id === ledgerType)?.label || 'Entity'}`}
             </label>
             <select
               value={selectedEntityId}
-              onChange={(e) => setSelectedEntityId(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedEntityId(val);
+                if (ledgerType === 'HEAD') {
+                  if (!val || val === 'ALL_HEADS') {
+                    handleBackToSummary();
+                  } else {
+                    const isSub = (entitiesMap.subHeads || []).some((s) => String(s.id) === String(val));
+                    if (isSub) {
+                      handleDrilldown(null, val);
+                    } else {
+                      handleDrilldown(val, null);
+                    }
+                  }
+                }
+              }}
               disabled={loadingEntities || ledgerType === 'RENT' || ledgerType === 'CONSOLIDATED'}
               className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3.5 py-2.5 font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800/40"
             >
@@ -468,6 +645,24 @@ export function LedgerPage({ selectedCompany }) {
                 <option value="">★ Entire Portfolio Rent Journal (Consolidated Invoices &amp; Receipts)</option>
               ) : ledgerType === 'CONSOLIDATED' ? (
                 <option value="">★ All Nominal Accounts &amp; Cash Accounts (Consolidated Journal)</option>
+              ) : ledgerType === 'HEAD' ? (
+                <>
+                  <option value="">★ Interactive Pivot Reconciliation Summary (Double-click any row to drill down)</option>
+                  <optgroup label="Main Nominal Heads">
+                    {(entitiesMap.heads || []).map((h) => (
+                      <option key={String(h.id)} value={String(h.id)}>
+                        Head: {h.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Sub Heads">
+                    {(entitiesMap.subHeads || []).map((sh) => (
+                      <option key={String(sh.id)} value={String(sh.id)}>
+                        Sub Head: {sh.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                </>
               ) : currentEntityList.length === 0 ? (
                 <option value="">{loadingEntities ? 'Loading UK entities...' : 'No entities configured'}</option>
               ) : (
@@ -559,8 +754,391 @@ export function LedgerPage({ selectedCompany }) {
         </div>
       )}
 
-      {/* Active Ledger Title & Executive KPI Strip */}
-      {ledgerData && (
+      {/* ============================================================= */}
+      {/* 1. HEAD & SUB HEAD RECONCILIATION SUMMARY PIVOT TABLE         */}
+      {/* ============================================================= */}
+      {ledgerType === 'HEAD' && headViewMode === 'SUMMARY' && (
+        <div className="space-y-6">
+          {/* Executive KPI Cards for Summary */}
+          {headSummaryData && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Total Receipts */}
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider flex items-center gap-1">
+                    Total Receipts (In)
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                    <ArrowDownLeft size={15} />
+                  </div>
+                </div>
+                <div className="font-display text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight tabular-nums">
+                  {formatGBP(headSummaryData.grandTotalReceipts || 0)}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 font-medium">
+                  Income &amp; Credit Collections
+                </div>
+              </div>
+
+              {/* Total Payments */}
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider flex items-center gap-1">
+                    Total Payments (Out)
+                  </span>
+                  <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+                    <ArrowUpRight size={15} />
+                  </div>
+                </div>
+                <div className="font-display text-xl sm:text-2xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight tabular-nums">
+                  {formatGBP(headSummaryData.grandTotalPayments || 0)}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 font-medium">
+                  Expenses &amp; Loan Disbursements
+                </div>
+              </div>
+
+              {/* Net Position */}
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden border-indigo-500/40">
+                <div className="flex items-center justify-between text-indigo-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider">Net Position</span>
+                  <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300">
+                    <Sparkles size={15} />
+                  </div>
+                </div>
+                <div
+                  className={`font-display text-xl sm:text-2xl font-extrabold tracking-tight tabular-nums ${
+                    (headSummaryData.netLiquidity || 0) >= 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-rose-600 dark:text-rose-400'
+                  }`}
+                >
+                  {formatGBP(headSummaryData.netLiquidity || 0)}
+                </div>
+                <div className="text-[11px] text-indigo-400/80 mt-1 font-medium">
+                  Receipts minus Payments
+                </div>
+              </div>
+
+              {/* Total Entries */}
+              <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                <div className="flex items-center justify-between text-slate-400 mb-2">
+                  <span className="text-xs font-medium uppercase tracking-wider">Total Transactions</span>
+                  <div className="p-1.5 rounded-lg bg-slate-500/10 text-slate-400">
+                    <BookOpen size={15} />
+                  </div>
+                </div>
+                <div className="font-display text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight tabular-nums">
+                  {headSummaryData.grandTotalCount || 0}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 font-medium">
+                  Across {(headSummaryData.heads || []).length} Nominal Heads
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Pivot Table Container */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                    Bank Reconciliation Summary — Heads &amp; Sub Heads
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    Interactive Drilldown
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                  Click or double-click on any row to open the full detailed transaction ledger for that Head or Sub Head.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={expandAllHeads}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+                >
+                  Expand All
+                </button>
+                <button
+                  type="button"
+                  onClick={collapseAllHeads}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition cursor-pointer"
+                >
+                  Collapse All
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportSummaryCSV}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+                >
+                  <Download size={13} />
+                  Export Summary CSV
+                </button>
+              </div>
+            </div>
+
+            {loadingHeadSummary ? (
+              <div className="py-20 text-center text-xs text-slate-500 font-bold flex items-center justify-center gap-2">
+                <RefreshCw size={18} className="animate-spin text-indigo-600" />
+                Aggregating Heads &amp; Sub Heads from database...
+              </div>
+            ) : !headSummaryData || (headSummaryData.heads || []).length === 0 ? (
+              <div className="py-16 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                <Layers size={32} className="mx-auto text-slate-400 mb-2.5" />
+                <div className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                  No Head or Sub Head entries recorded.
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Upload a statement with Head &amp; Sub Head columns or record transactions to populate.
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100/90 dark:bg-slate-800 text-slate-800 dark:text-slate-200 uppercase font-black border-b border-slate-200 dark:border-slate-700 tracking-wider">
+                    <tr>
+                      <th className="p-3.5">Head / Sub Head Category</th>
+                      <th className="p-3.5 text-center w-20">Entries</th>
+                      <th className="p-3.5 text-right">Payments (£) [Out]</th>
+                      <th className="p-3.5 text-right">Receipts (£) [In]</th>
+                      <th className="p-3.5 text-right">Net Total (£)</th>
+                      <th className="p-3.5 text-center w-36">Ledger Drilldown</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80 font-medium text-slate-900 dark:text-slate-100">
+                    {headSummaryData.heads.map((h) => {
+                      const isExpanded = expandedHeads.has(h.head);
+                      const subCount = (h.subHeads || []).length;
+                      return (
+                        <React.Fragment key={h.head}>
+                          {/* Master Head Row */}
+                          <tr
+                            onDoubleClick={() => handleDrilldown(h.head, null)}
+                            className="bg-slate-50/90 dark:bg-slate-800/60 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/30 transition-colors cursor-pointer group select-none"
+                            title={`Double click to open full ${h.head} Ledger`}
+                          >
+                            <td className="p-3.5">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleHeadExpand(h.head);
+                                  }}
+                                  className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition"
+                                  title={isExpanded ? 'Collapse Sub Heads' : 'Expand Sub Heads'}
+                                >
+                                  {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                </button>
+                                <span className="font-black text-sm text-slate-900 dark:text-white tracking-tight">
+                                  {h.head}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                                  {subCount} {subCount === 1 ? 'Sub Head' : 'Sub Heads'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3.5 text-center font-bold text-slate-600 dark:text-slate-400">
+                              {h.count}
+                            </td>
+                            <td className="p-3.5 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
+                              {h.totalPayments > 0 ? formatGBP(h.totalPayments) : '-'}
+                            </td>
+                            <td className="p-3.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              {h.totalReceipts > 0 ? formatGBP(h.totalReceipts) : '-'}
+                            </td>
+                            <td
+                              className={`p-3.5 text-right font-mono font-extrabold ${
+                                h.net > 0
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : h.net < 0
+                                  ? 'text-rose-600 dark:text-rose-400'
+                                  : 'text-slate-600 dark:text-slate-400'
+                              }`}
+                            >
+                              {formatGBP(h.net)}
+                            </td>
+                            <td className="p-3.5 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDrilldown(h.head, null);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] shadow-sm shadow-indigo-600/20 transition cursor-pointer"
+                                title={`Open complete ${h.head} ledger`}
+                              >
+                                <span>⚡ Head Ledger</span>
+                              </button>
+                            </td>
+                          </tr>
+
+                          {/* Sub Head Child Rows */}
+                          {isExpanded &&
+                            (h.subHeads || []).map((sh) => (
+                              <tr
+                                key={`${h.head}-${sh.subHead}`}
+                                onDoubleClick={() => handleDrilldown(h.head, sh.subHead)}
+                                className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group select-none"
+                                title={`Double click to open ${sh.subHead} Ledger`}
+                              >
+                                <td className="p-2.5 pl-10 sm:pl-12">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-slate-300 dark:text-slate-600 font-mono text-xs select-none">
+                                      └─
+                                    </span>
+                                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                      {sh.subHead}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-2.5 text-center text-slate-500 dark:text-slate-400 text-xs">
+                                  {sh.count}
+                                </td>
+                                <td className="p-2.5 text-right font-mono text-rose-600/90 dark:text-rose-400/90">
+                                  {sh.payments > 0 ? formatGBP(sh.payments) : '-'}
+                                </td>
+                                <td className="p-2.5 text-right font-mono text-emerald-600/90 dark:text-emerald-400/90">
+                                  {sh.receipts > 0 ? formatGBP(sh.receipts) : '-'}
+                                </td>
+                                <td
+                                  className={`p-2.5 text-right font-mono font-semibold ${
+                                    sh.net > 0
+                                      ? 'text-emerald-600/90 dark:text-emerald-400/90'
+                                      : sh.net < 0
+                                      ? 'text-rose-600/90 dark:text-rose-400/90'
+                                      : 'text-slate-500'
+                                  }`}
+                                >
+                                  {formatGBP(sh.net)}
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDrilldown(h.head, sh.subHead);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] shadow-sm transition cursor-pointer"
+                                    title={`Open ${sh.subHead} ledger`}
+                                  >
+                                    <span>⚡ Sub Head Ledger</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                  {/* Grand Total Row */}
+                  <tfoot className="bg-slate-900 text-white dark:bg-slate-950 font-black border-t-2 border-slate-700">
+                    <tr>
+                      <td className="p-3.5">
+                        <span className="text-sm uppercase tracking-wider text-white">
+                          Grand Total (All Nominal Heads)
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-center font-mono text-slate-300">
+                        {headSummaryData.grandTotalCount}
+                      </td>
+                      <td className="p-3.5 text-right font-mono text-rose-300 text-sm">
+                        {formatGBP(headSummaryData.grandTotalPayments)}
+                      </td>
+                      <td className="p-3.5 text-right font-mono text-emerald-300 text-sm">
+                        {formatGBP(headSummaryData.grandTotalReceipts)}
+                      </td>
+                      <td
+                        className={`p-3.5 text-right font-mono text-sm ${
+                          headSummaryData.netLiquidity >= 0 ? 'text-emerald-300' : 'text-rose-300'
+                        }`}
+                      >
+                        {formatGBP(headSummaryData.netLiquidity)}
+                      </td>
+                      <td className="p-3.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setLedgerType('CONSOLIDATED')}
+                          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[10px] border border-slate-700 transition cursor-pointer"
+                        >
+                          Master Journal
+                        </button>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* 2. DEDICATED TRANSACTION REGISTER & DRILLDOWN LEDGER          */}
+      {/* ============================================================= */}
+      {(ledgerType !== 'HEAD' || headViewMode === 'DRILLDOWN') && (
+        <>
+          {/* Breadcrumb Navigation when in HEAD Drilldown */}
+          {ledgerType === 'HEAD' && headViewMode === 'DRILLDOWN' && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 shadow-sm">
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleBackToSummary}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-black text-xs shadow-sm transition cursor-pointer"
+                >
+                  <ArrowLeft size={14} />
+                  <span>← Back to Summary Table</span>
+                </button>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 flex-wrap">
+                  <span className="text-slate-400">Reconciliation Summary</span>
+                  <ChevronRight size={13} className="text-slate-400" />
+                  <button
+                    type="button"
+                    onClick={() => handleDrilldown(drilldownHead, null)}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-extrabold transition cursor-pointer"
+                    title={`View all ${drilldownHead} entries`}
+                  >
+                    Head: {drilldownHead || 'All Heads'}
+                  </button>
+                  {drilldownSubHead && (
+                    <>
+                      <ChevronRight size={13} className="text-slate-400" />
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-extrabold">
+                        Sub Head: {drilldownSubHead}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick switcher to other Sub Heads in this Head */}
+              {drilldownHead && headSummaryData?.heads && (
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <span className="text-slate-500 dark:text-slate-400 text-[11px]">Sub Head:</span>
+                  <select
+                    value={drilldownSubHead || ''}
+                    onChange={(e) => handleDrilldown(drilldownHead, e.target.value || null)}
+                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-900 dark:text-white"
+                  >
+                    <option value="">All {drilldownHead} Sub Heads</option>
+                    {((headSummaryData.heads.find((h) => h.head === drilldownHead)?.subHeads) || []).map((sh) => (
+                      <option key={sh.subHead} value={sh.subHead}>
+                        {sh.subHead} ({sh.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Active Ledger Title & Executive KPI Strip */}
+          {ledgerData && (
         <>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 gap-2">
@@ -821,16 +1399,34 @@ export function LedgerPage({ selectedCompany }) {
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           {tx.head || tx.subHead ? (
-                            <div className="flex flex-col gap-0.5">
+                            <div className="flex flex-col gap-1">
                               {tx.head && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-extrabold text-[10px] border border-indigo-200 dark:border-indigo-800/60 w-fit">
-                                  {tx.head}
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setLedgerType('HEAD');
+                                    handleDrilldown(tx.head, null);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-extrabold text-[10px] border border-indigo-200 dark:border-indigo-800/60 w-fit cursor-pointer transition"
+                                  title={`View ${tx.head} Head Ledger`}
+                                >
+                                  <span>{tx.head}</span>
+                                  <ExternalLink size={9} className="opacity-60" />
+                                </button>
                               )}
                               {tx.subHead && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] border border-emerald-200 dark:border-emerald-800/60 w-fit">
-                                  &rarr; {tx.subHead}
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setLedgerType('HEAD');
+                                    handleDrilldown(tx.head, tx.subHead);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold text-[10px] border border-emerald-200 dark:border-emerald-800/60 w-fit cursor-pointer transition"
+                                  title={`View ${tx.subHead} Sub Head Ledger`}
+                                >
+                                  <span>&rarr; {tx.subHead}</span>
+                                  <ExternalLink size={9} className="opacity-60" />
+                                </button>
                               )}
                             </div>
                           ) : (
@@ -911,6 +1507,8 @@ export function LedgerPage({ selectedCompany }) {
           </div>
         </>
       )}
+    </>
+  )}
 
       {/* Voucher Detail Print Modal */}
       {activeVoucher && (

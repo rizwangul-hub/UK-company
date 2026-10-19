@@ -27,6 +27,7 @@ import pixxLogo from '../assets/logo.png';
 const SCOPES = [
   { id: 'COMPLETE', label: 'Complete Ledger', icon: Layers, desc: 'Master multi-currency portfolio journal' },
   { id: 'SELECTED', label: 'Selected Records', icon: Check, desc: 'Specific checked transactions only' },
+  { id: 'HEAD', label: 'Head / Sub Head', icon: Layers, desc: 'Income, Admin Expenses, Loan, Interest, etc.' },
   { id: 'ACCOUNT_HEAD', label: 'Nominal Head', icon: Receipt, desc: 'Repairs, Agent Fees, Insurance, etc.' },
   { id: 'PROPERTY', label: 'Property Asset', icon: Building2, desc: 'Asset P&L with optional unit rollup' },
   { id: 'MORTGAGE', label: 'Mortgage Facility', icon: Percent, desc: 'Debt principal and interest ledger' },
@@ -131,6 +132,15 @@ export default function ReportExportModal({
       }
       if (scope === 'TRANSACTION_TYPE') {
         payload.transactionType = txType;
+      }
+      if (scope === 'HEAD') {
+        const isSub = (entitiesMap.subHeads || []).some((s) => String(s.id) === String(entityId));
+        if (isSub) {
+          payload.scope = 'SUB_HEAD';
+          payload.subHead = entityId;
+        } else if (entityId) {
+          payload.head = entityId;
+        }
       }
     }
 
@@ -320,6 +330,30 @@ export default function ReportExportModal({
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
                   Target Entity
                 </label>
+                {scope === 'HEAD' && (
+                  <select
+                    value={entityId}
+                    onChange={(e) => setEntityId(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">★ All Heads &amp; Sub Heads (Consolidated)</option>
+                    <optgroup label="Main Heads">
+                      {(entitiesMap.heads || []).map((h) => (
+                        <option key={String(h.id)} value={String(h.id)}>
+                          Head: {h.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Sub Heads">
+                      {(entitiesMap.subHeads || []).map((sh) => (
+                        <option key={String(sh.id)} value={String(sh.id)}>
+                          Sub Head: {sh.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                )}
+
                 {scope === 'ACCOUNT_HEAD' && (
                   <select
                     value={entityId}

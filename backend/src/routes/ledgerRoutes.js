@@ -23,6 +23,7 @@ import {
   getTransactionById,
   getLedgerEntities,
   queryEntityLedger,
+  getHeadSubHeadSummary,
   uploadLedgerReceipt,
   attachTransactionReceipt,
   removeTransactionReceipt,
@@ -45,6 +46,7 @@ const router = express.Router();
 router.use(protect, requireCompanyContext);
 
 router.get('/entities', getLedgerEntities);
+router.get('/head-summary', getHeadSubHeadSummary);
 router.get('/query', queryEntityLedger);
 router.get('/preview', getLedgerReportPreview);
 router.post('/preview', getLedgerReportPreview);

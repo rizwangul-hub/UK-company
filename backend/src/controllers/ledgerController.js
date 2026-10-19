@@ -33,6 +33,8 @@ import {
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
 import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 
+const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const parseDateRange = (datePreset, startDate, endDate) => {
   const now = new Date();
   let periodStart = null;
@@ -59,6 +61,23 @@ const parseDateRange = (datePreset, startDate, endDate) => {
     case 'PREVIOUS_MONTH': {
       periodStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0));
       periodEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1, 0, 0, 0));
+      break;
+    }
+    case 'THIS_YEAR': {
+      periodStart = new Date(Date.UTC(now.getFullYear(), 0, 1, 0, 0, 0));
+      periodEnd = new Date(Date.UTC(now.getFullYear() + 1, 0, 1, 0, 0, 0));
+      break;
+    }
+    case 'THIS_FY': {
+      const currentYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      periodStart = new Date(Date.UTC(currentYear, 3, 1, 0, 0, 0));
+      periodEnd = new Date(Date.UTC(currentYear + 1, 3, 1, 0, 0, 0));
+      break;
+    }
+    case 'LAST_FY': {
+      const prevYear = (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) - 1;
+      periodStart = new Date(Date.UTC(prevYear, 3, 1, 0, 0, 0));
+      periodEnd = new Date(Date.UTC(prevYear + 1, 3, 1, 0, 0, 0));
       break;
     }
     case 'CUSTOM': {
@@ -170,6 +189,42 @@ export const getLedgerEntities = async (req, res) => {
         })),
     ];
 
+    // Extract distinct Heads and Sub Heads recorded in company transactions
+    const [distinctHeads, distinctSubHeads] = await Promise.all([
+      Transaction.distinct('head', {
+        companyId: req.companyId,
+        head: { $ne: null, $ne: '' },
+        isDeleted: { $ne: true },
+        status: 'POSTED',
+      }),
+      Transaction.distinct('subHead', {
+        companyId: req.companyId,
+        subHead: { $ne: null, $ne: '' },
+        isDeleted: { $ne: true },
+        status: 'POSTED',
+      }),
+    ]);
+
+    const headEntities = [
+      { id: 'ALL_HEADS', name: '★ All Heads (Consolidated)', type: 'HEAD', subtext: 'Consolidated transactions across all heads' },
+      ...distinctHeads.filter(Boolean).sort().map((h) => ({
+        id: h,
+        name: h,
+        type: 'HEAD',
+        subtext: `Nominal Head: ${h}`,
+      })),
+    ];
+
+    const subHeadEntities = [
+      { id: 'ALL_SUBHEADS', name: '★ All Sub Heads (Consolidated)', type: 'SUB_HEAD', subtext: 'Consolidated transactions across all sub heads' },
+      ...distinctSubHeads.filter(Boolean).sort().map((s) => ({
+        id: s,
+        name: s,
+        type: 'SUB_HEAD',
+        subtext: `Sub Head: ${s}`,
+      })),
+    ];
+
     return apiSuccess(res, {
       bankAccounts,
       cashAccounts,
@@ -178,6 +233,8 @@ export const getLedgerEntities = async (req, res) => {
       mortgages: mortgageEntities,
       expenseHeads,
       incomeHeads,
+      heads: headEntities,
+      subHeads: subHeadEntities,
     });
   } catch (error) {
     return apiError(res, 'Failed to fetch ledger entities', 500, error);
@@ -613,7 +670,86 @@ export const queryEntityLedger = async (req, res) => {
       closingBalance = round2(sumExpenses);
     }
 
-    // 6. RENT JOURNAL / OTHER INCOME / CONSOLIDATED ALL
+    // 6. HEAD & SUB HEAD CATEGORY LEDGER (UK Bank Reconciliation Hierarchy)
+    else if (type === 'HEAD' || type === 'SUB_HEAD') {
+      const headName = req.query.head || (type === 'HEAD' && entityId && entityId !== 'ALL_HEADS' ? entityId : null);
+      const subHeadName = req.query.subHead || (type === 'SUB_HEAD' && entityId && entityId !== 'ALL_SUBHEADS' ? entityId : null);
+
+      const txQuery = { companyId: req.companyId, status: 'POSTED', isDeleted: { $ne: true } };
+
+      if (headName && headName !== 'ALL_HEADS') {
+        txQuery.head = new RegExp(`^${escapeRegex(headName.trim())}$`, 'i');
+      }
+      if (subHeadName && subHeadName !== 'ALL_SUBHEADS') {
+        txQuery.subHead = new RegExp(`^${escapeRegex(subHeadName.trim())}$`, 'i');
+      }
+
+      ledgerTitle = subHeadName
+        ? `Sub Head Ledger: ${subHeadName} (${headName || 'All Heads'})`
+        : headName
+        ? `Head Ledger: ${headName}`
+        : 'Heads & Sub Heads Consolidated Ledger';
+
+      entitySubtext = `Categorized Nominal Ledger for ${req.companyId.toUpperCase()}`;
+
+      if (periodStart && periodEnd) txQuery.transactionDate = { $gte: periodStart, $lte: periodEnd };
+      else if (periodStart) txQuery.transactionDate = { $gte: periodStart };
+      else if (periodEnd) txQuery.transactionDate = { $lte: periodEnd };
+
+      if (sRegex) {
+        txQuery.$and = txQuery.$and || [];
+        txQuery.$and.push({ $or: [{ voucherNo: sRegex }, { narration: sRegex }, { reference: sRegex }] });
+      }
+
+      const txns = await Transaction.find(txQuery)
+        .sort({ transactionDate: 1, createdAt: 1 })
+        .populate('accountId', 'name')
+        .populate('counterAccountId', 'name')
+        .populate('categoryId', 'name')
+        .populate('propertyId', 'name title addressLine1')
+        .populate('unitId', 'unitName')
+        .lean();
+
+      let headRunning = 0;
+      entries = txns.map((tx) => {
+        const isDebit = tx.direction === 'OUT'; // Debit = Money Out / Payments; Credit = Money In / Receipts
+        const debit = isDebit ? tx.amount : 0;
+        const credit = !isDebit ? tx.amount : 0;
+
+        headRunning = round2(headRunning + (!isDebit ? tx.amount : -tx.amount));
+        totalDebit += debit;
+        totalCredit += credit;
+
+        return {
+          _id: tx._id,
+          date: tx.transactionDate,
+          voucherNo: tx.voucherNo,
+          detail: tx.narration,
+          transactionType: tx.transactionType,
+          head: tx.head || '',
+          subHead: tx.subHead || '',
+          categoryName: tx.head && tx.subHead ? `${tx.head} · ${tx.subHead}` : (tx.subHead || tx.head || tx.categoryId?.name || tx.transactionType),
+          drAccount: isDebit ? (tx.subHead || tx.head || 'Expense') : (tx.accountId?.name || 'Bank Account'),
+          crAccount: !isDebit ? (tx.subHead || tx.head || 'Revenue') : (tx.accountId?.name || 'Bank Account'),
+          propertyName: tx.propertyId?.title || tx.propertyId?.name || tx.propertyId?.addressLine1 || '',
+          unitName: tx.unitId?.unitName || '',
+          reference: tx.reference || '',
+          receiptUrl: tx.receiptUrl || (tx.documents?.[0]?.url || ''),
+          receiptFilename: tx.receiptFilename || (tx.documents?.[0]?.title || ''),
+          documents: tx.documents || [],
+          debit: round2(debit),
+          credit: round2(credit),
+          amount: round2(tx.amount),
+          runningBalance: round2(headRunning),
+          direction: tx.direction,
+        };
+      });
+
+      openingBalance = 0;
+      closingBalance = round2(headRunning);
+    }
+
+    // 7. RENT JOURNAL / OTHER INCOME / CONSOLIDATED ALL
     else {
       ledgerTitle = type === 'RENT'
         ? 'Rent Invoicing & Collections Journal'
@@ -715,6 +851,124 @@ export const queryEntityLedger = async (req, res) => {
     });
   } catch (error) {
     return apiError(res, error.message || 'Failed to query entity ledger', 500, error);
+  }
+};
+
+/**
+ * Interactive Head & Sub Head Pivot Summary
+ * Aggregates all transactions by Head and Sub Head with Payments, Receipts, and Net Balance.
+ * Exactly matches the hierarchical summary of the UK bank reconciliation report.
+ */
+export const getHeadSubHeadSummary = async (req, res) => {
+  try {
+    const { datePreset = 'ALL', startDate, endDate, search } = req.query;
+    const { periodStart, periodEnd } = parseDateRange(datePreset, startDate, endDate);
+
+    const matchQuery = {
+      companyId: req.companyId,
+      status: 'POSTED',
+      isDeleted: { $ne: true },
+    };
+
+    if (periodStart && periodEnd) matchQuery.transactionDate = { $gte: periodStart, $lte: periodEnd };
+    else if (periodStart) matchQuery.transactionDate = { $gte: periodStart };
+    else if (periodEnd) matchQuery.transactionDate = { $lte: periodEnd };
+
+    if (search && search.trim()) {
+      const s = search.trim();
+      matchQuery.$or = [
+        { head: { $regex: s, $options: 'i' } },
+        { subHead: { $regex: s, $options: 'i' } },
+        { narration: { $regex: s, $options: 'i' } },
+        { voucherNo: { $regex: s, $options: 'i' } },
+      ];
+    }
+
+    const aggregated = await Transaction.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: {
+            head: { $ifNull: ['$head', 'Uncategorized'] },
+            subHead: { $ifNull: ['$subHead', 'General'] },
+          },
+          count: { $sum: 1 },
+          payments: { $sum: { $cond: [{ $eq: ['$direction', 'OUT'] }, '$amount', 0] } },
+          receipts: { $sum: { $cond: [{ $eq: ['$direction', 'IN'] }, '$amount', 0] } },
+        },
+      },
+      {
+        $sort: { '_id.head': 1, '_id.subHead': 1 },
+      },
+    ]);
+
+    const headsMap = {};
+    let grandTotalPayments = 0;
+    let grandTotalReceipts = 0;
+    let grandTotalCount = 0;
+
+    aggregated.forEach((item) => {
+      const headName = item._id.head || 'Uncategorized';
+      const subHeadName = item._id.subHead || 'General';
+      const payments = round2(item.payments);
+      const receipts = round2(item.receipts);
+      const count = item.count;
+      const net = round2(receipts - payments);
+
+      grandTotalPayments = round2(grandTotalPayments + payments);
+      grandTotalReceipts = round2(grandTotalReceipts + receipts);
+      grandTotalCount += count;
+
+      if (!headsMap[headName]) {
+        headsMap[headName] = {
+          head: headName,
+          totalPayments: 0,
+          totalReceipts: 0,
+          net: 0,
+          count: 0,
+          subHeads: [],
+        };
+      }
+
+      headsMap[headName].totalPayments = round2(headsMap[headName].totalPayments + payments);
+      headsMap[headName].totalReceipts = round2(headsMap[headName].totalReceipts + receipts);
+      headsMap[headName].net = round2(headsMap[headName].totalReceipts - headsMap[headName].totalPayments);
+      headsMap[headName].count += count;
+
+      headsMap[headName].subHeads.push({
+        subHead: subHeadName,
+        head: headName,
+        payments,
+        receipts,
+        net,
+        count,
+      });
+    });
+
+    const headsList = Object.values(headsMap);
+
+    // Canonical UK corporate ordering: Income, Admin Expenses, Loan, Interest Expenses, Others, Property Purchase
+    const priorityOrder = ['income', 'admin expenses', 'loan', 'interest expenses', 'property purchase', 'others'];
+    headsList.sort((a, b) => {
+      const idxA = priorityOrder.indexOf(a.head.toLowerCase().trim());
+      const idxB = priorityOrder.indexOf(b.head.toLowerCase().trim());
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.head.localeCompare(b.head);
+    });
+
+    return apiSuccess(res, {
+      heads: headsList,
+      totals: {
+        totalPayments: grandTotalPayments,
+        totalReceipts: grandTotalReceipts,
+        netMovement: round2(grandTotalReceipts - grandTotalPayments),
+        totalTransactions: grandTotalCount,
+      },
+    });
+  } catch (error) {
+    return apiError(res, 'Failed to generate Head & Sub Head summary', 500, error);
   }
 };
 

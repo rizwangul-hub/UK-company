@@ -22,6 +22,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOGO_PATH = path.resolve(__dirname, '../assets/logo.png');
 
+const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Format standard UK date string (DD/MM/YYYY)
  */
@@ -330,6 +332,25 @@ export const buildLedgerReportData = async (filters = {}) => {
         reportTitle = `${transactionType} Transaction Journal`;
         scopeDescription = `All ${transactionType} operations across UK portfolio`;
       }
+      break;
+    }
+
+    case 'HEAD':
+    case 'SUB_HEAD': {
+      const headName = filters.head || (scope === 'HEAD' ? entityId : null);
+      const subHeadName = filters.subHead || (scope === 'SUB_HEAD' ? entityId : null);
+      if (headName && headName !== 'ALL_HEADS') {
+        query.head = new RegExp(`^${escapeRegex(headName.trim())}$`, 'i');
+      }
+      if (subHeadName && subHeadName !== 'ALL_SUBHEADS') {
+        query.subHead = new RegExp(`^${escapeRegex(subHeadName.trim())}$`, 'i');
+      }
+      reportTitle = subHeadName
+        ? `Sub Head Ledger: ${subHeadName} (${headName || 'All Heads'})`
+        : headName
+        ? `Head Ledger: ${headName}`
+        : 'Heads & Sub Heads Consolidated Ledger';
+      scopeDescription = 'Categorized UK Nominal Ledger';
       break;
     }
 
