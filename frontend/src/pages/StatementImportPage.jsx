@@ -518,40 +518,48 @@ export function StatementImportPage({ selectedCompany }) {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4">
-      {/* Executive Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 text-white shadow-2xl border border-indigo-500/20">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+      {/* Top Header & Bank Selector Banner */}
+      <div className="p-4 sm:p-6 rounded-2xl dashboard-header-banner space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Zero External AI · 100% Deterministic Engine
               </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-200 border border-indigo-400/30">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30">
                 GBP (£) UK
               </span>
+              {selectedCompany?.name && (
+                <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30">
+                  {selectedCompany.name}
+                </span>
+              )}
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
-              <FileUp className="w-8 h-8 text-indigo-400" />
-              Bank Statement Import & Reconciliation
+
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/60 shadow-xs shrink-0">
+                <FileUp className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <span>Bank Statement Import &amp; Reconciliation</span>
             </h1>
-            <p className="text-slate-300 text-sm md:text-base max-w-2xl">
-              Upload bank statements for <strong className="text-white">{selectedCompany?.name || 'Active Company'}</strong>,
-              auto-classify rent receipts, mortgage servicing, and property expenses, and post directly to the Central Ledger.
+
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium max-w-3xl">
+              Upload Excel or CSV bank statements for <strong className="text-slate-900 dark:text-white font-bold">{selectedCompany?.name || 'Active Company'}</strong>, auto-classify rent receipts, mortgage servicing, and property expenses, and post directly to the Central Ledger.
             </p>
           </div>
 
-          {/* Bank Account Selector Card */}
-          <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 min-w-[280px]">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Target Bank Account
+          {/* Target Bank Account Selector Card */}
+          <div className="bg-slate-50/90 dark:bg-slate-900/90 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs min-w-[300px] shrink-0">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>Target Bank Account</span>
+              <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 lowercase">reconciliation target</span>
             </label>
             <div className="relative">
               <select
                 value={selectedAccountId}
                 onChange={(e) => setSelectedAccountId(e.target.value)}
-                className="w-full appearance-none bg-slate-900/80 text-white rounded-xl px-3.5 py-2.5 pr-9 text-sm font-medium border border-indigo-400/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+                className="w-full appearance-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl px-3.5 py-2.5 pr-9 text-xs sm:text-sm font-semibold border border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-xs"
               >
                 {accounts.length === 0 ? (
                   <option value="">No bank accounts available</option>
@@ -563,13 +571,13 @@ export function StatementImportPage({ selectedCompany }) {
                   ))
                 )}
               </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3.5 pointer-events-none" />
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
             </div>
           </div>
         </div>
 
         {/* Tab Navigation Navigation Bar */}
-        <div className="flex items-center gap-2 mt-6 pt-4 border-t border-white/10 overflow-x-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 pt-3 border-t border-slate-200/70 dark:border-slate-800/80 overflow-x-auto pb-0.5">
           {[
             { id: 'upload', label: '1. Upload & Map Statement', icon: FileSpreadsheet },
             {
@@ -592,18 +600,18 @@ export function StatementImportPage({ selectedCompany }) {
                     loadBatchRows(activeBatchId);
                   }
                 }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer shrink-0 ${
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer shrink-0 ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                    : 'text-slate-300 hover:text-white hover:bg-white/10'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 ring-1 ring-indigo-500'
+                    : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700/60 shadow-2xs'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400'}`} />
                 <span>{tab.label}</span>
                 {tab.badge !== null && tab.badge !== undefined && (
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                      isActive ? 'bg-white text-indigo-700' : 'bg-indigo-500/30 text-indigo-200'
+                    className={`text-[11px] px-2 py-0.5 rounded-full font-extrabold ${
+                      isActive ? 'bg-white text-indigo-700' : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
                     }`}
                   >
                     {tab.badge}
