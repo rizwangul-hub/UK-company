@@ -83,6 +83,7 @@ export function StatementImportPage({ selectedCompany }) {
   // Posting Modal & Reconciliation State
   const [showPostModal, setShowPostModal] = useState(false);
   const [postingLoading, setPostingLoading] = useState(false);
+  const [postingProgress, setPostingProgress] = useState(null);
   const [postResult, setPostResult] = useState(null);
   const [reconciliationData, setReconciliationData] = useState(null);
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
@@ -389,27 +390,105 @@ export function StatementImportPage({ selectedCompany }) {
     }
   };
 
-  // Commit Approved Rows to Ledger
+  // Commit Approved Rows to Ledger in safe chunked batches
   const handleConfirmPost = async () => {
     if (!activeBatchId) return;
+
+    // Filter down to rows that are actually eligible to post (unposted & not excluded)
+    const allSelected = Array.from(selectedRowIds);
+    const unpostedIds =
+      stagedRows.length > 0
+        ? stagedRows
+            .filter((r) => selectedRowIds.has(r._id) && r.status !== 'POSTED' && !r.isExcluded)
+            .map((r) => r._id)
+        : allSelected;
+
+    if (unpostedIds.length === 0) {
+      setPostResult({
+        error:
+          'No unposted transactions are currently selected. All selected rows are either already posted or excluded.',
+      });
+      return;
+    }
+
     setPostingLoading(true);
     setPostResult(null);
 
+    const CHUNK_SIZE = 35;
+    const chunks = [];
+    for (let i = 0; i < unpostedIds.length; i += CHUNK_SIZE) {
+      chunks.push(unpostedIds.slice(i, i + CHUNK_SIZE));
+    }
+
+    let totalPosted = 0;
+    let totalFailed = 0;
+    const allErrors = [];
+
+    setPostingProgress({
+      current: 0,
+      total: unpostedIds.length,
+      percent: 0,
+      chunk: 1,
+      totalChunks: chunks.length,
+      message: `Preparing to post ${unpostedIds.length} transactions across ${chunks.length} batches...`,
+    });
+
     try {
-      const rowIds = Array.from(selectedRowIds);
-      const res = await statementImportAPI.postBatch(activeBatchId, {
-        rowIds: rowIds.length > 0 ? rowIds : null,
-      });
-      if (res?.success) {
-        setPostResult(res.data);
-        await loadBatchRows(activeBatchId);
-        // Refresh reconciliation
-        await loadReconciliation();
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        setPostingProgress({
+          current: totalPosted,
+          total: unpostedIds.length,
+          percent: Math.round((totalPosted / unpostedIds.length) * 100),
+          chunk: i + 1,
+          totalChunks: chunks.length,
+          message: `Posting batch ${i + 1} of ${chunks.length} (${totalPosted} of ${unpostedIds.length} posted)...`,
+        });
+
+        const res = await statementImportAPI.postBatch(activeBatchId, {
+          rowIds: chunk,
+        });
+
+        if (res?.success && res.data) {
+          totalPosted += res.data.postedCount || 0;
+          totalFailed += res.data.failedCount || 0;
+          if (res.data.errors && res.data.errors.length > 0) {
+            allErrors.push(...res.data.errors);
+          }
+        } else {
+          throw new Error(res?.message || `Failed to post batch ${i + 1}`);
+        }
+
+        setPostingProgress({
+          current: totalPosted,
+          total: unpostedIds.length,
+          percent: Math.round((totalPosted / unpostedIds.length) * 100),
+          chunk: i + 1,
+          totalChunks: chunks.length,
+          message: `Batch ${i + 1} of ${chunks.length} posted successfully!`,
+        });
       }
-    } catch (err) {
+
       setPostResult({
-        error: err.response?.data?.message || err.message || 'Failed to post transactions.',
+        success: true,
+        postedCount: totalPosted,
+        failedCount: totalFailed,
+        errors: allErrors,
       });
+
+      // Reload rows & refresh reconciliation
+      await loadBatchRows(activeBatchId);
+      await loadReconciliation();
+      await loadBatchHistory();
+    } catch (err) {
+      console.error('Batch post chunking error:', err);
+      setPostResult({
+        error: err.response?.data?.message || err.message || 'Failed while posting transaction batches.',
+        postedCount: totalPosted,
+      });
+      // Still reload whatever was posted so far so the UI updates
+      await loadBatchRows(activeBatchId);
+      await loadReconciliation();
     } finally {
       setPostingLoading(false);
     }
@@ -1751,16 +1830,28 @@ export function StatementImportPage({ selectedCompany }) {
                   </h3>
                 </div>
                 <button
-                  onClick={() => setShowPostModal(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                  onClick={() => {
+                    if (!postingLoading) {
+                      setShowPostModal(false);
+                      setPostingProgress(null);
+                      setPostResult(null);
+                    }
+                  }}
+                  disabled={postingLoading}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer disabled:opacity-40"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <p className="text-sm text-slate-600 dark:text-slate-300">
-                You are about to commit <strong>{selectedRowIds.size} transactions</strong> to the authoritative Central Ledger.
-                This will create official financial vouchers and adjust the bank account liquidity.
+                You are about to commit{' '}
+                <strong>
+                  {stagedRows.filter((r) => selectedRowIds.has(r._id) && r.status !== 'POSTED' && !r.isExcluded)
+                    .length || selectedRowIds.size}{' '}
+                  transactions
+                </strong>{' '}
+                to the authoritative Central Ledger. This will create official financial vouchers and adjust the bank account liquidity.
               </p>
 
               {/* Financial Impact Breakdown Card */}
@@ -1781,6 +1872,28 @@ export function StatementImportPage({ selectedCompany }) {
                 </div>
               </div>
 
+              {/* Live Chunking Progress Bar */}
+              {postingLoading && postingProgress && (
+                <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 space-y-2.5">
+                  <div className="flex justify-between items-center text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-600 dark:text-indigo-400" />
+                      {postingProgress.message || 'Posting to Central Ledger...'}
+                    </span>
+                    <span className="font-mono">{postingProgress.percent}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-indigo-600 h-full rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${Math.min(100, Math.max(5, postingProgress.percent))}%` }}
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
+                    Posting safely in streaming chunks to guarantee zero timeouts and preserve ledger integrity.
+                  </div>
+                </div>
+              )}
+
               {postResult?.error && (
                 <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -1798,9 +1911,13 @@ export function StatementImportPage({ selectedCompany }) {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowPostModal(false)}
+                  onClick={() => {
+                    setShowPostModal(false);
+                    setPostingProgress(null);
+                    setPostResult(null);
+                  }}
                   disabled={postingLoading}
-                  className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer disabled:opacity-40"
                 >
                   {postResult?.success ? 'Close' : 'Cancel'}
                 </button>

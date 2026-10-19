@@ -307,7 +307,7 @@ export const postBatch = async (req, res) => {
   try {
     const companyId = req.companyId;
     const { batchId } = req.params;
-    const { rowIds } = req.body;
+    const { rowIds, limit } = req.body;
 
     const batch = await StatementImportBatch.findOne({ _id: batchId, companyId });
     if (!batch) {
@@ -317,6 +317,7 @@ export const postBatch = async (req, res) => {
     const result = await postBatchTransactions({
       batchId,
       rowIds: Array.isArray(rowIds) && rowIds.length > 0 ? rowIds : null,
+      limit: limit ? Number(limit) : (req.query.limit ? Number(req.query.limit) : null),
       userId: req.user?._id || null,
       userName: req.user?.name || 'System Operator',
     });

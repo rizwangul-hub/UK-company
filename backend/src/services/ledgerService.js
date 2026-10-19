@@ -122,6 +122,10 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
     receiptUrl = '',
     receiptFilename = '',
     documents = [],
+    importBatchId = null,
+    statementRef = '',
+    reconciled = false,
+    reconciledAt = null,
   } = data;
 
   if (!companyId) {
@@ -262,6 +266,10 @@ export const postLedgerTransaction = async (data, externalSession = null) => {
           receiptFilename,
           documents: resolvedDocs,
           status: 'POSTED',
+          importBatchId,
+          statementRef,
+          reconciled,
+          reconciledAt,
           isDeleted: false,
           auditHistory: [initialAudit],
           createdBy: userId,

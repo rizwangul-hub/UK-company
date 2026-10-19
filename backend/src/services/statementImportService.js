@@ -12,7 +12,7 @@ import Mortgage from '../models/Mortgage.js';
 import RentSchedule from '../models/RentSchedule.js';
 import RentPayment from '../models/RentPayment.js';
 import MortgagePayment from '../models/MortgagePayment.js';
-import { postLedgerTransaction, deleteLedgerTransaction, round2 } from './ledgerService.js';
+import { postLedgerTransaction, deleteLedgerTransaction, generateVoucherNo, round2 } from './ledgerService.js';
 
 /**
  * Tokenize string into alphanumeric search tokens for fuzzy matching
@@ -901,7 +901,7 @@ export const saveStatementBatch = async ({
 /**
  * Post approved rows of an import batch to the authoritative Central Ledger
  */
-export const postBatchTransactions = async ({ batchId, rowIds = null, userId = null, userName = 'System Operator' }) => {
+export const postBatchTransactions = async ({ batchId, rowIds = null, limit = null, userId = null, userName = 'System Operator' }) => {
   const batch = await StatementImportBatch.findById(batchId);
   if (!batch) throw new Error('Statement import batch not found.');
   if (batch.status === 'POSTED') throw new Error('This statement batch has already been fully posted.');
@@ -915,17 +915,39 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, userId = n
     filter._id = { $in: rowIds };
   }
 
-  const rowsToPost = await StatementImportRow.find(filter).sort({ rowIndex: 1 });
+  let query = StatementImportRow.find(filter).sort({ rowIndex: 1 });
+  if (limit && Number(limit) > 0) {
+    query = query.limit(Number(limit));
+  }
+
+  const rowsToPost = await query;
   if (!rowsToPost.length) {
     return {
       success: true,
       postedCount: 0,
+      failedCount: 0,
+      errors: [],
       message: 'No eligible approved rows found to post.',
     };
   }
 
   let postedCount = 0;
   const errors = [];
+
+  // In-memory voucher sequence cache per type code to eliminate redundant index/regex queries
+  const voucherCounters = {};
+  const getNextVoucherNo = async (typeCode) => {
+    if (!voucherCounters[typeCode]) {
+      const initialVoucher = await generateVoucherNo(typeCode, batch.companyId);
+      const lastDash = initialVoucher.lastIndexOf('-');
+      const prefix = initialVoucher.slice(0, lastDash);
+      const seq = parseInt(initialVoucher.slice(lastDash + 1), 10) || 1;
+      voucherCounters[typeCode] = { prefix, currentSeq: seq };
+      return initialVoucher;
+    }
+    voucherCounters[typeCode].currentSeq += 1;
+    return `${voucherCounters[typeCode].prefix}-${String(voucherCounters[typeCode].currentSeq).padStart(4, '0')}`;
+  };
 
   for (const row of rowsToPost) {
     try {
@@ -938,8 +960,20 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, userId = n
           ? 'MORTGAGE_PAYMENT'
           : 'EXPENSE';
 
+      const typeCode =
+        txType === 'INCOME'
+          ? 'RNT'
+          : txType === 'TRANSFER'
+          ? 'TRF'
+          : txType === 'MORTGAGE_PAYMENT'
+          ? 'MTG'
+          : 'EXP';
+
+      const voucherNo = await getNextVoucherNo(typeCode);
+
       const postResult = await postLedgerTransaction({
         companyId: batch.companyId,
+        voucherNo,
         transactionDate: row.transactionDate,
         transactionType: txType,
         accountId: batch.accountId,
@@ -958,10 +992,6 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, userId = n
         reference: row.reference || `IMP-${batch._id.toString().slice(-6)}-R${row.rowIndex}`,
         userId,
         userName,
-      });
-
-      // Update Transaction with batch references
-      await Transaction.findByIdAndUpdate(postResult.transaction._id, {
         importBatchId: batch._id,
         statementRef: `Row #${row.rowIndex} (${batch.filename})`,
         reconciled: true,
@@ -1039,6 +1069,7 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, userId = n
     failedCount: errors.length,
     errors,
     batchStatus: batch.status,
+    totalPostedInBatch,
   };
 };
 
