@@ -625,7 +625,8 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
         } else if (matchedCat.type === 'FINANCE_COST' || /interest/i.test(normHead)) {
           suggestedType = 'MORTGAGE_PAYMENT';
         } else if (matchedCat.type === 'TRANSFER' || /loan|other/i.test(normHead)) {
-          suggestedType = 'TRANSFER';
+          // If no second bank account is designated, loans are income (inflow) or expense (outflow)
+          suggestedType = row.direction === 'IN' ? 'RENT' : 'EXPENSE';
         } else {
           suggestedType = 'EXPENSE';
         }
@@ -673,13 +674,17 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
         ? `Matched mortgage lender facility: ${suggestedMortgageName}`
         : 'Mortgage lender servicing debt debit';
     } else if (isTransferSignal) {
-      suggestedType = 'TRANSFER';
-      confidenceScore = 80;
-      classificationReason = 'Inter-account liquidity movement or company loan';
       const otherAccount = accounts.find((a) => a._id.toString() !== accountId.toString());
       if (otherAccount) {
+        suggestedType = 'TRANSFER';
         suggestedCounterAccountId = otherAccount._id;
         suggestedCounterAccountName = otherAccount.name;
+        confidenceScore = 80;
+        classificationReason = 'Inter-account liquidity movement matched to ' + otherAccount.name;
+      } else {
+        suggestedType = row.direction === 'IN' ? 'RENT' : 'EXPENSE';
+        confidenceScore = 75;
+        classificationReason = 'Company loan or financing transaction';
       }
     } else if (row.direction === 'OUT') {
       suggestedType = 'EXPENSE';
@@ -951,14 +956,20 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, limit = nu
 
   for (const row of rowsToPost) {
     try {
+      const hasValidCounterAccount =
+        row.suggestedCounterAccountId &&
+        row.suggestedCounterAccountId.toString() !== batch.accountId.toString();
+
       const txType =
-        row.suggestedType === 'RENT'
-          ? 'INCOME'
-          : row.suggestedType === 'TRANSFER'
+        row.suggestedType === 'TRANSFER' && hasValidCounterAccount
           ? 'TRANSFER'
+          : row.suggestedType === 'RENT' || (row.direction === 'IN' && row.suggestedType !== 'EXPENSE')
+          ? 'INCOME'
           : row.suggestedType === 'MORTGAGE_PAYMENT'
           ? 'MORTGAGE_PAYMENT'
           : 'EXPENSE';
+
+      const counterAccountId = txType === 'TRANSFER' ? row.suggestedCounterAccountId : null;
 
       const typeCode =
         txType === 'INCOME'
@@ -977,7 +988,7 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, limit = nu
         transactionDate: row.transactionDate,
         transactionType: txType,
         accountId: batch.accountId,
-        counterAccountId: row.suggestedCounterAccountId || null,
+        counterAccountId,
         categoryId: row.suggestedCategoryId || null,
         headId: row.suggestedHeadId || null,
         subHeadId: row.suggestedSubHeadId || null,

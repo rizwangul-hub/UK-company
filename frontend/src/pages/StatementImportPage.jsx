@@ -469,12 +469,21 @@ export function StatementImportPage({ selectedCompany }) {
         });
       }
 
-      setPostResult({
-        success: true,
-        postedCount: totalPosted,
-        failedCount: totalFailed,
-        errors: allErrors,
-      });
+      if (totalPosted === 0 && totalFailed > 0) {
+        const firstErr = allErrors[0]?.error || 'Failed to post selected transactions.';
+        setPostResult({
+          error: `Posting failed: ${totalFailed} transaction(s) could not be posted. Reason: ${firstErr}`,
+          failedCount: totalFailed,
+          errors: allErrors,
+        });
+      } else {
+        setPostResult({
+          success: true,
+          postedCount: totalPosted,
+          failedCount: totalFailed,
+          errors: allErrors,
+        });
+      }
 
       // Reload rows & refresh reconciliation
       await loadBatchRows(activeBatchId);
