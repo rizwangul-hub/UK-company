@@ -18,6 +18,7 @@ import { ChartOfAccountsPage } from './pages/ChartOfAccountsPage.jsx';
 import { GroupPortfolioDashboard } from './pages/GroupPortfolioDashboard.jsx';
 import { RecycleBinPage } from './pages/RecycleBinPage.jsx';
 import { StatementImportPage } from './pages/StatementImportPage.jsx';
+import { ProfitLossPage } from './pages/ProfitLossPage.jsx';
 import { authAPI, clearApiCache } from './services/api.js';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { PWAInstallBanner } from './components/PWAInstallBanner.jsx';
@@ -369,6 +370,7 @@ export function App() {
               selectedCompany={selectedCompany}
             />
           )}
+          {currentView === 'profit-loss' && <ProfitLossPage selectedCompany={selectedCompany} />}
           {currentView === 'data-entry' && <DataEntryPage selectedCompany={selectedCompany} />}
           {currentView === 'properties' && <PropertiesPage selectedCompany={selectedCompany} />}
           {currentView === 'appliances' && <AppliancesPage selectedCompany={selectedCompany} />}
@@ -384,6 +386,7 @@ export function App() {
           {currentView === 'settings' && <SettingsPage user={user} selectedCompany={selectedCompany} />}
           {![
             'dashboard',
+            'profit-loss',
             'data-entry',
             'properties',
             'appliances',

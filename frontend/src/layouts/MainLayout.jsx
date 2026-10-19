@@ -21,6 +21,7 @@ import {
   Sparkles,
   Trash2,
   FileUp,
+  TrendingUp,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import pixxLogo from '../assets/logo.png';
@@ -28,6 +29,7 @@ import { getPageAnimationClass } from '../utils/pageAnimations.js';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'profit-loss', label: 'Profit & Loss', icon: TrendingUp, badge: 'P&L' },
   { id: 'data-entry', label: 'Data Entry', icon: FileEdit, badge: 'OPS' },
   { id: 'properties', label: 'Properties', icon: Building2 },
   { id: 'appliances', label: 'Appliances & Valet', icon: Sparkles, badge: 'CARE' },

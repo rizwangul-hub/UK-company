@@ -5,6 +5,7 @@ import {
   Wallet,
   Receipt,
   TrendingUp,
+  TrendingDown,
   Percent,
   Calendar,
   ArrowUpRight,
@@ -24,7 +25,7 @@ import {
   Download,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
-import { reportsAPI, complianceAPI, propertyChargesAPI, getApiCache } from '../services/api.js';
+import { reportsAPI, complianceAPI, propertyChargesAPI, pnlAPI, getApiCache } from '../services/api.js';
 
 export function DashboardPage({ onNavigate, selectedCompany }) {
   const currentMonthVal = getCurrentMonth();
@@ -34,6 +35,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const [loading, setLoading] = useState(!initialCache?.data);
   const [complianceData, setComplianceData] = useState(null);
   const [chargesOverview, setChargesOverview] = useState(null);
+  const [pnlSummary, setPnlSummary] = useState(null);
   const [exportingReport, setExportingReport] = useState(false);
 
   const companyName = selectedCompany?.name || 'Portfolio';
@@ -42,10 +44,11 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [res, compRes, chargesRes] = await Promise.all([
+      const [res, compRes, chargesRes, pnlRes] = await Promise.all([
         reportsAPI.getDashboardStats({ month: selectedMonth }, { forceRefresh: true }),
         complianceAPI.getOverview({ forceRefresh: true }).catch(() => null),
         propertyChargesAPI.getOverview({ forceRefresh: true }).catch(() => null),
+        pnlAPI.getSummary({ month: selectedMonth }, { forceRefresh: true }).catch(() => null),
       ]);
       if (res?.success) {
         setData(res.data);
@@ -55,6 +58,9 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
       }
       if (chargesRes?.success) {
         setChargesOverview(chargesRes.data);
+      }
+      if (pnlRes?.success) {
+        setPnlSummary(pnlRes.data);
       }
     } catch (err) {
       console.error('Failed to load dashboard stats:', err);
@@ -66,6 +72,10 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   useEffect(() => {
     let isCurrent = true;
     const cached = getApiCache('/reports/dashboard', { params: { month: selectedMonth } });
+    const cachedPnl = getApiCache('/pnl/summary', { params: { month: selectedMonth } });
+    if (cachedPnl?.data) {
+      setPnlSummary(cachedPnl.data);
+    }
     if (cached?.data) {
       setData(cached.data);
       setLoading(false);
@@ -75,10 +85,11 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
     const loadStats = async () => {
       try {
-        const [res, compRes, chargesRes] = await Promise.all([
+        const [res, compRes, chargesRes, pnlRes] = await Promise.all([
           reportsAPI.getDashboardStats({ month: selectedMonth }),
           complianceAPI.getOverview().catch(() => null),
           propertyChargesAPI.getOverview().catch(() => null),
+          pnlAPI.getSummary({ month: selectedMonth }).catch(() => null),
         ]);
         if (isCurrent && res?.success) {
           setData(res.data);
@@ -88,6 +99,9 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
         }
         if (isCurrent && chargesRes?.success) {
           setChargesOverview(chargesRes.data);
+        }
+        if (isCurrent && pnlRes?.success) {
+          setPnlSummary(pnlRes.data);
         }
       } catch (err) {
         if (isCurrent) console.error('Failed to load dashboard stats:', err);
@@ -378,6 +392,127 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
                 </div>
                 <div className="metric-subtext min-w-0 break-words text-[10px] font-medium mt-1">
                   Rent + Inflow − Exp − Mortgages
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Executive Profit & Loss Performance Widget */}
+          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Profit & Loss Executive Summary: {formatMonthLabel(selectedMonth)}
+                    </h3>
+                    <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30">
+                      P&L Statement
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Recognised income less allowable operating expenditure and mortgage finance interest.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('profit-loss')}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition cursor-pointer self-start sm:self-auto"
+              >
+                <span>View Full P&L Statement</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Card 1: Current Month Net Profit / Loss */}
+              <div className={`p-4 rounded-xl border ${
+                pnlSummary?.currentPeriod?.isProfit
+                  ? 'bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-950/20'
+                  : 'bg-rose-500/5 border-rose-500/30 dark:bg-rose-950/20'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {formatMonthLabel(selectedMonth)} Net Result
+                  </span>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                    pnlSummary?.currentPeriod?.isProfit
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
+                      : 'bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300'
+                  }`}>
+                    {pnlSummary?.currentPeriod?.isProfit ? 'Net Profit' : 'Net Loss'}
+                  </span>
+                </div>
+                <div className={`text-2xl font-black mt-2 tabular-nums ${
+                  pnlSummary?.currentPeriod?.isProfit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                }`}>
+                  {formatGBP(pnlSummary?.currentPeriod?.netResult ?? (m.rentCollected - m.operatingExpenses - m.mortgageInterestPaid))}
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                  <span>Net Margin:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {pnlSummary?.currentPeriod?.netProfitMargin != null ? `${pnlSummary.currentPeriod.netProfitMargin}%` : '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 2: MoM Comparison */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    Previous Month Comparison
+                  </span>
+                  {pnlSummary?.comparison?.hasComparison && (
+                    <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${
+                      (pnlSummary.comparison.netChange || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'
+                    }`}>
+                      {(pnlSummary.comparison.netChange || 0) >= 0 ? (
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      ) : (
+                        <ArrowDownRight className="w-3.5 h-3.5" />
+                      )}
+                      {pnlSummary.comparison.netChangePercent != null ? `${pnlSummary.comparison.netChangePercent}%` : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white mt-2 tabular-nums">
+                  {pnlSummary?.comparison?.hasComparison
+                    ? `${(pnlSummary.comparison.netChange || 0) >= 0 ? '+' : ''}${formatGBP(pnlSummary.comparison.netChange)}`
+                    : 'Baseline Month'}
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                  <span>Prev Net Result:</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {pnlSummary?.comparison?.hasComparison ? formatGBP(pnlSummary.comparison.prevNetResult) : '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 3: Year-to-Date (YTD) Profit */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    Year-to-Date (YTD) Result
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    Annual YTD
+                  </span>
+                </div>
+                <div className={`text-2xl font-black mt-2 tabular-nums ${
+                  (pnlSummary?.ytd?.netResult || 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                }`}>
+                  {formatGBP(pnlSummary?.ytd?.netResult || 0)}
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                  <span>YTD Revenue:</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {formatGBP(pnlSummary?.ytd?.totalIncome || 0)}
+                  </span>
                 </div>
               </div>
             </div>

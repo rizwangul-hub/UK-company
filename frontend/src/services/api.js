@@ -655,6 +655,41 @@ export const reportsAPI = {
 };
 
 // --------------------------------------------------------------------------
+// Profit & Loss API
+// --------------------------------------------------------------------------
+export const pnlAPI = {
+  getReport: async (params, config = {}) => {
+    return cachedGet('/pnl', { params, ...config });
+  },
+  getSummary: async (params, config = {}) => {
+    return cachedGet('/pnl/summary', { params, ...config });
+  },
+  classifyTransaction: async (id, data) => {
+    const res = await api.patch(`/pnl/classify/${id}`, data);
+    clearApiCache();
+    return res.data;
+  },
+  downloadExcel: async (params, customFilename) => {
+    const res = await api.get('/pnl/export/excel', {
+      params,
+      responseType: 'blob',
+    });
+    const filename = customFilename || `UK_Property_Profit_and_Loss_${params?.datePreset || 'Statement'}.xlsx`;
+    triggerBlobDownload(res.data, filename);
+    return true;
+  },
+  downloadCsv: async (params, customFilename) => {
+    const res = await api.get('/pnl/export/csv', {
+      params,
+      responseType: 'blob',
+    });
+    const filename = customFilename || `UK_Property_Profit_and_Loss_${params?.datePreset || 'Statement'}.csv`;
+    triggerBlobDownload(res.data, filename);
+    return true;
+  },
+};
+
+// --------------------------------------------------------------------------
 // Property Documents & Compliance API
 // --------------------------------------------------------------------------
 export const complianceAPI = {

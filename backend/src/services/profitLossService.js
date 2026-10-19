@@ -681,6 +681,29 @@ export async function calculateProfitAndLoss({
         propBucket.operatingExpenses = round2(propBucket.operatingExpenses + classification.operatingFeeAmount);
       }
 
+      // Also record principal component if split from mortgage payment (balance sheet liability reduction)
+      if (classification.principalAmountExcluded && classification.principalAmountExcluded > 0) {
+        totalExcluded = round2(totalExcluded + classification.principalAmountExcluded);
+        const reasonKey = 'EXCLUDED_PRINCIPAL';
+        if (!excludedItems.has(reasonKey)) {
+          excludedItems.set(reasonKey, {
+            classification: reasonKey,
+            reason: 'Mortgage principal repayment component (Balance sheet liability reduction, excluded from P&L)',
+            total: 0,
+            count: 0,
+            transactions: [],
+          });
+        }
+        const e = excludedItems.get(reasonKey);
+        e.total = round2(e.total + classification.principalAmountExcluded);
+        e.count += 1;
+        e.transactions.push({
+          ...rowDetail,
+          amount: classification.principalAmountExcluded,
+          reason: 'Mortgage principal repayment',
+        });
+      }
+
       propBucket.financeCosts = round2(propBucket.financeCosts + amount);
       propBucket.totalExpenses = round2(propBucket.totalExpenses + amount);
       propBucket.transactionCount += 1;
@@ -768,10 +791,10 @@ export async function calculateProfitAndLoss({
       const prevExp = round2(prevOpex + prevFin);
       const prevNet = round2(prevInc - prevExp);
 
-      const incDelta = round2(totalIncome - prevInc);
-      const incDeltaPct = prevInc > 0 ? round2((incDelta / prevInc) * 100) : 0;
-      const expDelta = round2(totalExpenses - prevExp);
-      const expDeltaPct = prevExp > 0 ? round2((expDelta / prevExp) * 100) : 0;
+      const incomeDelta = round2(totalIncome - prevInc);
+      const incomeDeltaPct = prevInc > 0 ? round2((incomeDelta / prevInc) * 100) : 0;
+      const expenseDelta = round2(totalExpenses - prevExp);
+      const expenseDeltaPct = prevExp > 0 ? round2((expenseDelta / prevExp) * 100) : 0;
       const netDelta = round2(netResult - prevNet);
       const netDeltaPct = prevNet !== 0 ? round2((netDelta / Math.abs(prevNet)) * 100) : 0;
 
