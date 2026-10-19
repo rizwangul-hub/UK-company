@@ -59,6 +59,40 @@ const LEDGER_TYPES = [
   { id: 'CONSOLIDATED', label: 'Master Journal', icon: BookOpen, desc: 'All Double-Entry Transactions' },
 ];
 
+export function formatPropertyType(p) {
+  if (!p) return 'Property';
+  if (p.propertyType && !p.propertyType.includes('Units') && !p.propertyType.includes('London')) {
+    const raw = p.propertyType.trim();
+    if (['FLAT', 'FLAT_APARTMENT', 'APARTMENT'].includes(raw.toUpperCase())) return 'Flat';
+    if (['SHOP'].includes(raw.toUpperCase())) return 'Shop';
+    if (['HOUSE', 'RESIDENTIAL_TERRACED', 'TERRACED_HOUSE', 'SEMI_DETACHED', 'DETACHED'].includes(raw.toUpperCase())) return 'House';
+    if (['COMMERCIAL', 'COMMERCIAL_OFFICE', 'OFFICE'].includes(raw.toUpperCase())) return 'Commercial';
+    if (['HMO', 'ROOM_HMO'].includes(raw.toUpperCase())) return 'HMO';
+    if (raw.toUpperCase() !== 'OTHER' && raw.toUpperCase() !== 'RESIDENTIAL') return raw;
+  }
+  const nameLower = (p.name || '').toLowerCase();
+  if (nameLower.includes('-shop') || nameLower.startsWith('shop') || nameLower.includes(' shop')) {
+    return 'Shop';
+  }
+  if (
+    nameLower.includes('-flat') ||
+    nameLower.includes('flat ') ||
+    nameLower.includes(' flat') ||
+    nameLower.includes('ground floor') ||
+    nameLower.includes('1st floor') ||
+    nameLower.includes('first floor') ||
+    nameLower.includes('2nd floor') ||
+    nameLower.includes('second floor') ||
+    nameLower.includes('basement')
+  ) {
+    return 'Flat';
+  }
+  if (p.subtext && !p.subtext.includes('Units') && !p.subtext.includes('London')) {
+    return p.subtext;
+  }
+  return 'House';
+}
+
 export function LedgerPage({ selectedCompany }) {
   const cachedEntities = getApiCache('/ledger/entities');
   const [ledgerType, setLedgerType] = useState('HEAD');
@@ -666,11 +700,14 @@ export function LedgerPage({ selectedCompany }) {
               ) : currentEntityList.length === 0 ? (
                 <option value="">{loadingEntities ? 'Loading UK entities...' : 'No entities configured'}</option>
               ) : (
-                currentEntityList.map((item) => (
-                  <option key={String(item.id)} value={String(item.id)}>
-                    {item.name} {item.subtext ? ` — (${item.subtext})` : ''}
-                  </option>
-                ))
+                currentEntityList.map((item) => {
+                  const subtext = ledgerType === 'PROPERTY' ? formatPropertyType(item) : item.subtext;
+                  return (
+                    <option key={String(item.id)} value={String(item.id)}>
+                      {item.name} {subtext ? ` — (${subtext})` : ''}
+                    </option>
+                  );
+                })
               )}
             </select>
           </div>

@@ -99,6 +99,64 @@ const parseDateRange = (datePreset, startDate, endDate) => {
   return { periodStart, periodEnd };
 };
 
+/**
+ * Format clean property type (e.g. 'Flat', 'Shop', 'House', 'Commercial')
+ * Avoids showing raw or awkward 'London · 1 Units' in ledger views.
+ */
+export function formatPropertyType(p) {
+  if (!p) return 'Property';
+  const rawType = (p.propertyType || '').trim();
+  const nameLower = (p.name || '').toLowerCase();
+
+  if (nameLower.includes('-shop') || nameLower.startsWith('shop') || nameLower.includes(' shop')) {
+    return 'Shop';
+  }
+  if (
+    nameLower.includes('-flat') ||
+    nameLower.includes('flat ') ||
+    nameLower.includes(' flat') ||
+    nameLower.includes('ground floor') ||
+    nameLower.includes('1st floor') ||
+    nameLower.includes('first floor') ||
+    nameLower.includes('2nd floor') ||
+    nameLower.includes('second floor') ||
+    nameLower.includes('basement')
+  ) {
+    return 'Flat';
+  }
+
+  switch (rawType.toUpperCase()) {
+    case 'SHOP':
+      return 'Shop';
+    case 'FLAT':
+    case 'FLAT_APARTMENT':
+    case 'APARTMENT':
+      return 'Flat';
+    case 'HOUSE':
+    case 'RESIDENTIAL_TERRACED':
+    case 'TERRACED_HOUSE':
+    case 'SEMI_DETACHED':
+    case 'DETACHED':
+      return 'House';
+    case 'COMMERCIAL':
+    case 'COMMERCIAL_OFFICE':
+    case 'OFFICE':
+      return 'Commercial';
+    case 'HMO':
+    case 'ROOM_HMO':
+      return 'HMO';
+    case 'RESIDENTIAL':
+      return (nameLower.includes('flat') || nameLower.includes('apartment')) ? 'Flat' : 'House';
+    case 'OTHER':
+      if (nameLower.includes('flat') || nameLower.includes('apartment')) return 'Flat';
+      if (nameLower.includes('shop') || nameLower.includes('retail')) return 'Shop';
+      if (nameLower.includes('office') || nameLower.includes('commercial')) return 'Commercial';
+      return 'House';
+    default:
+      return rawType || 'Property';
+  }
+}
+
 export const getLedgerEntities = async (req, res) => {
   try {
     const [accounts, properties, tenants, mortgages, categories] = await Promise.all([
@@ -131,12 +189,16 @@ export const getLedgerEntities = async (req, res) => {
         subtext: `Cash Float · Bal: £${(a.currentBalance || 0).toFixed(2)}`,
       }));
 
-    const propertyEntities = properties.map((p) => ({
-      id: p._id,
-      name: p.name,
-      type: 'PROPERTY',
-      subtext: `${p.postcode || ''} · ${p.city || 'UK'} · ${p.totalUnits || 1} Units`,
-    }));
+    const propertyEntities = properties.map((p) => {
+      const propType = formatPropertyType(p);
+      return {
+        id: p._id,
+        name: p.name,
+        type: 'PROPERTY',
+        propertyType: propType,
+        subtext: propType,
+      };
+    });
 
     const tenantEntities = tenants.map((t) => ({
       id: t._id,
@@ -391,8 +453,15 @@ export const queryEntityLedger = async (req, res) => {
         closingBalance = 0;
       } else {
         const effectivePropId = prop._id;
-        ledgerTitle = `Property Ledger: ${prop.name}`;
-        entitySubtext = `${prop.addressLine1 || ''}, ${prop.city || 'UK'} (${prop.postcode || ''}) · Valuation: £${(prop.currentValuation || 0).toFixed(2)}`;
+        const propType = formatPropertyType(prop);
+        ledgerTitle = `Property Ledger: ${prop.name} (${propType})`;
+        const locParts = [
+          `Type: ${propType}`,
+          prop.addressLine1,
+          prop.city,
+          prop.postcode,
+        ].filter(Boolean);
+        entitySubtext = `${locParts.join(' · ')} · Valuation: £${(prop.currentValuation || 0).toFixed(2)}`;
 
         const txQuery = {
           companyId: req.companyId,

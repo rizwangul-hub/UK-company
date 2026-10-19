@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { reportsAPI, propertiesAPI } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
+import { formatPropertyType } from '../pages/LedgerPage.jsx';
 import pixxLogo from '../assets/logo.png';
 
 const SCOPES = [
@@ -388,11 +389,14 @@ export default function ReportExportModal({
                       className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       <option value="">★ All Properties (Portfolio Level)</option>
-                      {(entitiesMap.properties || []).map((p) => (
-                        <option key={String(p.id)} value={String(p.id)}>
-                          {p.name} {p.subtext ? `(${p.subtext})` : ''}
-                        </option>
-                      ))}
+                      {(entitiesMap.properties || []).map((p) => {
+                        const propType = formatPropertyType(p);
+                        return (
+                          <option key={String(p.id)} value={String(p.id)}>
+                            {p.name} {propType ? `(${propType})` : ''}
+                          </option>
+                        );
+                      })}
                     </select>
 
                     {entityId && propertyUnits.length > 0 && (
