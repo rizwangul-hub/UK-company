@@ -29,7 +29,16 @@ const categorySchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['INCOME', 'OPERATING_EXPENSE', 'FINANCE_COST', 'CAPITAL_EXPENDITURE', 'TRANSFER'],
+      enum: [
+        'INCOME',
+        'OPERATING_EXPENSE',
+        'FINANCE_COST',
+        'CAPITAL_EXPENDITURE',
+        'TRANSFER',
+        'LIABILITY_LOAN',
+        'OWNER_EQUITY',
+        'EXCLUDED_FROM_PNL',
+      ],
       default: 'OPERATING_EXPENSE',
       index: true,
     },

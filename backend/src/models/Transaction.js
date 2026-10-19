@@ -155,6 +155,23 @@ const transactionSchema = new mongoose.Schema(
       default: 'POSTED',
       index: true,
     },
+    // Accounting P&L Classification Override (null = automatic classification engine applies)
+    accountingClassification: {
+      type: String,
+      enum: [
+        'INCOME',
+        'OPERATING_EXPENSE',
+        'FINANCE_COST',
+        'CAPITAL_EXPENDITURE',
+        'LIABILITY_LOAN',
+        'INTERNAL_TRANSFER',
+        'OWNER_EQUITY',
+        'EXCLUDED_FROM_PNL',
+        'NEEDS_REVIEW',
+      ],
+      default: null,
+      index: true,
+    },
     importBatchId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'StatementImportBatch',
