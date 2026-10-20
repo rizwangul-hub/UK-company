@@ -728,11 +728,11 @@ export function LedgerPage({ selectedCompany }) {
                 <option value="">{loadingEntities ? 'Loading UK entities...' : 'No entities configured'}</option>
               ) : ledgerType === 'PROPERTY' ? (
                 currentEntityList.map((item) => {
-                  const hasUnits = Array.isArray(item.units) && item.units.length > 0;
-                  if (hasUnits) {
+                  const propUnits = Array.isArray(item.units) ? item.units : [];
+                  if (propUnits.length > 1) {
                     return (
-                      <optgroup key={String(item.id)} label={`🏢 ${item.name} (${item.units.length} Units)`}>
-                        {item.units.map((u) => (
+                      <optgroup key={String(item.id)} label={`🏢 ${item.name} (${propUnits.length} Units)`}>
+                        {propUnits.map((u) => (
                           <option key={String(u.id)} value={String(u.id)}>
                             ↳ {u.name} — ({u.type || 'Unit'}{u.targetRent ? ` · £${u.targetRent}/mo` : ''})
                           </option>
@@ -741,6 +741,14 @@ export function LedgerPage({ selectedCompany }) {
                           ★ {item.name} — Consolidated (All Units)
                         </option>
                       </optgroup>
+                    );
+                  }
+                  if (propUnits.length === 1) {
+                    const u = propUnits[0];
+                    return (
+                      <option key={String(u.id)} value={String(u.id)}>
+                        🏠 {item.name} — ({u.type || formatPropertyType(item)}{u.targetRent ? ` · £${u.targetRent}/mo` : ''})
+                      </option>
                     );
                   }
                   return (

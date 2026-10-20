@@ -130,6 +130,7 @@ export function DataEntryPage({ selectedCompany }) {
   // Master Data
   const [accounts, setAccounts] = useState(cachedAccs?.data?.accounts || []);
   const [properties, setProperties] = useState(cachedProps?.data?.properties || []);
+  const [buildings, setBuildings] = useState(cachedProps?.data?.buildings || []);
   const [categories, setCategories] = useState(cachedCats?.data?.categories || []);
   const [mortgages, setMortgages] = useState([]);
   const [rentSchedules, setRentSchedules] = useState([]);
@@ -253,6 +254,7 @@ export function DataEntryPage({ selectedCompany }) {
 
       const accList = accRes?.data?.accounts || accRes?.accounts || [];
       const propList = propRes?.data?.properties || propRes?.properties || [];
+      const bldgsList = propRes?.data?.buildings || [];
       const catList = catRes?.data?.categories || catRes?.categories || [];
       const mtgList = mtgRes?.data?.mortgages || mtgRes?.mortgages || [];
       const schedulesList = rentRes?.data?.schedules || rentRes?.schedules || [];
@@ -260,6 +262,32 @@ export function DataEntryPage({ selectedCompany }) {
 
       setAccounts(accList);
       setProperties(propList);
+      if (Array.isArray(bldgsList) && bldgsList.length > 0) {
+        setBuildings(bldgsList);
+      } else {
+        // Fallback: Reconstruct head properties from flattened properties
+        const map = new Map();
+        propList.forEach((p) => {
+          const parentId = String(p.parentPropertyId || p._id);
+          if (!map.has(parentId)) {
+            map.set(parentId, {
+              _id: parentId,
+              name: p.parentPropertyName || p.name || p.addressLine1,
+              addressLine1: p.addressLine1,
+              postcode: p.postcode,
+              city: p.city,
+              units: [],
+            });
+          }
+          const b = map.get(parentId);
+          if (p.isMultiUnitChild || p.unitId) {
+            b.units.push({ _id: p.unitId || p._id, unitName: p.name, unitType: p.propertyType });
+          } else if (Array.isArray(p.units)) {
+            b.units = p.units;
+          }
+        });
+        setBuildings(Array.from(map.values()));
+      }
       setCategories(catList);
       setMortgages(mtgList);
       setRentSchedules(schedulesList);
@@ -308,9 +336,14 @@ export function DataEntryPage({ selectedCompany }) {
       const propUnits = Array.isArray(p.units) ? p.units : [];
 
       if (propUnits.length > 0) {
-        // Multi-unit property: add each unit with key `${pId}___${u._id}`
+        // Property with units
         propUnits.forEach((u) => {
           const uType = cleanUnitType(u.unitType);
+          const isSingle = propUnits.length === 1;
+          const cleanName = (isSingle || (u.unitName && u.unitName.toLowerCase().trim() === p.name.toLowerCase().trim()))
+            ? `${p.name} (${uType})`
+            : `${p.name} ➔ ${u.unitName} (${uType})`;
+
           items.push({
             key: `${pId}___${u._id}`,
             propertyId: pId,
@@ -318,9 +351,9 @@ export function DataEntryPage({ selectedCompany }) {
             propertyName: p.name,
             unitName: u.unitName,
             unitType: uType,
-            displayName: `${p.name} ➔ ${u.unitName} (${uType})`,
+            displayName: cleanName,
             tenantName: u.tenantName || p.tenantName || '',
-            contractualRent: Number(u.targetRent || 0),
+            contractualRent: Number(u.targetRent || p.contractualRent || 0),
             isUnit: true,
           });
         });
@@ -784,8 +817,10 @@ export function DataEntryPage({ selectedCompany }) {
   const incomeCategories = categories.filter((c) => c.type === 'INCOME');
   const generalExpenseCategories = expenseCategories.filter((c) => !c.propertyId);
 
+  const headPropertiesList = buildings.length > 0 ? buildings : properties;
+
   // Filter Units for Selected Property
-  const selectedPropObj = properties.find((p) => p._id === expenseForm.propertyId);
+  const selectedPropObj = headPropertiesList.find((p) => String(p._id) === String(expenseForm.propertyId));
   const selectedPropHeads = expenseCategories.filter(
     (c) => (c.propertyId?._id || c.propertyId)?.toString() === expenseForm.propertyId
   );
@@ -846,7 +881,7 @@ export function DataEntryPage({ selectedCompany }) {
     setExpenseForm((prev) => ({ ...prev, categoryId: catId }));
   };
 
-  const otherIncomePropObj = properties.find((p) => p._id === otherIncomeForm.propertyId);
+  const otherIncomePropObj = headPropertiesList.find((p) => String(p._id) === String(otherIncomeForm.propertyId));
   const unitsForOtherIncome = otherIncomePropObj?.units || [];
 
   // Selected property & tenant helpers for Rent Collection
@@ -1149,21 +1184,43 @@ export function DataEntryPage({ selectedCompany }) {
                   {properties.map((p) => {
                     const pId = String(p._id);
                     const propUnits = Array.isArray(p.units) ? p.units : [];
-                    if (propUnits.length > 0) {
+
+                    // True multi-unit property: group units under property header
+                    if (propUnits.length > 1) {
                       return (
                         <optgroup key={pId} label={`🏢 ${p.name} (${propUnits.length} Units)`}>
                           {propUnits.map((u) => {
                             const uKey = `${pId}___${u._id}`;
                             const uType = cleanUnitType(u.unitType);
+                            let unitLabel = u.unitName || 'Unit';
+                            if (p.name && unitLabel.toLowerCase().startsWith(p.name.toLowerCase())) {
+                              const trimmed = unitLabel.slice(p.name.length).replace(/^[\s\-,–—:]+/, '').trim();
+                              if (trimmed) unitLabel = trimmed;
+                            }
                             return (
                               <option key={uKey} value={uKey}>
-                                ↳ {u.unitName} ({uType}) &bull; Monthly Rent: {formatGBP(u.targetRent || 0)}
+                                ↳ {unitLabel} ({uType}) &bull; Monthly Rent: {formatGBP(u.targetRent || 0)}
                               </option>
                             );
                           })}
                         </optgroup>
                       );
                     }
+
+                    // Single-unit property: show directly without redundant optgroup header
+                    if (propUnits.length === 1) {
+                      const u = propUnits[0];
+                      const uKey = `${pId}___${u._id}`;
+                      const uType = cleanUnitType(u.unitType);
+                      const rentVal = u.targetRent || p.contractualRent || 0;
+                      return (
+                        <option key={uKey} value={uKey}>
+                          🏠 {p.name} ({uType}) &bull; Monthly Rent: {formatGBP(rentVal)}
+                        </option>
+                      );
+                    }
+
+                    // Property without defined units
                     return (
                       <option key={pId} value={pId}>
                         🏠 {p.name} {p.tenantName ? `• Tenant: ${p.tenantName}` : ''} &bull; Monthly Rent: {formatGBP(p.contractualRent || 0)}
@@ -1420,15 +1477,15 @@ export function DataEntryPage({ selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
                 >
                   <option value="">-- General / Non-Property Specific --</option>
-                  {properties.map((p) => (
+                  {headPropertiesList.map((p) => (
                     <option key={p._id} value={p._id}>
-                      🏢 {p.name} ({p.postcode || p.city || 'UK'})
+                      🏢 {p.name || p.addressLine1} {p.postcode || p.city ? `(${p.postcode || p.city})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {unitsForExpense.length > 0 && (
+              {unitsForExpense.length > 1 && (
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                     Specific Unit / Flat / Shop (Optional)
@@ -1438,10 +1495,10 @@ export function DataEntryPage({ selectedCompany }) {
                     onChange={(e) => setExpenseForm({ ...expenseForm, unitId: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
                   >
-                    <option value="">-- Entire Property ({selectedPropObj?.name}) --</option>
+                    <option value="">-- Entire Property ({selectedPropObj?.name || selectedPropObj?.addressLine1}) --</option>
                     {unitsForExpense.map((u) => (
                       <option key={u._id} value={u._id}>
-                        ↳ {u.unitName} ({cleanUnitType(u.unitType)})
+                        ↳ {u.unitName} {u.unitType ? `(${cleanUnitType(u.unitType)})` : ''}
                       </option>
                     ))}
                   </select>
@@ -1501,13 +1558,13 @@ export function DataEntryPage({ selectedCompany }) {
                           ))}
                         </optgroup>
                       )}
-                      {properties.map((p) => {
+                      {headPropertiesList.map((p) => {
                         const heads = expenseCategories.filter(
                           (c) => (c.propertyId?._id || c.propertyId)?.toString() === p._id.toString()
                         );
                         if (heads.length === 0) return null;
                         return (
-                          <optgroup key={p._id} label={`🏢 ${p.name} Sub-Heads`}>
+                          <optgroup key={p._id} label={`🏢 ${p.name || p.addressLine1} Sub-Heads`}>
                             {heads.map((c) => (
                               <option key={c._id} value={c._id}>
                                 {c.name} {c.code ? `(${c.code})` : ''}
@@ -1873,15 +1930,15 @@ export function DataEntryPage({ selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
                 >
                   <option value="">-- General / Non-Property Specific --</option>
-                  {properties.map((p) => (
+                  {headPropertiesList.map((p) => (
                     <option key={p._id} value={p._id}>
-                      🏢 {p.name} ({p.postcode || p.city || 'UK'})
+                      🏢 {p.name || p.addressLine1} {p.postcode || p.city ? `(${p.postcode || p.city})` : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {unitsForOtherIncome.length > 0 && (
+              {unitsForOtherIncome.length > 1 && (
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                     Specific Unit / Flat / Shop (Optional)
@@ -1891,10 +1948,10 @@ export function DataEntryPage({ selectedCompany }) {
                     onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, unitId: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
                   >
-                    <option value="">-- Entire Property ({otherIncomePropObj?.name}) --</option>
+                    <option value="">-- Entire Property ({otherIncomePropObj?.name || otherIncomePropObj?.addressLine1}) --</option>
                     {unitsForOtherIncome.map((u) => (
                       <option key={u._id} value={u._id}>
-                        ↳ {u.unitName} ({cleanUnitType(u.unitType)})
+                        ↳ {u.unitName} {u.unitType ? `(${cleanUnitType(u.unitType)})` : ''}
                       </option>
                     ))}
                   </select>
