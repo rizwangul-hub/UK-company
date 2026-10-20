@@ -396,8 +396,8 @@ export const exportProfitLossExcel = async (req, res) => {
       { header: 'Profit Margin', width: 16 },
     ];
 
-    sheet2.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    sheet2.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    sheet2.getRow(1).font = { bold: true, color: { argb: 'FF0F172A' } };
+    sheet2.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
 
     reportData.propertyProfitability.forEach((p) => {
       const r = sheet2.addRow([
@@ -453,8 +453,8 @@ export const exportProfitLossExcel = async (req, res) => {
       { header: 'Status', width: 16 },
       { header: 'YTD Net (£)', width: 20 },
     ];
-    sheet3.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    sheet3.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    sheet3.getRow(1).font = { bold: true, color: { argb: 'FF0F172A' } };
+    sheet3.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
 
     reportData.monthlyTrend.forEach((m) => {
       const r = sheet3.addRow([

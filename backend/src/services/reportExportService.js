@@ -15,12 +15,33 @@ import MortgagePayment from '../models/MortgagePayment.js';
 import RentSchedule from '../models/RentSchedule.js';
 import RentPayment from '../models/RentPayment.js';
 import { round2 } from './ledgerService.js';
-import { getCompanyById } from '../config/companies.js';
+import { getCompanyById, normalizeCompanyId } from '../config/companies.js';
 import { createOfficialLandlordWorkbook } from '../scripts/generateLandlordReportFile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOGO_PATH = path.resolve(__dirname, '../assets/logo.png');
+
+/**
+ * Resolve dynamic high-resolution company logo
+ */
+export const getCompanyLogoPath = (companyId) => {
+  if (!companyId) return LOGO_PATH;
+  const normalized = normalizeCompanyId(companyId);
+  const logoMap = {
+    'old-street': path.resolve(__dirname, '../assets/logos/OldStreetLogo.png'),
+    'best-standard': path.resolve(__dirname, '../assets/logos/BestStandardLogo.png'),
+    'sk-hamilton': path.resolve(__dirname, '../assets/logos/SKLogo.png'),
+    'homewards': path.resolve(__dirname, '../assets/logos/HomeWardsLogo.png'),
+    'mile-end-road': path.resolve(__dirname, '../assets/logos/MileEndLogo.png'),
+    'global-standard': path.resolve(__dirname, '../assets/logos/GlobalStandardLogo.png'),
+  };
+  const targetPath = logoMap[normalized];
+  if (targetPath && fs.existsSync(targetPath)) {
+    return targetPath;
+  }
+  return LOGO_PATH;
+};
 
 const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -155,6 +176,9 @@ export const buildLedgerReportData = async (filters = {}) => {
 
   const companyConfig = getCompanyById(companyId);
   const companyName = companyConfig ? companyConfig.name.toUpperCase() : 'PIXX TECHNOLOGIES UK PROPERTY FINANCE LTD';
+  const companyLegalName = companyConfig?.legalName || companyName;
+  const companyRegNo = companyConfig?.registrationNo || 'UK-08492014';
+  const companyJurisdiction = companyConfig?.jurisdiction || 'England & Wales';
 
   const { periodStart, periodEnd } = parseReportingDateRange(datePreset, startDate, endDate);
 
@@ -427,6 +451,8 @@ export const buildLedgerReportData = async (filters = {}) => {
 
   const categoryMap = new Map();
   const propertyMap = new Map();
+  const monthlyMap = new Map();
+  const yearlyMap = new Map();
 
   const entries = rawTransactions.map((tx) => {
     let isInflow = false;
@@ -469,33 +495,108 @@ export const buildLedgerReportData = async (filters = {}) => {
     let principalComponent = 0;
     let feeComponent = 0;
     if (tx.transactionType === 'MORTGAGE_PAYMENT') {
-      // Mortgage payment breakdown
       totalMortgagePrincipal += tx.amount;
       principalComponent = tx.amount;
     }
 
-    // Track Category summary
-    const catName = tx.categoryId?.name || (isTransfer ? 'Internal Liquidity Transfer' : tx.transactionType);
+    // Track Category / Nominal Head summary
+    const headName = tx.head || tx.headId?.name || (isTransfer ? 'Internal Transfer' : tx.categoryId?.name || tx.transactionType);
+    const subHeadName = tx.subHead || tx.subHeadId?.name || '';
+    const fullCatName = headName && subHeadName ? `${headName} · ${subHeadName}` : headName;
     const catType = tx.categoryId?.type || (isTransfer ? 'TRANSFER' : tx.transactionType);
-    if (!categoryMap.has(catName)) {
-      categoryMap.set(catName, { name: catName, type: catType, count: 0, total: 0 });
+
+    if (!categoryMap.has(fullCatName)) {
+      categoryMap.set(fullCatName, {
+        name: fullCatName,
+        head: headName,
+        subHead: subHeadName,
+        type: catType,
+        count: 0,
+        total: 0,
+        moneyIn: 0,
+        moneyOut: 0,
+      });
     }
-    const catStat = categoryMap.get(catName);
+    const catStat = categoryMap.get(fullCatName);
     catStat.count += 1;
     catStat.total = round2(catStat.total + tx.amount);
+    catStat.moneyIn = round2(catStat.moneyIn + moneyIn);
+    catStat.moneyOut = round2(catStat.moneyOut + moneyOut);
 
-    // Track Property summary
+    // Track Property & Unit summary
     if (tx.propertyId?.name) {
       const propName = tx.propertyId.name;
-      if (!propertyMap.has(propName)) {
-        propertyMap.set(propName, { name: propName, postcode: tx.propertyId.postcode || '', income: 0, expense: 0, net: 0, count: 0 });
+      const unitName = tx.unitId?.unitName || '';
+      const mapKey = unitName && unitName !== propName ? `${propName} — ${unitName}` : propName;
+      if (!propertyMap.has(mapKey)) {
+        propertyMap.set(mapKey, {
+          name: propName,
+          unitName: unitName && unitName !== propName ? unitName : '',
+          postcode: tx.propertyId.postcode || '',
+          income: 0,
+          expense: 0,
+          net: 0,
+          count: 0,
+        });
       }
-      const propStat = propertyMap.get(propName);
+      const propStat = propertyMap.get(mapKey);
       propStat.count += 1;
       if (isInflow) propStat.income = round2(propStat.income + tx.amount);
       if (isOutflow) propStat.expense = round2(propStat.expense + tx.amount);
       propStat.net = round2(propStat.income - propStat.expense);
     }
+
+    // Track Monthly and Yearly Cashflow
+    let mKey = '';
+    if (tx.periodMonth && /^\d{4}-\d{2}$/.test(tx.periodMonth)) {
+      mKey = tx.periodMonth;
+    } else if (tx.transactionDate) {
+      try {
+        mKey = new Date(tx.transactionDate).toISOString().slice(0, 7);
+      } catch {
+        mKey = 'Unknown';
+      }
+    } else {
+      mKey = 'Unknown';
+    }
+
+    const yKey = mKey !== 'Unknown' ? mKey.slice(0, 4) : 'Unknown';
+
+    if (!monthlyMap.has(mKey)) {
+      const [yStr, mStr] = mKey.split('-');
+      const monthDate = mStr ? new Date(Number(yStr), Number(mStr) - 1, 1) : null;
+      const monthLabel = monthDate && !isNaN(monthDate.getTime())
+        ? monthDate.toLocaleString('en-GB', { month: 'short', year: 'numeric' })
+        : mKey;
+      monthlyMap.set(mKey, {
+        month: mKey,
+        monthLabel,
+        count: 0,
+        moneyIn: 0,
+        moneyOut: 0,
+        net: 0,
+      });
+    }
+    const mStat = monthlyMap.get(mKey);
+    mStat.count += 1;
+    mStat.moneyIn = round2(mStat.moneyIn + moneyIn);
+    mStat.moneyOut = round2(mStat.moneyOut + moneyOut);
+    mStat.net = round2(mStat.moneyIn - mStat.moneyOut);
+
+    if (!yearlyMap.has(yKey)) {
+      yearlyMap.set(yKey, {
+        year: yKey,
+        count: 0,
+        moneyIn: 0,
+        moneyOut: 0,
+        net: 0,
+      });
+    }
+    const yStat = yearlyMap.get(yKey);
+    yStat.count += 1;
+    yStat.moneyIn = round2(yStat.moneyIn + moneyIn);
+    yStat.moneyOut = round2(yStat.moneyOut + moneyOut);
+    yStat.net = round2(yStat.moneyIn - yStat.moneyOut);
 
     return {
       _id: tx._id,
@@ -544,6 +645,9 @@ export const buildLedgerReportData = async (filters = {}) => {
   return {
     companyId,
     companyName,
+    companyLegalName,
+    companyRegNo,
+    companyJurisdiction,
     reportRef,
     reportTitle,
     scope,
@@ -571,6 +675,8 @@ export const buildLedgerReportData = async (filters = {}) => {
     },
     categoryBreakdown: Array.from(categoryMap.values()).sort((a, b) => b.total - a.total),
     propertyBreakdown: Array.from(propertyMap.values()).sort((a, b) => b.income - a.income),
+    monthlyBreakdown: Array.from(monthlyMap.values()).sort((a, b) => a.month.localeCompare(b.month)),
+    yearlyBreakdown: Array.from(yearlyMap.values()).sort((a, b) => a.year.localeCompare(b.year)),
     entries,
   };
 };
@@ -580,27 +686,32 @@ export const buildLedgerReportData = async (filters = {}) => {
  * Designed to mirror the executive visual prestige and styling of the official PDF export.
  */
 export const generateExcelReport = async (reportData) => {
+  const activeCompName = reportData.companyLegalName || reportData.companyName || 'PixxTechnologies UK Property Finance';
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = reportData.companyName || 'PixxTechnologies UK Property Finance';
-  workbook.lastModifiedBy = 'PixxTechnologies UK System';
+  workbook.creator = activeCompName;
+  workbook.lastModifiedBy = `${activeCompName} Reporting Engine`;
   workbook.created = new Date();
   workbook.modified = new Date();
 
-  // Unified Corporate Color Palette
-  const brandNavy = '0F172A';
-  const brandDark = '1E293B';
+  // High-Contrast Executive Palette (NO BLACK BACKGROUNDS)
+  const brandRoyal = '1E40AF'; // Crisp Royal Blue
+  const brandHeaderFill = 'E2E8F0'; // Soft crisp slate for table headers
+  const brandSectionFill = 'EEF2FF'; // Soft indigo tint for section banners
+  const brandHeaderDarkText = '0F172A'; // Deep Navy text (ultra readable on light bg)
   const brandIndigo = '4338CA';
   const brandEmerald = '059669';
   const brandRose = 'E11D48';
   const brandLightGray = 'F8FAFC';
   const borderLight = 'E2E8F0';
+  const borderMedium = 'CBD5E1';
 
-  // Embed Official PixxTechnologies Logo if available
+  // Embed Official Company Logo if available
+  const logoPath = getCompanyLogoPath(reportData.companyId);
   let logoImageId = null;
-  if (fs.existsSync(LOGO_PATH)) {
+  if (fs.existsSync(logoPath)) {
     try {
       logoImageId = workbook.addImage({
-        filename: LOGO_PATH,
+        filename: logoPath,
         extension: 'png',
       });
     } catch {
@@ -654,13 +765,13 @@ export const generateExcelReport = async (reportData) => {
   // Header Title & Address (Cols C to F)
   summarySheet.mergeCells('C1:F1');
   const h1 = summarySheet.getCell('C1');
-  h1.value = reportData.companyName || 'PIXX TECHNOLOGIES UK PROPERTY FINANCE LTD';
-  h1.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF' + brandNavy } };
+  h1.value = activeCompName;
+  h1.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
   h1.alignment = { vertical: 'middle', horizontal: 'left' };
 
   summarySheet.mergeCells('C2:F2');
   const h2 = summarySheet.getCell('C2');
-  h2.value = '14 Belgrave Square, London SW1X 8PZ • United Kingdom • HMRC Compliant Accounting';
+  h2.value = `UK Reg: ${reportData.companyRegNo || 'N/A'} • 14 Belgrave Square, London SW1X 8PZ • United Kingdom • HMRC Compliant Accounting`;
   h2.font = { name: 'Segoe UI', size: 8.5, color: { argb: 'FF64748B' } };
   h2.alignment = { vertical: 'middle', horizontal: 'left' };
 
@@ -674,7 +785,7 @@ export const generateExcelReport = async (reportData) => {
   summarySheet.mergeCells('G1:H1');
   const m1 = summarySheet.getCell('G1');
   m1.value = `AUDIT REF: ${reportData.reportRef}`;
-  m1.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandNavy } };
+  m1.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
   m1.alignment = { vertical: 'middle', horizontal: 'right' };
 
   summarySheet.mergeCells('G2:H2');
@@ -837,16 +948,120 @@ export const generateExcelReport = async (reportData) => {
 
   summarySheet.getRow(12).height = 14; // Spacing
 
-  // -------------------------------------------------------------------------
-  // Nominal Account Head Breakdown Table
-  // -------------------------------------------------------------------------
   let nextRow = 13;
+
+  // -------------------------------------------------------------------------
+  // NEW: Monthly Cashflow & Transaction Volume Summary Table (NO BLACK BACKGROUND)
+  // -------------------------------------------------------------------------
+  if (reportData.monthlyBreakdown && reportData.monthlyBreakdown.length > 0) {
+    summarySheet.mergeCells(`A${nextRow}:H${nextRow}`);
+    const secM = summarySheet.getCell(`A${nextRow}`);
+    secM.value = 'MONTHLY CASHFLOW & TRANSACTION VOLUME SUMMARY';
+    secM.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF' + brandRoyal } };
+    secM.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandSectionFill } };
+    secM.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    summarySheet.getRow(nextRow).height = 24;
+    nextRow++;
+
+    // Table Header
+    summarySheet.mergeCells(`A${nextRow}:B${nextRow}`);
+    summarySheet.getCell(`A${nextRow}`).value = 'Reporting Month';
+    summarySheet.mergeCells(`C${nextRow}:D${nextRow}`);
+    summarySheet.getCell(`C${nextRow}`).value = 'Money In (£)';
+    summarySheet.mergeCells(`E${nextRow}:F${nextRow}`);
+    summarySheet.getCell(`E${nextRow}`).value = 'Money Out (£)';
+    summarySheet.getCell(`G${nextRow}`).value = 'Net Movement (£)';
+    summarySheet.getCell(`H${nextRow}`).value = 'Vouchers';
+
+    summarySheet.getRow(nextRow).height = 22;
+    for (let c = 1; c <= 8; c++) {
+      const cell = summarySheet.getCell(nextRow, c);
+      cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandHeaderFill } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+        bottom: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+      };
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: c === 8 ? 'center' : c >= 3 ? 'right' : 'left',
+      };
+    }
+    nextRow++;
+
+    const mStartRow = nextRow;
+    reportData.monthlyBreakdown.forEach((mb, idx) => {
+      const isEven = idx % 2 === 0;
+      summarySheet.mergeCells(`A${nextRow}:B${nextRow}`);
+      summarySheet.getCell(`A${nextRow}`).value = mb.monthLabel || mb.month;
+      summarySheet.mergeCells(`C${nextRow}:D${nextRow}`);
+      summarySheet.getCell(`C${nextRow}`).value = mb.moneyIn;
+      summarySheet.getCell(`C${nextRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"-"';
+      summarySheet.mergeCells(`E${nextRow}:F${nextRow}`);
+      summarySheet.getCell(`E${nextRow}`).value = mb.moneyOut;
+      summarySheet.getCell(`E${nextRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"-"';
+      summarySheet.getCell(`G${nextRow}`).value = mb.net;
+      summarySheet.getCell(`G${nextRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"£"0.00';
+      summarySheet.getCell(`H${nextRow}`).value = mb.count;
+
+      summarySheet.getRow(nextRow).height = 20;
+      for (let c = 1; c <= 8; c++) {
+        const cell = summarySheet.getCell(nextRow, c);
+        cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF0F172A' } };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: isEven ? 'FFFFFFFF' : 'FFF8FAFC' },
+        };
+        cell.border = {
+          top: { style: 'thin', color: { argb: borderLight } },
+          bottom: { style: 'thin', color: { argb: borderLight } },
+          left: { style: 'thin', color: { argb: borderLight } },
+          right: { style: 'thin', color: { argb: borderLight } },
+        };
+        if (c === 8) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        if (c >= 3 && c <= 7) cell.alignment = { vertical: 'middle', horizontal: 'right' };
+      }
+      nextRow++;
+    });
+
+    // Total Row
+    summarySheet.mergeCells(`A${nextRow}:B${nextRow}`);
+    summarySheet.getCell(`A${nextRow}`).value = 'CUMULATIVE CASHFLOW TOTALS';
+    summarySheet.mergeCells(`C${nextRow}:D${nextRow}`);
+    summarySheet.getCell(`C${nextRow}`).value = { formula: `SUM(C${mStartRow}:C${nextRow - 1})` };
+    summarySheet.getCell(`C${nextRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"£"0.00';
+    summarySheet.mergeCells(`E${nextRow}:F${nextRow}`);
+    summarySheet.getCell(`E${nextRow}`).value = { formula: `SUM(E${mStartRow}:E${nextRow - 1})` };
+    summarySheet.getCell(`E${nextRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"£"0.00';
+    summarySheet.getCell(`G${nextRow}`).value = { formula: `C${nextRow}-E${nextRow}` };
+    summarySheet.getCell(`G${nextRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"£"0.00';
+    summarySheet.getCell(`H${nextRow}`).value = { formula: `SUM(H${mStartRow}:H${nextRow - 1})` };
+
+    summarySheet.getRow(nextRow).height = 22;
+    for (let c = 1; c <= 8; c++) {
+      const cell = summarySheet.getCell(nextRow, c);
+      cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+        bottom: { style: 'double', color: { argb: 'FF475569' } },
+      };
+      if (c === 8) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      if (c >= 3 && c <= 7) cell.alignment = { vertical: 'middle', horizontal: 'right' };
+    }
+    nextRow += 2;
+  }
+
+  // -------------------------------------------------------------------------
+  // Nominal Account Head Breakdown Table (NO BLACK BACKGROUND)
+  // -------------------------------------------------------------------------
   if (reportData.categoryBreakdown && reportData.categoryBreakdown.length > 0) {
     summarySheet.mergeCells(`A${nextRow}:H${nextRow}`);
     const sec1 = summarySheet.getCell(`A${nextRow}`);
-    sec1.value = 'NOMINAL ACCOUNT HEAD BREAKDOWN';
-    sec1.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
-    sec1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandNavy } };
+    sec1.value = 'NOMINAL ACCOUNT HEAD & CATEGORY BREAKDOWN';
+    sec1.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF' + brandRoyal } };
+    sec1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandSectionFill } };
     sec1.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
     summarySheet.getRow(nextRow).height = 24;
     nextRow++;
@@ -863,8 +1078,12 @@ export const generateExcelReport = async (reportData) => {
     summarySheet.getRow(nextRow).height = 22;
     for (let c = 1; c <= 8; c++) {
       const cell = summarySheet.getCell(nextRow, c);
-      cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandDark } };
+      cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandHeaderFill } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+        bottom: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+      };
       cell.alignment = {
         vertical: 'middle',
         horizontal: c === 4 || c === 5 ? 'center' : c >= 6 ? 'right' : 'left',
@@ -922,11 +1141,11 @@ export const generateExcelReport = async (reportData) => {
     summarySheet.getRow(nextRow).height = 22;
     for (let c = 1; c <= 8; c++) {
       const cell = summarySheet.getCell(nextRow, c);
-      cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandDark } };
+      cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
       cell.border = {
-        top: { style: 'thin', color: { argb: borderLight } },
-        bottom: { style: 'double', color: { argb: 'FFFFFFFF' } },
+        top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+        bottom: { style: 'double', color: { argb: 'FF475569' } },
       };
       if (c === 5) cell.alignment = { vertical: 'middle', horizontal: 'center' };
       if (c >= 6) cell.alignment = { vertical: 'middle', horizontal: 'right' };
@@ -935,21 +1154,21 @@ export const generateExcelReport = async (reportData) => {
   }
 
   // -------------------------------------------------------------------------
-  // Property Portfolio Breakdown Table
+  // Property Portfolio Breakdown Table (NO BLACK BACKGROUND)
   // -------------------------------------------------------------------------
   if (reportData.propertyBreakdown && reportData.propertyBreakdown.length > 0) {
     summarySheet.mergeCells(`A${nextRow}:H${nextRow}`);
     const sec2 = summarySheet.getCell(`A${nextRow}`);
     sec2.value = 'PROPERTY ASSET & UNIT FINANCIAL SUMMARY';
-    sec2.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
-    sec2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandNavy } };
+    sec2.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF' + brandRoyal } };
+    sec2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandSectionFill } };
     sec2.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
     summarySheet.getRow(nextRow).height = 24;
     nextRow++;
 
     // Table Header
     summarySheet.mergeCells(`A${nextRow}:B${nextRow}`);
-    summarySheet.getCell(`A${nextRow}`).value = 'Property Asset';
+    summarySheet.getCell(`A${nextRow}`).value = 'Property Asset / Unit';
     summarySheet.getCell(`C${nextRow}`).value = 'Postcode';
     summarySheet.getCell(`D${nextRow}`).value = 'Vouchers';
     summarySheet.getCell(`E${nextRow}`).value = 'Rental Receipts (£)';
@@ -960,8 +1179,12 @@ export const generateExcelReport = async (reportData) => {
     summarySheet.getRow(nextRow).height = 22;
     for (let c = 1; c <= 8; c++) {
       const cell = summarySheet.getCell(nextRow, c);
-      cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandDark } };
+      cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandHeaderFill } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+        bottom: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+      };
       cell.alignment = {
         vertical: 'middle',
         horizontal: c === 3 || c === 4 ? 'center' : c >= 5 ? 'right' : 'left',
@@ -973,7 +1196,7 @@ export const generateExcelReport = async (reportData) => {
     reportData.propertyBreakdown.forEach((prop, idx) => {
       const isEven = idx % 2 === 0;
       summarySheet.mergeCells(`A${nextRow}:B${nextRow}`);
-      summarySheet.getCell(`A${nextRow}`).value = prop.name;
+      summarySheet.getCell(`A${nextRow}`).value = prop.unitName ? `${prop.name} — ${prop.unitName}` : prop.name;
       summarySheet.getCell(`C${nextRow}`).value = prop.postcode || '-';
       summarySheet.getCell(`D${nextRow}`).value = prop.count;
       summarySheet.getCell(`E${nextRow}`).value = prop.income;
@@ -1002,16 +1225,12 @@ export const generateExcelReport = async (reportData) => {
         if (c === 3 || c === 4) cell.alignment = { vertical: 'middle', horizontal: 'center' };
         if (c >= 5) cell.alignment = { vertical: 'middle', horizontal: 'right' };
       }
-      // Emphasize financial figures
-      summarySheet.getCell(`E${nextRow}`).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandEmerald } };
-      summarySheet.getCell(`F${nextRow}`).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandRose } };
-      summarySheet.getCell(`G${nextRow}`).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandIndigo } };
       nextRow++;
     });
 
     // Total Row
     summarySheet.mergeCells(`A${nextRow}:C${nextRow}`);
-    summarySheet.getCell(`A${nextRow}`).value = 'PORTFOLIO TOTALS';
+    summarySheet.getCell(`A${nextRow}`).value = 'PORTFOLIO GRAND TOTALS';
     summarySheet.getCell(`D${nextRow}`).value = { formula: `SUM(D${propStartRow}:D${nextRow - 1})` };
     summarySheet.getCell(`E${nextRow}`).value = { formula: `SUM(E${propStartRow}:E${nextRow - 1})` };
     summarySheet.getCell(`E${nextRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"£"0.00';
@@ -1024,11 +1243,11 @@ export const generateExcelReport = async (reportData) => {
     summarySheet.getRow(nextRow).height = 22;
     for (let c = 1; c <= 8; c++) {
       const cell = summarySheet.getCell(nextRow, c);
-      cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandDark } };
+      cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
       cell.border = {
-        top: { style: 'thin', color: { argb: borderLight } },
-        bottom: { style: 'double', color: { argb: 'FFFFFFFF' } },
+        top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+        bottom: { style: 'double', color: { argb: 'FF475569' } },
       };
       if (c === 4) cell.alignment = { vertical: 'middle', horizontal: 'center' };
       if (c >= 5) cell.alignment = { vertical: 'middle', horizontal: 'right' };
@@ -1072,8 +1291,8 @@ export const generateExcelReport = async (reportData) => {
   // Corporate Banner on Sheet 2 (Rows 1 to 3)
   txSheet.mergeCells('C1:J1');
   const tH1 = txSheet.getCell('C1');
-  tH1.value = 'PIXX TECHNOLOGIES UK PROPERTY FINANCE LTD';
-  tH1.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF' + brandNavy } };
+  tH1.value = activeCompName;
+  tH1.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
   tH1.alignment = { vertical: 'middle', horizontal: 'left' };
 
   txSheet.mergeCells('C2:J2');
@@ -1092,7 +1311,7 @@ export const generateExcelReport = async (reportData) => {
   txSheet.mergeCells('K1:O1');
   const tM1 = txSheet.getCell('K1');
   tM1.value = `AUDIT REF: ${reportData.reportRef}`;
-  tM1.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandNavy } };
+  tM1.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
   tM1.alignment = { vertical: 'middle', horizontal: 'right' };
 
   txSheet.mergeCells('K2:O2');
@@ -1117,7 +1336,7 @@ export const generateExcelReport = async (reportData) => {
     };
   }
 
-  // Row 5: Sticky Column Header Row
+  // Row 5: Sticky Column Header Row (NO BLACK BACKGROUND)
   const headers = [
     'Date',
     'Period',
@@ -1143,8 +1362,12 @@ export const generateExcelReport = async (reportData) => {
   headerRow.height = 28;
   for (let c = 1; c <= 15; c++) {
     const cell = headerRow.getCell(c);
-    cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandNavy } };
+    cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandHeaderFill } };
+    cell.border = {
+      top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+      bottom: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+    };
     cell.alignment = {
       vertical: 'middle',
       horizontal: c === 1 || c === 2 || c === 3 || c === 15 ? 'center' : c >= 12 && c <= 14 ? 'right' : 'left',
@@ -1221,12 +1444,12 @@ export const generateExcelReport = async (reportData) => {
       if (tx.moneyOut > 0) {
         r.getCell(13).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandRose } };
       }
-      r.getCell(14).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandNavy } };
+      r.getCell(14).font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
 
       currentTxRow++;
     });
 
-    // Total Row
+    // Total Row (NO BLACK BACKGROUND)
     const lastDataRow = currentTxRow - 1;
     txSheet.mergeCells(`A${currentTxRow}:K${currentTxRow}`);
     const totLabel = txSheet.getCell(`A${currentTxRow}`);
@@ -1248,11 +1471,11 @@ export const generateExcelReport = async (reportData) => {
     txSheet.getRow(currentTxRow).height = 26;
     for (let c = 1; c <= 15; c++) {
       const cell = txSheet.getCell(currentTxRow, c);
-      cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + brandDark } };
+      cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF' + brandHeaderDarkText } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
       cell.border = {
-        top: { style: 'thin', color: { argb: borderLight } },
-        bottom: { style: 'double', color: { argb: 'FFFFFFFF' } },
+        top: { style: 'medium', color: { argb: 'FF' + borderMedium } },
+        bottom: { style: 'double', color: { argb: 'FF475569' } },
       };
       if (c >= 12 && c <= 14) cell.alignment = { vertical: 'middle', horizontal: 'right' };
     }
@@ -1270,6 +1493,9 @@ export const generateExcelReport = async (reportData) => {
 
 /**
  * Generate Real, High-Quality Corporate PDF Report using PDFKit
+ * Completely eliminates black backgrounds and text overlapping.
+ * Uses dynamic company logos, legal company metadata, robust dynamic row heights,
+ * and elegant light-contrast executive styling.
  */
 export const generatePdfReport = async (reportData) => {
   return new Promise((resolve, reject) => {
@@ -1295,51 +1521,67 @@ export const generatePdfReport = async (reportData) => {
       const contentWidth = pageWidth - margin * 2;
 
       // ---------------------------------------------------------------------
-      // 1. Header (Logo & Company Title)
+      // 1. Header (Dynamic Logo & Company Details)
       // ---------------------------------------------------------------------
-      const logoWidth = 48;
-      const logoHeight = 48;
-      if (fs.existsSync(LOGO_PATH)) {
-        doc.image(LOGO_PATH, margin, margin, { width: logoWidth, height: logoHeight });
+      const logoPath = getCompanyLogoPath(reportData.companyId);
+      const logoWidth = 46;
+      const logoHeight = 46;
+      if (fs.existsSync(logoPath)) {
+        try {
+          doc.image(logoPath, margin, margin, { width: logoWidth, height: logoHeight, fit: [logoWidth, logoHeight] });
+        } catch {
+          // fallback gracefully if image format fails
+        }
       }
 
-      const textStartX = fs.existsSync(LOGO_PATH) ? margin + logoWidth + 12 : margin;
+      const textStartX = fs.existsSync(logoPath) ? margin + logoWidth + 12 : margin;
+      const activeLegalName = reportData.companyLegalName || reportData.companyName || 'PIXX TECHNOLOGIES UK PROPERTY FINANCE LTD';
+
       doc
         .font('Helvetica-Bold')
         .fontSize(13)
         .fillColor('#0F172A')
-        .text(reportData.companyName || 'PIXX TECHNOLOGIES UK PROPERTY FINANCE LTD', textStartX, margin);
+        .text(activeLegalName, textStartX, margin);
 
       doc
         .font('Helvetica')
         .fontSize(8)
         .fillColor('#64748B')
-        .text('14 Belgrave Square, London SW1X 8PZ • United Kingdom • HMRC Compliant Accounting', textStartX, margin + 17);
+        .text(
+          `UK Reg: ${reportData.companyRegNo || 'N/A'} • 14 Belgrave Square, London SW1X 8PZ • United Kingdom • HMRC Compliant Accounting`,
+          textStartX,
+          margin + 17
+        );
 
       doc
         .font('Helvetica-Bold')
         .fontSize(10)
-        .fillColor('#1E293B')
+        .fillColor('#1E40AF')
         .text(reportData.reportTitle.toUpperCase(), textStartX, margin + 30);
 
       // Top Right Reference Box
       doc
         .font('Helvetica-Bold')
-        .fontSize(8)
-        .fillColor('#475569')
-        .text(`REF: ${reportData.reportRef}`, contentWidth - 80, margin, { align: 'right' });
+        .fontSize(8.5)
+        .fillColor('#0F172A')
+        .text(`AUDIT REF: ${reportData.reportRef}`, contentWidth - 100, margin, { align: 'right' });
 
       doc
         .font('Helvetica')
         .fontSize(8)
-        .fillColor('#64748B')
-        .text(`Period: ${reportData.periodLabel}`, contentWidth - 80, margin + 14, { align: 'right' });
+        .fillColor('#475569')
+        .text(`Period: ${reportData.periodLabel}`, contentWidth - 100, margin + 14, { align: 'right' });
 
       doc
-        .text(`Date: ${formatUKDate(reportData.generatedAt)} ${new Date(reportData.generatedAt).toLocaleTimeString('en-GB')}`, contentWidth - 80, margin + 26, { align: 'right' });
+        .text(
+          `Date: ${formatUKDate(reportData.generatedAt)} ${new Date(reportData.generatedAt).toLocaleTimeString('en-GB')} (GBP £)`,
+          contentWidth - 100,
+          margin + 26,
+          { align: 'right' }
+        );
 
       // Horizontal Divider
-      const headerBottomY = margin + 54;
+      const headerBottomY = margin + 50;
       doc
         .strokeColor('#CBD5E1')
         .lineWidth(1)
@@ -1348,7 +1590,7 @@ export const generatePdfReport = async (reportData) => {
         .stroke();
 
       // ---------------------------------------------------------------------
-      // 2. Executive KPI Cards Strip
+      // 2. Executive KPI Cards Strip (NO BLACK BACKGROUNDS)
       // ---------------------------------------------------------------------
       const kpiY = headerBottomY + 8;
       const kpiCount = 4;
@@ -1357,17 +1599,23 @@ export const generatePdfReport = async (reportData) => {
       const kpiHeight = 36;
 
       const kpis = [
-        { label: 'OPENING BALANCE (B/F)', val: formatGBP(reportData.summary.openingBalance), color: '#334155' },
-        { label: 'TOTAL RECEIPTS (IN)', val: formatGBP(reportData.summary.totalMoneyIn), color: '#059669' },
-        { label: 'TOTAL PAYMENTS (OUT)', val: formatGBP(reportData.summary.totalMoneyOut), color: '#E11D48' },
-        { label: reportData.isLiquidity ? 'CLOSING BALANCE' : 'NET CASH MOVEMENT', val: formatGBP(reportData.isLiquidity ? reportData.summary.closingBalance : reportData.summary.netCashMovement), color: '#4F46E5' },
+        { label: 'OPENING BALANCE (B/F)', val: formatGBP(reportData.summary.openingBalance), color: '#334155', bg: '#F8FAFC', border: '#CBD5E1' },
+        { label: 'TOTAL RECEIPTS (IN)', val: formatGBP(reportData.summary.totalMoneyIn), color: '#15803D', bg: '#F0FDF4', border: '#BBF7D0' },
+        { label: 'TOTAL PAYMENTS (OUT)', val: formatGBP(reportData.summary.totalMoneyOut), color: '#B91C1C', bg: '#FEF2F2', border: '#FECACA' },
+        {
+          label: reportData.isLiquidity ? 'CLOSING BALANCE' : 'NET CASH MOVEMENT',
+          val: formatGBP(reportData.isLiquidity ? reportData.summary.closingBalance : reportData.summary.netCashMovement),
+          color: '#4338CA',
+          bg: '#EEF2FF',
+          border: '#C7D2FE',
+        },
       ];
 
       kpis.forEach((kpi, idx) => {
         const kX = margin + idx * (kpiWidth + gap);
         doc
           .roundedRect(kX, kpiY, kpiWidth, kpiHeight, 4)
-          .fillAndStroke('#F8FAFC', '#E2E8F0');
+          .fillAndStroke(kpi.bg, kpi.border);
 
         doc
           .font('Helvetica-Bold')
@@ -1383,63 +1631,72 @@ export const generatePdfReport = async (reportData) => {
       });
 
       // ---------------------------------------------------------------------
-      // 3. Transactions Table Setup
+      // 3. Transactions Table Setup (NO BLACK BACKGROUND & NO OVERLAPPING)
       // ---------------------------------------------------------------------
       let startTableY = kpiY + kpiHeight + 10;
 
-      // Table Columns definition for Landscape A4 (total contentWidth ~ 786pt)
+      // Table Columns definition (total = 786 pt, matching landscape printable width)
       const colWidths = {
-        date: 58,
-        voucher: 68,
-        detail: 190,
-        head: 100,
-        account: 80,
-        property: 90,
-        in: 66,
-        out: 66,
-        balance: 68,
+        date: 54,
+        voucher: 90, // Generous width so UK-EXP-202610-0065 NEVER wraps to line 2
+        detail: 168, // Narration
+        head: 96,    // Nominal Head
+        account: 74, // Account
+        property: 106, // Property & Unit
+        in: 64,      // Money In
+        out: 64,     // Money Out
+        balance: 70, // Running Balance
       };
 
       const drawTableHeader = (yPos) => {
+        // Soft Light Slate Header (NO BLACK BACKGROUND)
         doc
-          .rect(margin, yPos, contentWidth, 18)
-          .fill('#0F172A');
+          .rect(margin, yPos, contentWidth, 19)
+          .fill('#F1F5F9');
 
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF');
+        doc
+          .strokeColor('#94A3B8')
+          .lineWidth(1)
+          .moveTo(margin, yPos)
+          .lineTo(pageWidth - margin, yPos)
+          .moveTo(margin, yPos + 19)
+          .lineTo(pageWidth - margin, yPos + 19)
+          .stroke();
+
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A');
         let currentX = margin + 4;
 
-        doc.text('DATE', currentX, yPos + 5, { width: colWidths.date });
+        doc.text('DATE', currentX, yPos + 6, { width: colWidths.date, align: 'center' });
         currentX += colWidths.date;
 
-        doc.text('VOUCHER NO', currentX, yPos + 5, { width: colWidths.voucher });
+        doc.text('VOUCHER NO', currentX, yPos + 6, { width: colWidths.voucher, align: 'center' });
         currentX += colWidths.voucher;
 
-        doc.text('PARTICULARS / DESCRIPTION', currentX, yPos + 5, { width: colWidths.detail });
+        doc.text('PARTICULARS / DESCRIPTION', currentX, yPos + 6, { width: colWidths.detail });
         currentX += colWidths.detail;
 
-        doc.text('NOMINAL HEAD', currentX, yPos + 5, { width: colWidths.head });
+        doc.text('NOMINAL HEAD', currentX, yPos + 6, { width: colWidths.head });
         currentX += colWidths.head;
 
-        doc.text('ACCOUNT', currentX, yPos + 5, { width: colWidths.account });
+        doc.text('ACCOUNT', currentX, yPos + 6, { width: colWidths.account });
         currentX += colWidths.account;
 
-        doc.text('ASSET / UNIT', currentX, yPos + 5, { width: colWidths.property });
+        doc.text('PROPERTY / ASSET', currentX, yPos + 6, { width: colWidths.property });
         currentX += colWidths.property;
 
-        doc.text('MONEY IN (£)', currentX, yPos + 5, { width: colWidths.in, align: 'right' });
+        doc.text('MONEY IN (£)', currentX, yPos + 6, { width: colWidths.in, align: 'right' });
         currentX += colWidths.in;
 
-        doc.text('MONEY OUT (£)', currentX, yPos + 5, { width: colWidths.out, align: 'right' });
+        doc.text('MONEY OUT (£)', currentX, yPos + 6, { width: colWidths.out, align: 'right' });
         currentX += colWidths.out;
 
-        doc.text('BALANCE (£)', currentX, yPos + 5, { width: colWidths.balance - 8, align: 'right' });
+        doc.text('BALANCE (£)', currentX, yPos + 6, { width: colWidths.balance - 8, align: 'right' });
 
-        return yPos + 18;
+        return yPos + 19;
       };
 
       let currentY = drawTableHeader(startTableY);
-      const rowHeight = 16;
-      const maxY = pageHeight - margin - 24;
+      const maxY = pageHeight - margin - 26;
 
       if (reportData.entries.length === 0) {
         doc
@@ -1449,72 +1706,88 @@ export const generatePdfReport = async (reportData) => {
           .text('No financial transactions found matching the selected report criteria.', margin, currentY + 20, { align: 'center', width: contentWidth });
       } else {
         reportData.entries.forEach((tx, idx) => {
-          // Check page break
+          const cleanDetail = (tx.narration || '-').replace(/\r?\n/g, ' ').trim();
+          const cleanHead = (tx.categoryName || '-').replace(/\r?\n/g, ' ').trim();
+          const hasProp = Boolean(tx.propertyName && tx.propertyName !== '-');
+          const hasUnit = Boolean(tx.unitName && tx.unitName !== '-');
+          const cleanPropUnit = (hasProp && hasUnit ? `${tx.propertyName} · ${tx.unitName}` : hasProp ? tx.propertyName : hasUnit ? tx.unitName : '-').replace(/\r?\n/g, ' ').trim();
+
+          // Calculate height needed to prevent text collision
+          doc.fontSize(6.5).font('Helvetica');
+          const hDetail = doc.heightOfString(cleanDetail, { width: colWidths.detail - 6 });
+          const hHead = doc.heightOfString(cleanHead, { width: colWidths.head - 4 });
+          const hProp = doc.heightOfString(cleanPropUnit, { width: colWidths.property - 4 });
+          const maxTextH = Math.max(hDetail, hHead, hProp);
+
+          // Dynamic row height with safe bounding (min 18pt, max 32pt)
+          const rowHeight = Math.min(32, Math.max(18, maxTextH + 6));
+
+          // Page break check
           if (currentY + rowHeight > maxY) {
             doc.addPage({ size: 'A4', layout: 'landscape', margin });
             currentY = drawTableHeader(margin);
           }
 
           const isEven = idx % 2 === 0;
-          if (isEven) {
-            doc.rect(margin, currentY, contentWidth, rowHeight).fill('#F8FAFC');
-          }
+          doc.rect(margin, currentY, contentWidth, rowHeight).fill(isEven ? '#FFFFFF' : '#F8FAFC');
 
-          doc.font('Helvetica').fontSize(6.8).fillColor('#1E293B');
+          const textY = currentY + 4;
+          const textH = rowHeight - 6;
           let rX = margin + 4;
 
-          // Date
-          doc.text(formatUKDate(tx.date), rX, currentY + 4, { width: colWidths.date });
+          // 1. Date
+          doc.font('Helvetica').fontSize(6.5).fillColor('#334155');
+          doc.text(formatUKDate(tx.date), rX, textY, { width: colWidths.date - 4, height: textH, align: 'center', ellipsis: true });
           rX += colWidths.date;
 
-          // Voucher
-          doc.font('Helvetica-Bold').fillColor('#4338CA').text(tx.voucherNo || '-', rX, currentY + 4, { width: colWidths.voucher });
+          // 2. Voucher (Single line, bold indigo)
+          doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#3730A3');
+          doc.text(tx.voucherNo || '-', rX, textY, { width: colWidths.voucher - 4, height: textH, align: 'center', ellipsis: true });
           rX += colWidths.voucher;
 
-          // Narration (truncated with ellipsis if too long)
-          doc.font('Helvetica').fillColor('#1E293B');
-          const cleanDetail = (tx.narration || '-').replace(/\n/g, ' ');
-          doc.text(cleanDetail, rX, currentY + 4, { width: colWidths.detail - 6, lineBreak: false });
+          // 3. Particulars / Narration
+          doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A');
+          doc.text(cleanDetail, rX, textY, { width: colWidths.detail - 6, height: textH, ellipsis: true });
           rX += colWidths.detail;
 
-          // Nominal Head
-          doc.text(tx.categoryName || '-', rX, currentY + 4, { width: colWidths.head - 4, lineBreak: false });
+          // 4. Nominal Head
+          doc.font('Helvetica').fontSize(6.5).fillColor('#334155');
+          doc.text(cleanHead, rX, textY, { width: colWidths.head - 4, height: textH, ellipsis: true });
           rX += colWidths.head;
 
-          // Account
-          doc.text(tx.accountName || '-', rX, currentY + 4, { width: colWidths.account - 4, lineBreak: false });
+          // 5. Account
+          doc.font('Helvetica').fontSize(6.5).fillColor('#475569');
+          doc.text(tx.accountName || '-', rX, textY, { width: colWidths.account - 4, height: textH, ellipsis: true });
           rX += colWidths.account;
 
-          // Property / Unit
-          const hasProp = Boolean(tx.propertyName && tx.propertyName !== '-');
-          const hasUnit = Boolean(tx.unitName && tx.unitName !== '-');
-          const propUnit = hasProp && hasUnit ? `${tx.propertyName} · ${tx.unitName}` : hasProp ? tx.propertyName : hasUnit ? tx.unitName : '-';
-          doc.text(propUnit, rX, currentY + 4, { width: colWidths.property - 4, lineBreak: false });
+          // 6. Property / Asset
+          doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A');
+          doc.text(cleanPropUnit, rX, textY, { width: colWidths.property - 4, height: textH, ellipsis: true });
           rX += colWidths.property;
 
-          // Money In
-          doc.font('Helvetica-Bold');
+          // 7. Money In
+          doc.font('Helvetica-Bold').fontSize(6.5);
           if (tx.moneyIn > 0) {
-            doc.fillColor('#059669').text(formatGBP(tx.moneyIn), rX, currentY + 4, { width: colWidths.in, align: 'right' });
+            doc.fillColor('#15803D').text(formatGBP(tx.moneyIn), rX, textY, { width: colWidths.in - 4, height: textH, align: 'right', ellipsis: true });
           } else {
-            doc.fillColor('#94A3B8').text('-', rX, currentY + 4, { width: colWidths.in, align: 'right' });
+            doc.fillColor('#94A3B8').text('-', rX, textY, { width: colWidths.in - 4, height: textH, align: 'right' });
           }
           rX += colWidths.in;
 
-          // Money Out
+          // 8. Money Out
           if (tx.moneyOut > 0) {
-            doc.fillColor('#E11D48').text(formatGBP(tx.moneyOut), rX, currentY + 4, { width: colWidths.out, align: 'right' });
+            doc.fillColor('#B91C1C').text(formatGBP(tx.moneyOut), rX, textY, { width: colWidths.out - 4, height: textH, align: 'right', ellipsis: true });
           } else {
-            doc.fillColor('#94A3B8').text('-', rX, currentY + 4, { width: colWidths.out, align: 'right' });
+            doc.fillColor('#94A3B8').text('-', rX, textY, { width: colWidths.out - 4, height: textH, align: 'right' });
           }
           rX += colWidths.out;
 
-          // Running Balance
-          doc.fillColor('#0F172A').text(formatGBP(tx.runningBalance), rX, currentY + 4, { width: colWidths.balance - 8, align: 'right' });
+          // 9. Running Balance
+          doc.fillColor('#0F172A').text(formatGBP(tx.runningBalance), rX, textY, { width: colWidths.balance - 8, height: textH, align: 'right', ellipsis: true });
 
           // Light row bottom border
           doc
-            .strokeColor('#F1F5F9')
+            .strokeColor('#E2E8F0')
             .lineWidth(0.5)
             .moveTo(margin, currentY + rowHeight)
             .lineTo(pageWidth - margin, currentY + rowHeight)
@@ -1523,28 +1796,37 @@ export const generatePdfReport = async (reportData) => {
           currentY += rowHeight;
         });
 
-        // Bottom Grand Total Row
-        if (currentY + 20 > maxY) {
+        // Bottom Grand Total Row (NO BLACK BACKGROUND)
+        if (currentY + 22 > maxY) {
           doc.addPage({ size: 'A4', layout: 'landscape', margin });
           currentY = drawTableHeader(margin);
         }
 
-        doc.rect(margin, currentY, contentWidth, 20).fill('#1E293B');
-        doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#FFFFFF');
+        doc.rect(margin, currentY, contentWidth, 22).fill('#EEF2FF');
+        doc
+          .strokeColor('#94A3B8')
+          .lineWidth(1)
+          .moveTo(margin, currentY)
+          .lineTo(pageWidth - margin, currentY)
+          .moveTo(margin, currentY + 22)
+          .lineTo(pageWidth - margin, currentY + 22)
+          .stroke();
+
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0F172A');
 
         let totX = margin + 4;
-        doc.text(`TOTALS (${reportData.entries.length} POSTED RECORDS)`, totX, currentY + 6, {
+        doc.text(`TOTALS (${reportData.entries.length} POSTED RECORDS)`, totX, currentY + 7, {
           width: colWidths.date + colWidths.voucher + colWidths.detail + colWidths.head + colWidths.account + colWidths.property,
         });
 
         totX += colWidths.date + colWidths.voucher + colWidths.detail + colWidths.head + colWidths.account + colWidths.property;
-        doc.text(formatGBP(reportData.summary.totalMoneyIn), totX, currentY + 6, { width: colWidths.in, align: 'right' });
+        doc.fillColor('#15803D').text(formatGBP(reportData.summary.totalMoneyIn), totX, currentY + 7, { width: colWidths.in - 4, align: 'right' });
         totX += colWidths.in;
 
-        doc.text(formatGBP(reportData.summary.totalMoneyOut), totX, currentY + 6, { width: colWidths.out, align: 'right' });
+        doc.fillColor('#B91C1C').text(formatGBP(reportData.summary.totalMoneyOut), totX, currentY + 7, { width: colWidths.out - 4, align: 'right' });
         totX += colWidths.out;
 
-        doc.text(formatGBP(reportData.summary.closingBalance), totX, currentY + 6, { width: colWidths.balance - 8, align: 'right' });
+        doc.fillColor('#0F172A').text(formatGBP(reportData.summary.closingBalance), totX, currentY + 7, { width: colWidths.balance - 8, align: 'right' });
       }
 
       // ---------------------------------------------------------------------
@@ -1567,7 +1849,7 @@ export const generatePdfReport = async (reportData) => {
           .fontSize(6.5)
           .fillColor('#64748B')
           .text(
-            `${reportData.companyName || 'PIXX TECHNOLOGIES UK'} • OFFICIAL AUDIT REGISTER • CONFIDENTIAL`,
+            `${reportData.companyLegalName || reportData.companyName || 'PIXX TECHNOLOGIES UK'} • OFFICIAL AUDIT REGISTER • CONFIDENTIAL`,
             margin,
             footerY,
             { align: 'left', width: contentWidth / 2 }

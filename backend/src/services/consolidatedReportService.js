@@ -8,13 +8,34 @@ import Mortgage from '../models/Mortgage.js';
 import Tenant from '../models/Tenant.js';
 import Account from '../models/Account.js';
 import RentSchedule from '../models/RentSchedule.js';
-import { COMPANIES, getCompanyById } from '../config/companies.js';
+import { COMPANIES, getCompanyById, normalizeCompanyId } from '../config/companies.js';
 import { round2 } from './ledgerService.js';
 import { OLD_STREET_PROPERTIES } from '../scripts/generateLandlordReportFile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LOGO_PATH = path.resolve(__dirname, '../assets/logo.png');
+
+/**
+ * Resolve dynamic high-resolution company logo
+ */
+const getCompanyLogoPath = (companyId) => {
+  if (!companyId) return LOGO_PATH;
+  const normalized = normalizeCompanyId(companyId);
+  const logoMap = {
+    'old-street': path.resolve(__dirname, '../assets/logos/OldStreetLogo.png'),
+    'best-standard': path.resolve(__dirname, '../assets/logos/BestStandardLogo.png'),
+    'sk-hamilton': path.resolve(__dirname, '../assets/logos/SKLogo.png'),
+    'homewards': path.resolve(__dirname, '../assets/logos/HomeWardsLogo.png'),
+    'mile-end-road': path.resolve(__dirname, '../assets/logos/MileEndLogo.png'),
+    'global-standard': path.resolve(__dirname, '../assets/logos/GlobalStandardLogo.png'),
+  };
+  const targetPath = logoMap[normalized];
+  if (targetPath && fs.existsSync(targetPath)) {
+    return targetPath;
+  }
+  return LOGO_PATH;
+};
 
 /**
  * Format monetary amount into GBP currency string
@@ -178,8 +199,8 @@ export async function generateConsolidatedGroupExcelReport() {
   ws1.mergeCells('A1:L1');
   const mTitle = ws1.getCell('A1');
   mTitle.value = 'PIXX TECHNOLOGIES UK — MASTER CONSOLIDATED RENT INCOME REPORT';
-  mTitle.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
-  mTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+  mTitle.font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF0F172A' } };
+  mTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
   mTitle.alignment = { horizontal: 'center', vertical: 'middle' };
   ws1.getRow(1).height = 30;
 
@@ -212,8 +233,8 @@ export async function generateConsolidatedGroupExcelReport() {
     ws1.mergeCells(`A${currentRow}:L${currentRow}`);
     const compBanner = ws1.getCell(`A${currentRow}`);
     compBanner.value = `${comp.name.toUpperCase()} — ${comp.legalName.toUpperCase()}`;
-    compBanner.font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FFFFFFFF' } };
-    compBanner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    compBanner.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF0F172A' } };
+    compBanner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
     compBanner.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
     ws1.getRow(currentRow).height = 24;
     currentRow++;
@@ -447,9 +468,9 @@ export async function generateConsolidatedGroupExcelReport() {
   for (let c = 1; c <= 12; c++) {
     const cell = masterTotRow.getCell(c);
     cell.border = totalBorder;
-    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF0F172A' } };
     cell.alignment = cell.alignment || { horizontal: 'right', vertical: 'middle' };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // Deep Navy Slate
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } }; // Soft Indigo Tint
   }
 
   // =========================================================================
@@ -475,8 +496,8 @@ export async function generateConsolidatedGroupExcelReport() {
   ws2.mergeCells('A1:I1');
   const ws2Title = ws2.getCell('A1');
   ws2Title.value = 'PIXX TECHNOLOGIES UK — CONSOLIDATED MORTGAGE & LOAN FACILITY REGISTER';
-  ws2Title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-  ws2Title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF047857' } }; // Deep Emerald
+  ws2Title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF047857' } };
+  ws2Title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECFDF5' } }; // Soft Emerald Tint
   ws2Title.alignment = { horizontal: 'center', vertical: 'middle' };
   ws2.getRow(1).height = 28;
 
@@ -499,8 +520,8 @@ export async function generateConsolidatedGroupExcelReport() {
   s2Headers.forEach((h, idx) => {
     const cell = ws2.getRow(3).getCell(idx + 1);
     cell.value = h;
-    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
     cell.alignment = {
       horizontal: idx === 0 || idx === 5 || idx === 6 ? 'center' : idx >= 7 ? 'right' : 'left',
       vertical: 'middle',
@@ -619,8 +640,8 @@ export async function generateConsolidatedGroupExcelReport() {
   ws3.mergeCells('A1:I1');
   const ws3Title = ws3.getCell('A1');
   ws3Title.value = 'PIXX TECHNOLOGIES UK — DIRECT PROPERTY ASSET INVENTORY (ALL 48 PROPERTIES)';
-  ws3Title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-  ws3Title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }; // Corporate Blue
+  ws3Title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1E40AF' } };
+  ws3Title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } }; // Soft Indigo Tint
   ws3Title.alignment = { horizontal: 'center', vertical: 'middle' };
   ws3.getRow(1).height = 28;
 
@@ -643,8 +664,8 @@ export async function generateConsolidatedGroupExcelReport() {
   s3Headers.forEach((h, idx) => {
     const cell = ws3.getRow(3).getCell(idx + 1);
     cell.value = h;
-    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
     cell.alignment = {
       horizontal: idx === 0 || idx === 3 || idx === 4 ? 'center' : idx >= 6 ? 'right' : 'left',
       vertical: 'middle',
@@ -900,14 +921,14 @@ export async function generateConsolidatedGroupPdfReport(options = {}) {
         const compHeaderY = tableY + 16;
         doc
           .roundedRect(margin, compHeaderY, contentWidth, 20, 4)
-          .fill('#1E293B');
+          .fill('#F1F5F9');
 
         let colX = margin + 6;
         compCols.forEach((c) => {
           doc
             .font('Helvetica-Bold')
             .fontSize(7.5)
-            .fillColor('#FFFFFF')
+            .fillColor('#0F172A')
             .text(c.label, colX, compHeaderY + 6, { width: c.width - 10, align: c.align });
           colX += c.width;
         });
@@ -963,41 +984,41 @@ export async function generateConsolidatedGroupPdfReport(options = {}) {
           compRowY += 19;
         });
 
-        // Total Row for Comparison Table
+        // Total Row for Comparison Table (NO BLACK BACKGROUND)
         doc
           .roundedRect(margin, compRowY, contentWidth, 22, 4)
-          .fill('#0F172A');
+          .fill('#EEF2FF');
 
         colX = margin + 6;
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0F172A')
           .text('MASTER GROUP TOTAL', colX, compRowY + 6, { width: compCols[0].width - 10, align: 'left' });
         colX += compCols[0].width;
 
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#94A3B8')
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#475569')
           .text('6 Entities', colX, compRowY + 6, { width: compCols[1].width - 10, align: 'center' });
         colX += compCols[1].width;
 
-        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#FFFFFF')
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0F172A')
           .text(String(data.totals.totalProperties), colX, compRowY + 6, { width: compCols[2].width - 10, align: 'center' });
         colX += compCols[2].width;
 
-        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#34D399')
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#059669')
           .text(formatGBP(data.totals.totalMonthlyRent), colX, compRowY + 6, { width: compCols[3].width - 10, align: 'right' });
         colX += compCols[3].width;
 
-        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#34D399')
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#047857')
           .text(formatGBP(data.totals.totalAnnualRent), colX, compRowY + 6, { width: compCols[4].width - 10, align: 'right' });
         colX += compCols[4].width;
 
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0F172A')
           .text(String(data.allMortgages.length), colX, compRowY + 6, { width: compCols[5].width - 10, align: 'center' });
         colX += compCols[5].width;
 
-        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#F87171')
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#DC2626')
           .text(formatGBP(data.totals.totalMortgageDebt), colX, compRowY + 6, { width: compCols[6].width - 10, align: 'right' });
         colX += compCols[6].width;
 
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF')
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0F172A')
           .text(formatGBP(data.totals.totalMonthlyDebtService), colX, compRowY + 6, { width: compCols[7].width - 10, align: 'right' });
       }
 
@@ -1036,11 +1057,13 @@ export async function generateConsolidatedGroupPdfReport(options = {}) {
 
         // 1. Company Corporate Header
         const headerTopY = margin;
-        if (fs.existsSync(LOGO_PATH)) {
-          doc.image(LOGO_PATH, margin, headerTopY, { width: 38, height: 38 });
+        const compLogoPath = getCompanyLogoPath(comp.id);
+        const hasCompLogo = Boolean(compLogoPath && fs.existsSync(compLogoPath));
+        if (hasCompLogo) {
+          doc.image(compLogoPath, margin, headerTopY, { width: 38, height: 38 });
         }
 
-        const headTextX = fs.existsSync(LOGO_PATH) ? margin + 48 : margin;
+        const headTextX = hasCompLogo ? margin + 48 : margin;
         const compSeq = !isSingleCompany ? `${compIdx + 1}. ` : '';
 
         doc
@@ -1114,13 +1137,13 @@ export async function generateConsolidatedGroupPdfReport(options = {}) {
         ];
 
         const drawPropHeader = (y) => {
-          doc.roundedRect(margin, y, contentWidth, 16, 3).fill('#1E293B');
+          doc.roundedRect(margin, y, contentWidth, 16, 3).fill('#F1F5F9');
           let px = margin + 4;
           propCols.forEach((col) => {
             doc
               .font('Helvetica-Bold')
               .fontSize(7)
-              .fillColor('#FFFFFF')
+              .fillColor('#0F172A')
               .text(col.label, px, y + 4, { width: col.width - 6, align: col.align });
             px += col.width;
           });
@@ -1187,25 +1210,25 @@ export async function generateConsolidatedGroupPdfReport(options = {}) {
           currentY += 15;
         });
 
-        // Company Property Sub-Total Row
+        // Company Property Sub-Total Row (NO BLACK BACKGROUND)
         if (currentY > pageHeight - 50) {
           doc.addPage();
           currentY = margin;
         }
-        doc.roundedRect(margin, currentY, contentWidth, 16, 3).fill('#0F172A');
+        doc.roundedRect(margin, currentY, contentWidth, 16, 3).fill('#EEF2FF');
         let totPx = margin + 4;
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF')
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A')
           .text(`${comp.name.toUpperCase()} — TOTAL (${compProps.length} PROPERTIES)`, totPx, currentY + 4, {
             width: propCols[0].width + propCols[1].width + propCols[2].width + propCols[3].width + propCols[4].width - 6,
             align: 'left',
           });
 
         totPx += propCols[0].width + propCols[1].width + propCols[2].width + propCols[3].width + propCols[4].width;
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#34D399')
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#059669')
           .text(formatGBP(compTotalMonthlyRent), totPx, currentY + 4, { width: propCols[5].width - 6, align: 'right' });
         totPx += propCols[5].width;
 
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#34D399')
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#047857')
           .text(formatGBP(compTotalAnnualRent), totPx, currentY + 4, { width: propCols[6].width - 6, align: 'right' });
 
         currentY += 22;
@@ -1236,13 +1259,13 @@ export async function generateConsolidatedGroupPdfReport(options = {}) {
           ];
 
           const drawMortHeader = (y) => {
-            doc.roundedRect(margin, y, contentWidth, 16, 3).fill('#1E293B');
+            doc.roundedRect(margin, y, contentWidth, 16, 3).fill('#F1F5F9');
             let mx = margin + 4;
             mortCols.forEach((col) => {
               doc
                 .font('Helvetica-Bold')
                 .fontSize(7)
-                .fillColor('#FFFFFF')
+                .fillColor('#0F172A')
                 .text(col.label, mx, y + 4, { width: col.width - 6, align: col.align });
               mx += col.width;
             });
@@ -1308,25 +1331,25 @@ export async function generateConsolidatedGroupPdfReport(options = {}) {
             currentY += 15;
           });
 
-          // Company Mortgage Sub-Total Row
+          // Company Mortgage Sub-Total Row (NO BLACK BACKGROUND)
           if (currentY > pageHeight - 50) {
             doc.addPage();
             currentY = margin;
           }
-          doc.roundedRect(margin, currentY, contentWidth, 16, 3).fill('#0F172A');
+          doc.roundedRect(margin, currentY, contentWidth, 16, 3).fill('#EEF2FF');
           let mTotPx = margin + 4;
-          doc.font('Helvetica-Bold').fontSize(7).fillColor('#FFFFFF')
+          doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A')
             .text(`${comp.name.toUpperCase()} — MORTGAGE SUB-TOTAL (${compMorts.length} FACILITIES)`, mTotPx, currentY + 4, {
               width: mortCols[0].width + mortCols[1].width + mortCols[2].width + mortCols[3].width + mortCols[4].width - 6,
               align: 'left',
             });
 
           mTotPx += mortCols[0].width + mortCols[1].width + mortCols[2].width + mortCols[3].width + mortCols[4].width;
-          doc.font('Helvetica-Bold').fontSize(7).fillColor('#34D399')
+          doc.font('Helvetica-Bold').fontSize(7).fillColor('#059669')
             .text(formatGBP(compTotalMortService), mTotPx, currentY + 4, { width: mortCols[5].width - 6, align: 'right' });
           mTotPx += mortCols[5].width;
 
-          doc.font('Helvetica-Bold').fontSize(7).fillColor('#F87171')
+          doc.font('Helvetica-Bold').fontSize(7).fillColor('#DC2626')
             .text(formatGBP(compTotalMortDebt), mTotPx, currentY + 4, { width: mortCols[6].width - 6, align: 'right' });
         } else {
           // Note if no mortgages

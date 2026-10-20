@@ -44,6 +44,7 @@ async function verifyAll() {
 
   console.log('\n--- 1. Testing buildLedgerReportData (COMPLETE Scope) ---');
   const completeReport = await buildLedgerReportData({
+    companyId: 'old-street',
     scope: 'COMPLETE',
     datePreset: 'ALL',
   });
@@ -59,7 +60,7 @@ async function verifyAll() {
 
   console.log('\n--- 2. Testing Preview Controller (GET /api/reports/ledger/preview) ---');
   const mockPrev = runMockResponse();
-  await getLedgerReportPreview({ query: { scope: 'COMPLETE', datePreset: 'ALL' } }, mockPrev.res);
+  await getLedgerReportPreview({ query: { scope: 'COMPLETE', datePreset: 'ALL' }, companyId: 'old-street' }, mockPrev.res);
   const prevRes = mockPrev.getResult();
   if (!prevRes.data?.success) {
     throw new Error('Preview controller failed: ' + JSON.stringify(prevRes));
@@ -86,13 +87,13 @@ async function verifyAll() {
   console.log('✓ Valid PDF signature (%PDF-)');
 
   console.log('\n--- 5. Testing Other Scopes (BANK, PROPERTY, ACCOUNT_HEAD) ---');
-  const bankReport = await buildLedgerReportData({ scope: 'BANK', datePreset: 'ALL' });
+  const bankReport = await buildLedgerReportData({ companyId: 'old-street', scope: 'BANK', datePreset: 'ALL' });
   console.log(`✓ BANK Scope Title: "${bankReport.reportTitle}" | Count: ${bankReport.summary.transactionCount} | Opening: £${bankReport.summary.openingBalance}`);
 
-  const propReport = await buildLedgerReportData({ scope: 'PROPERTY', datePreset: 'ALL' });
+  const propReport = await buildLedgerReportData({ companyId: 'old-street', scope: 'PROPERTY', datePreset: 'ALL' });
   console.log(`✓ PROPERTY Scope Title: "${propReport.reportTitle}" | Count: ${propReport.summary.transactionCount}`);
 
-  const headReport = await buildLedgerReportData({ scope: 'ACCOUNT_HEAD', datePreset: 'ALL' });
+  const headReport = await buildLedgerReportData({ companyId: 'old-street', scope: 'ACCOUNT_HEAD', datePreset: 'ALL' });
   console.log(`✓ ACCOUNT_HEAD Scope Title: "${headReport.reportTitle}" | Count: ${headReport.summary.transactionCount}`);
 
   console.log('\n======================================================');

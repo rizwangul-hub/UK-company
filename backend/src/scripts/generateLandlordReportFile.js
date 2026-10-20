@@ -337,8 +337,8 @@ export async function createOfficialLandlordWorkbook(
   s2Headers.forEach((h, idx) => {
     const cell = ws2.getRow(3).getCell(idx + 1);
     cell.value = h;
-    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } }; // Deep Navy Slate
+    cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; // Executive Slate
     cell.alignment = {
       horizontal: idx === 0 || idx === 2 || idx === 3 ? 'center' : idx >= 5 ? 'right' : 'left',
       vertical: 'middle',
