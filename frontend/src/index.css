@@ -472,14 +472,34 @@ html.light .text-slate-400 {
   color: #64748b !important;
 }
 
+html.light .hover\:bg-slate-950:hover,
+html.light .hover\:bg-slate-900:hover,
+html.light .hover\:bg-slate-900\/90:hover,
+html.light .hover\:bg-slate-850:hover,
+html.light .hover\:bg-slate-850\/50:hover,
 html.light .hover\:bg-slate-800:hover,
 html.light .hover\:bg-slate-800\/60:hover,
 html.light .hover\:bg-slate-800\/80:hover {
   background-color: #f1f5f9 !important;
 }
 
+html.light tr:hover,
+html.light tr.hover\:bg-slate-850\/50:hover,
+html.light tr.hover\:bg-slate-850:hover {
+  background-color: #f8fafc !important;
+}
+
+html.light thead {
+  background-color: #f8fafc !important;
+}
+
+html.light th {
+  color: #64748b !important;
+}
+
 html.light .hover\:text-white:hover,
-html.light .hover\:text-slate-100:hover {
+html.light .hover\:text-slate-100:hover,
+html.light .hover\:text-slate-200:hover {
   color: #0f172a !important;
 }
 

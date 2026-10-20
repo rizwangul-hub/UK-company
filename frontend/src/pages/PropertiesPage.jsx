@@ -1480,30 +1480,60 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
         </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by property name, UK postcode, address, town..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-          />
-        </div>
+      {/* Filters & Portfolio View Switcher Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by property/unit name, postcode, address..."
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
 
-        <div className="flex items-center gap-2">
           <select
             value={tenureFilter}
             onChange={(e) => setTenureFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none cursor-pointer"
+            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none cursor-pointer shrink-0"
           >
             <option value="">All Tenures</option>
             <option value="FREEHOLD">Freehold</option>
             <option value="LEASEHOLD">Leasehold</option>
             <option value="SHARE_OF_FREEHOLD">Share of Freehold</option>
           </select>
+        </div>
+
+        {/* View Mode Toggle: All Properties & Units (23) vs Buildings Overview (13) */}
+        <div className="inline-flex items-center p-1 bg-slate-900/90 border border-slate-800 rounded-xl self-start sm:self-auto shrink-0 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setPortfolioViewMode('UNITS')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              portfolioViewMode === 'UNITS'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Display every individual property and lettable unit with its own rent, tenant, and documents"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>All Properties &amp; Units ({properties.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPortfolioViewMode('BUILDINGS')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              portfolioViewMode === 'BUILDINGS'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Group units by physical building parcels"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Buildings Overview ({buildings.length})</span>
+          </button>
         </div>
       </div>
 
@@ -1513,7 +1543,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
           <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
           <span className="text-xs">Loading property portfolio...</span>
         </div>
-      ) : properties.length === 0 ? (
+      ) : (portfolioViewMode === 'BUILDINGS' ? buildings : properties).length === 0 ? (
         <div className="bg-slate-900/60 border border-dashed border-slate-800 rounded-2xl p-12 text-center space-y-3">
           <Building2 className="w-10 h-10 text-slate-600 mx-auto" />
           <div className="text-sm font-semibold text-slate-300">
@@ -1532,10 +1562,12 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {properties.map((prop) => {
-            const hasMultipleUnits = prop.units && prop.units.length > 1;
+          {(portfolioViewMode === 'BUILDINGS' ? buildings : properties).map((prop) => {
+            const hasMultipleUnits = portfolioViewMode === 'BUILDINGS' && prop.units && prop.units.length > 1;
             const isExpanded = expandedPropertyIds.has(prop._id);
             const unitSummary = hasMultipleUnits ? getUnitTypesSummary(prop.units) : '';
+            const isShop = prop.propertyType === 'Shop' || prop.propertyType === 'RETAIL_SHOP' || prop.name?.toLowerCase().includes('shop');
+            const PropIcon = isShop ? Store : (prop.isMultiUnitChild ? Home : Building2);
 
             return (
               <div
@@ -1556,9 +1588,15 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <h3 className="text-sm font-bold text-white group-hover:text-indigo-400 transition truncate flex items-center gap-1.5">
-                        <Home className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <PropIcon className={`w-3.5 h-3.5 shrink-0 ${isShop ? 'text-amber-400' : 'text-indigo-400'}`} />
                         <span className="truncate">{prop.name}</span>
                       </h3>
+                      {prop.parentPropertyName && (
+                        <div className="text-[11px] text-indigo-300 flex items-center gap-1 mt-0.5">
+                          <Building2 className="w-3 h-3 text-indigo-400 shrink-0" />
+                          <span className="truncate">Part of {prop.parentPropertyName}</span>
+                        </div>
+                      )}
                       <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-1">
                         <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                         <span className="truncate">
@@ -1581,12 +1619,21 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                       >
                         {prop.status || 'Available'}
                       </span>
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${
+                        isShop
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}>
                         {prop.propertyType?.replace(/_/g, ' ')}
                       </span>
                       {hasMultipleUnits && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                           {prop.units.length} Units ({unitSummary})
+                        </span>
+                      )}
+                      {prop.isMultiUnitChild && prop.floor && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                          Floor: {prop.floor}
                         </span>
                       )}
                     </div>
@@ -1830,20 +1877,47 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                 </div>
 
                 {/* Action row */}
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <button
-                    type="button"
-                    onClick={(e) => handleOpenEdit(prop, e)}
-                    className="text-slate-400 hover:text-white transition cursor-pointer text-[11px] py-1 px-1.5 rounded hover:bg-slate-800"
-                  >
-                    Edit Property
-                  </button>
+                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => handleOpenEdit(prop, e)}
+                      className="text-slate-400 hover:text-white transition cursor-pointer text-[11px] py-1 px-1.5 rounded hover:bg-slate-800"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.href = `/company/${compSlug}/ledger?type=PROPERTY&entityId=${prop._id}`;
+                      }}
+                      className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition text-[10px] font-semibold"
+                      title="Open Ledger"
+                    >
+                      <FileText className="w-3 h-3" />
+                      <span>Ledger</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.href = `/company/${compSlug}/rent`;
+                      }}
+                      className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition text-[10px] font-semibold"
+                      title="Collect Rent"
+                    >
+                      <Receipt className="w-3 h-3" />
+                      <span>Rent</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={(e) => handleOpenDetails(prop, e)}
-                    className="text-indigo-400 hover:text-indigo-300 group-hover:translate-x-0.5 transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer py-1 px-2 rounded-lg hover:bg-indigo-500/10"
+                    className="text-indigo-400 hover:text-indigo-300 group-hover:translate-x-0.5 transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer py-1 px-2 rounded-lg hover:bg-indigo-500/10 shrink-0"
                   >
-                    <span>Open Full Dashboard</span>
+                    <span>Open Dashboard</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

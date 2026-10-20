@@ -23,6 +23,7 @@ import {
 import { reportsAPI, propertiesAPI } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { formatPropertyType } from '../pages/LedgerPage.jsx';
+import { ModalPortal } from './ModalPortal.jsx';
 import pixxLogo from '../assets/logo.png';
 
 const SCOPES = [
@@ -246,7 +247,8 @@ export default function ReportExportModal({
   const previewRows = previewData?.previewRows || [];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <ModalPortal isOpen={true} onClose={onClose} zIndex="z-[9999]">
+    <div className="fixed inset-0 z-[9999] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in duration-200">
         {/* Top Header */}
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/70 shrink-0">
@@ -751,6 +753,6 @@ export default function ReportExportModal({
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

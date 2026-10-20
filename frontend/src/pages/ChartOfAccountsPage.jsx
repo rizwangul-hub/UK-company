@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { ledgerAPI, accountsAPI, mortgagesAPI, propertiesAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
+import { ModalPortal } from '../components/ModalPortal.jsx';
 import { HeadSubHeadHierarchyView } from '../components/HeadSubHeadHierarchyView.jsx';
 import { CategoryBackfillReviewView } from '../components/CategoryBackfillReviewView.jsx';
 import pixxLogo from '../assets/logo.png';
@@ -92,6 +93,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
   const [createType, setCreateType] = useState('EXPENSE'); // 'EXPENSE' | 'LIQUIDITY' | 'INCOME' | 'MORTGAGE' | 'FINANCE_COST'
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
+  const [standardHeadsModalProp, setStandardHeadsModalProp] = useState(null);
 
   // Forms for creation
   const [expenseForm, setExpenseForm] = useState({
@@ -929,7 +931,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
 
                           <div className="flex items-center gap-1.5 self-end sm:self-auto">
                             <button
-                              onClick={() => handleGenerateStandardHeads(prop)}
+                              onClick={() => setStandardHeadsModalProp(prop)}
                               disabled={generatingStandard[prop._id]}
                               className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-bold text-[10px] transition cursor-pointer flex items-center gap-1"
                               title="1-Click auto generate standard UK utility and maintenance sub-heads (Electricity, Gas, Maintenance, Water, Insurance, Council Tax)"
@@ -956,7 +958,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
                               <div>No sub-heads assigned to this property yet.</div>
                               <div className="flex items-center justify-center gap-2 pt-1">
                                 <button
-                                  onClick={() => handleGenerateStandardHeads(prop)}
+                                  onClick={() => setStandardHeadsModalProp(prop)}
                                   className="text-amber-600 dark:text-amber-400 font-bold hover:underline flex items-center gap-1"
                                 >
                                   <Sparkles size={11} /> Auto-Add Electricity, Gas, Maintenance
@@ -1347,7 +1349,8 @@ export function ChartOfAccountsPage({ selectedCompany }) {
       {/* UNIVERSAL CREATE MODAL                                                */}
       {/* ===================================================================== */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <ModalPortal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
@@ -1862,13 +1865,15 @@ export function ChartOfAccountsPage({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* ===================================================================== */}
       {/* EDIT MODAL                                                            */}
       {/* ===================================================================== */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <ModalPortal isOpen={Boolean(editingItem)} onClose={() => setEditingItem(null)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg p-5 sm:p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
@@ -2106,6 +2111,7 @@ export function ChartOfAccountsPage({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

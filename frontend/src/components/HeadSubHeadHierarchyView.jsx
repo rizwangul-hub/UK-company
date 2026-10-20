@@ -26,6 +26,7 @@ import {
   X,
   Check,
 } from 'lucide-react';
+import { ModalPortal } from './ModalPortal.jsx';
 import { ledgerAPI } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 
@@ -686,7 +687,8 @@ export function HeadSubHeadHierarchyView({ selectedCompany }) {
 
       {/* Head Modal (Create/Edit) */}
       {headModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+        <ModalPortal isOpen={headModalOpen} onClose={() => setHeadModalOpen(false)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
@@ -781,11 +783,13 @@ export function HeadSubHeadHierarchyView({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Sub Head Modal (Create/Edit) */}
       {subHeadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+        <ModalPortal isOpen={subHeadModalOpen} onClose={() => setSubHeadModalOpen(false)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
@@ -882,11 +886,13 @@ export function HeadSubHeadHierarchyView({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Move Sub Head Modal */}
       {moveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+        <ModalPortal isOpen={moveModalOpen} onClose={() => setMoveModalOpen(false)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
@@ -963,6 +969,7 @@ export function HeadSubHeadHierarchyView({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { appliancesAPI, propertiesAPI, triggerBlobDownload } from '../services/api.js';
+import { ModalPortal } from '../components/ModalPortal.jsx';
 import ApplianceModal from '../components/ApplianceModal.jsx';
 import { APPLIANCE_ICONS, APPLIANCE_TYPE_TITLES } from '../components/PropertyAppliancesSection.jsx';
 
@@ -553,90 +554,54 @@ export function AppliancesPage({ selectedCompany }) {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('appliances')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'appliances'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Appliances Register ({appliances.length})</span>
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2 overflow-x-auto">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setActiveTab('appliances')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+              activeTab === 'appliances'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Appliances Register ({appliances.length})</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('receipts')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'receipts'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Receipt className="w-3.5 h-3.5 text-blue-400" />
-          <span>Supplier Invoices &amp; Master Receipts ({receipts.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('receipts')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+              activeTab === 'receipts'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5 text-blue-400" />
+            <span>Purchase Invoices &amp; Receipts ({receipts.length})</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('reminders')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'reminders'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Bell className="w-3.5 h-3.5 text-rose-400" />
-          <span>Warranty &amp; Expiry Reminders ({reminders.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('reminders')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+              activeTab === 'reminders'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5 text-rose-400" />
+            <span>Warranty &amp; Expiry Alerts ({reminders.length})</span>
+          </button>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('calendar')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'calendar'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
+        {/* Currys Support Direct Helpline Callout */}
+        <a
+          href="tel:03448006080"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 dark:text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition whitespace-nowrap shrink-0 shadow-sm"
+          title="Direct Currys Care & Repair Helpline & Annual Squeaky Clean Valet Booking"
         >
-          <Calendar className="w-3.5 h-3.5" />
-          <span>Valet Schedule</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('tasks')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'tasks'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Wrench className="w-3.5 h-3.5" />
-          <span>Action Checklist ({tasks.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('access')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'access'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <UserCheck className="w-3.5 h-3.5" />
-          <span>Tenant Notices</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('currys')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-            activeTab === 'currys'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-900'
-          }`}
-        >
-          <Phone className="w-3.5 h-3.5 text-amber-400" />
-          <span>Currys Directory</span>
-        </button>
+          <Phone className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+          <span>Currys Support &amp; Valet: 0344 800 6080</span>
+        </a>
       </div>
 
       {/* TAB 1: APPLIANCES REGISTER */}
@@ -1115,522 +1080,63 @@ export function AppliancesPage({ selectedCompany }) {
               </div>
             )}
           </div>
-        </div>
-      )}
 
-      {/* TAB 3: WARRANTY & EXPIRY REMINDERS */}
-      {activeTab === 'reminders' && (
-        <div className="space-y-4">
+          {/* Currys Care & Support Card embedded directly in Warranty & Expiry section */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-rose-400" />
-                  <span>Warranty, Care Contract &amp; Service Reminders</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Proactive tracking of expiring warranties, service plans, missing documents, and unassigned property locations.
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-xl shrink-0">
+                  📞
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Currys Care &amp; Repair Official Support &amp; Valet</h3>
+                  <p className="text-xs text-slate-400">
+                    Direct phone lines for booking free annual Squeaky Clean Valets, breakdown repairs, and warranty claims.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-semibold">Look Ahead:</span>
-                <select
-                  value={reminderDays}
-                  onChange={(e) => setReminderDays(Number(e.target.value))}
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                >
-                  <option value="30">Next 30 Days</option>
-                  <option value="60">Next 60 Days</option>
-                  <option value="90">Next 90 Days</option>
-                </select>
-              </div>
-            </div>
-
-            {reminders.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-                <span>All warranties and care plans are up to date within the selected window.</span>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {reminders.map((rem, i) => {
-                  const isUrgent = rem.severity === 'URGENT';
-                  const isHigh = rem.severity === 'HIGH';
-
-                  return (
-                    <div
-                      key={i}
-                      className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        isUrgent
-                          ? 'bg-rose-500/10 border-rose-500/30'
-                          : isHigh
-                          ? 'bg-amber-500/10 border-amber-500/30'
-                          : 'bg-slate-950/60 border-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5">
-                          {isUrgent ? (
-                            <AlertTriangle className="w-4 h-4 text-rose-400" />
-                          ) : (
-                            <Clock className="w-4 h-4 text-amber-400" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-white text-xs">{rem.title}</span>
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                isUrgent
-                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                              }`}
-                            >
-                              {rem.severity}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-0.5">{rem.message}</p>
-                        </div>
-                      </div>
-
-                      {rem.dueDate && (
-                        <div className="text-right text-[11px] text-slate-400 shrink-0">
-                          <div>Expiry / Due</div>
-                          <div className="text-slate-200 font-bold">{formatUKDate(rem.dueDate)}</div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: VALET & SERVICE CALENDAR */}
-      {activeTab === 'calendar' && (
-        <div className="space-y-4">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-indigo-400" />
-                  <span>Annual Squeaky Clean Valet Schedule</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Currys Care &amp; Repair includes an annual valet service for household washing machines, tumble dryers, dishwashers, cookers, and fridges.
-                </p>
-              </div>
               <a
                 href="tel:03448006080"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/20 transition cursor-pointer self-start sm:self-auto"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition whitespace-nowrap self-start sm:self-auto cursor-pointer"
               >
                 <Phone className="w-3.5 h-3.5" />
-                <span>Book Valet: 0344 800 6080</span>
+                <span>Call Currys: 0344 800 6080</span>
               </a>
             </div>
 
-            {appliances.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                No appliances registered to display valet schedules.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {appliances.map((app) => {
-                  const valet = app.squeakyCleanValet;
-                  const isDue = valet?.eligibilityStatus === 'DUE';
-                  const isBooked = valet?.eligibilityStatus === 'BOOKED';
-
-                  return (
-                    <div
-                      key={app._id}
-                      className={`p-4 rounded-xl border transition ${
-                        isDue
-                          ? 'bg-amber-500/5 border-amber-500/30'
-                          : isBooked
-                          ? 'bg-blue-500/5 border-blue-500/30'
-                          : 'bg-slate-950/60 border-slate-800/80'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{APPLIANCE_ICONS[app.applianceType] || '🔌'}</span>
-                          <div>
-                            <span className="font-bold text-white text-xs block">{app.name}</span>
-                            <span className="text-[10px] text-slate-400">
-                              {app.propertyId?.name || 'Pending Location'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                            valet?.eligibilityStatus === 'DUE'
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                              : valet?.eligibilityStatus === 'BOOKED'
-                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                              : valet?.eligibilityStatus === 'COMPLETED'
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : 'bg-slate-800 text-slate-400 border-slate-700'
-                          }`}
-                        >
-                          {valet?.eligibilityStatus || 'NOT VERIFIED'}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 pt-2.5 border-t border-slate-800/60 space-y-1 text-xs">
-                        <div className="flex justify-between text-slate-400 text-[11px]">
-                          <span>Next Valet Due:</span>
-                          <span className="font-semibold text-slate-200">
-                            {valet?.nextValetDueDate ? formatUKDate(valet.nextValetDueDate) : 'Not Scheduled'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-slate-400 text-[11px]">
-                          <span>Last Completed:</span>
-                          <span className="text-slate-300">
-                            {valet?.lastValetDate ? formatUKDate(valet.lastValetDate) : 'None'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 pt-2 flex items-center justify-between">
-                        <button
-                          onClick={() => handleOpenEdit(app)}
-                          className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 cursor-pointer flex items-center gap-1"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                          <span>Update Valet Record</span>
-                        </button>
-
-                        <a
-                          href="tel:03448006080"
-                          className="text-[10px] font-bold text-amber-400 hover:text-amber-300 cursor-pointer flex items-center gap-1"
-                        >
-                          <Phone className="w-2.5 h-2.5" />
-                          <span>Call Currys</span>
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 5: ACTION CHECKLIST */}
-      {activeTab === 'tasks' && (
-        <div className="space-y-4">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-indigo-400" />
-                  <span>Appliance Maintenance &amp; Audit Responsibilities</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Interactive operational action checklist for property appliance registers, Currys Care validation, and valet coordination.
-                </p>
-              </div>
-
-              <button
-                onClick={() => setShowTaskModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition cursor-pointer self-start sm:self-auto"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Task Item</span>
-              </button>
-            </div>
-
-            {/* Tasks List */}
-            {tasks.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                No tasks available.
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {tasks.map((task) => {
-                  const isDone = task.status === 'COMPLETED';
-                  const isInProg = task.status === 'IN_PROGRESS';
-
-                  return (
-                    <div
-                      key={task._id}
-                      className={`p-3.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        isDone
-                          ? 'bg-emerald-950/20 border-emerald-500/20 opacity-75'
-                          : isInProg
-                          ? 'bg-blue-950/20 border-blue-500/30'
-                          : 'bg-slate-950/60 border-slate-800/80'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => handleToggleTaskStatus(task)}
-                          className="mt-0.5 text-slate-400 hover:text-white transition cursor-pointer"
-                          title="Click to cycle task status"
-                        >
-                          {isDone ? (
-                            <CheckSquare className="w-5 h-5 text-emerald-400" />
-                          ) : (
-                            <Square className="w-5 h-5 text-slate-500" />
-                          )}
-                        </button>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span
-                              className={`text-xs font-bold ${
-                                isDone ? 'text-slate-400 line-through' : 'text-white'
-                              }`}
-                            >
-                              {task.title}
-                            </span>
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                task.priority === 'URGENT'
-                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                                  : task.priority === 'HIGH'
-                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                                  : 'bg-slate-800 text-slate-400 border-slate-700'
-                              }`}
-                            >
-                              {task.priority}
-                            </span>
-                            {task.assignedTo && (
-                              <span className="text-[10px] text-indigo-400 font-semibold">
-                                Assignee: {task.assignedTo}
-                              </span>
-                            )}
-                          </div>
-
-                          <p className="text-xs text-slate-400 max-w-2xl">
-                            {task.description}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                        <button
-                          onClick={() => handleToggleTaskStatus(task)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                            isDone
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : isInProg
-                              ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
-                          }`}
-                        >
-                          {task.status.replace('_', ' ')}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 6: TENANT NOTICES */}
-      {activeTab === 'access' && (
-        <div className="space-y-4">
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="pb-3 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-indigo-400" />
-                <span>Tenant Access Notices &amp; Valet Visit Logs</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Under UK Tenancy Law (Housing Act 1988), landlords must serve at least 24 hours' written notice before engineers or cleaners enter the premises for appliance maintenance.
-              </p>
-            </div>
-
-            {appliances.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
-                No appliances registered.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {appliances.map((app) => {
-                  const notice = app.tenantAccessNotice;
-                  const status = notice?.accessStatus || 'NOT_NOTIFIED';
-
-                  return (
-                    <div
-                      key={app._id}
-                      className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-white text-xs flex items-center gap-1.5">
-                            <span>{APPLIANCE_ICONS[app.applianceType] || '🔌'}</span>
-                            <span>{app.name}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-400">
-                            Property: {app.propertyId?.name || 'Pending Location'}
-                          </span>
-                        </div>
-
-                        <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-                            status === 'TENANT_CONFIRMED'
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : status === 'NOTICE_SENT'
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                              : 'bg-slate-800 text-slate-400 border-slate-700'
-                          }`}
-                        >
-                          {status.replace(/_/g, ' ')}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-end">
-                        <button
-                          onClick={() => handleOpenEdit(app)}
-                          className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 cursor-pointer"
-                        >
-                          Update Notice Details &rarr;
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 7: CURRYS DIRECTORY & GUIDE */}
-      {activeTab === 'currys' && (
-        <div className="space-y-5">
-          <div className="bg-gradient-to-r from-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-2xl">
-                📞
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">Currys Care &amp; Repair Official Directory</h3>
-                <p className="text-xs text-slate-400">
-                  Direct phone lines and customer support extracted from official Currys Care &amp; Repair documentation.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">Customer Service &amp; Valet Booking</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">Standard Line</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                <div className="font-bold text-white flex items-center justify-between">
+                  <span>Customer Support &amp; Valet</span>
+                  <span className="text-[10px] text-amber-400 font-mono font-bold">Standard</span>
                 </div>
-                <div className="text-xl font-extrabold text-amber-400 font-mono">
-                  0344 800 6080
-                </div>
+                <div className="text-base font-extrabold text-amber-400 font-mono">0344 800 6080</div>
                 <p className="text-[11px] text-slate-400">
-                  Call to report an appliance breakdown, book an annual Squeaky Clean Valet, or check active plan status.
+                  Book annual cleaning valets for washing machines, tumble dryers, dishwashers, and cookers.
                 </p>
-                <a
-                  href="tel:03448006080"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-400 hover:text-indigo-300 pt-1"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Call 0344 800 6080</span>
-                </a>
               </div>
 
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">7-Day Fix Claim Hotline</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold">Freephone Guarantee</span>
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                <div className="font-bold text-white flex items-center justify-between">
+                  <span>24/7 Breakdown &amp; Tech Line</span>
+                  <span className="text-[10px] text-emerald-400 font-mono font-bold">Freephone</span>
                 </div>
-                <div className="text-xl font-extrabold text-indigo-400 font-mono">
-                  0800 0121 909
-                </div>
+                <div className="text-base font-extrabold text-emerald-400 font-mono">0800 0121 909</div>
                 <p className="text-[11px] text-slate-400">
-                  Call if a repair has taken more than 7 days from engineer visit to claim a brand new replacement.
+                  Call 24/7 for emergency fault diagnosis, engineer callouts, or replacement approvals.
                 </p>
-                <a
-                  href="tel:08000121909"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-400 hover:text-indigo-300 pt-1"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Call 0800 0121 909</span>
-                </a>
               </div>
-            </div>
 
-            {/* Official Care & Repair Key Inclusions from Leaflet */}
-            <div className="mt-4 pt-4 border-t border-slate-800 space-y-3">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Brochure Policy Benefits &amp; Key Inclusions</span>
-              </h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>7 Day Fix Promise</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    If repair takes more than 7 calendar days from engineer visit, request an immediate replacement.
-                  </p>
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                <div className="font-bold text-white flex items-center justify-between">
+                  <span>Online Portal &amp; Post</span>
+                  <span className="text-[10px] text-indigo-400 font-mono font-bold">Web</span>
                 </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Replacement Guarantee</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    If unrepairable, receive a Currys gift card for equivalent spec product. If &gt;2 breakdowns, request a replacement regardless of whether faults are related.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>£0 Parts, Labour &amp; Call Outs</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    100% covered. Zero repair bills, no charges even if no fault found. Free delivery, installation &amp; recycling if replacement needed.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                    <span>Annual Squeaky Clean Valet</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Annual deep clean included for eligible household appliances (washing machines, dryers, dishwashers, cookers, fridges/freezers).
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span>24/7 Tech &amp; Fault Support</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Call 0800 0121 909 anytime for technical assistance, fault logging, or replacement authorization.
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-                  <div className="font-bold text-white flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <span>Official Portal &amp; Post</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    currys.co.uk/careandrepair · Postal: Currys Care Services, PO Box 194, Cramlington, NE23 0DA.
-                  </p>
-                </div>
+                <div className="text-sm font-bold text-slate-200">currys.co.uk/careandrepair</div>
+                <p className="text-[11px] text-slate-400">
+                  Currys Care Services, PO Box 194, Cramlington, NE23 0DA.
+                </p>
               </div>
             </div>
           </div>
@@ -1647,7 +1153,8 @@ export function AppliancesPage({ selectedCompany }) {
 
       {/* Quick Assign Property Modal */}
       {assignModalAppliance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <ModalPortal isOpen={Boolean(assignModalAppliance)} onClose={() => setAssignModalAppliance(null)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1718,11 +1225,13 @@ export function AppliancesPage({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Record Supplier Receipt Modal */}
       {showReceiptModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <ModalPortal isOpen={showReceiptModal} onClose={() => setShowReceiptModal(false)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1886,11 +1395,13 @@ export function AppliancesPage({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Quick Upload Modal */}
       {uploadModalAppliance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <ModalPortal isOpen={Boolean(uploadModalAppliance)} onClose={() => setUploadModalAppliance(null)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1967,11 +1478,13 @@ export function AppliancesPage({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* Task Modal */}
       {showTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <ModalPortal isOpen={showTaskModal} onClose={() => setShowTaskModal(false)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -2054,6 +1567,7 @@ export function AppliancesPage({ selectedCompany }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

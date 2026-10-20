@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { appliancesAPI } from '../services/api.js';
+import { ModalPortal } from './ModalPortal.jsx';
 import ApplianceModal from './ApplianceModal.jsx';
 
 export const APPLIANCE_ICONS = {
@@ -389,7 +390,8 @@ export function PropertyAppliancesSection({
 
       {/* Quick Upload Receipt Modal */}
       {uploadModalAppliance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+        <ModalPortal isOpen={Boolean(uploadModalAppliance)} onClose={() => setUploadModalAppliance(null)} zIndex="z-[9999]">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -462,6 +464,7 @@ export function PropertyAppliancesSection({
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );
