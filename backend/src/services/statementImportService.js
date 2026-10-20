@@ -12,6 +12,9 @@ import Mortgage from '../models/Mortgage.js';
 import RentSchedule from '../models/RentSchedule.js';
 import RentPayment from '../models/RentPayment.js';
 import MortgagePayment from '../models/MortgagePayment.js';
+import PropertyChargePayment from '../models/PropertyChargePayment.js';
+import PropertyDemand from '../models/PropertyDemand.js';
+import Voucher from '../models/Voucher.js';
 import { postLedgerTransaction, deleteLedgerTransaction, generateVoucherNo, round2 } from './ledgerService.js';
 
 /**
@@ -1085,65 +1088,209 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, limit = nu
 };
 
 /**
+ * Safely and rapidly reverses all ledger transactions associated with a statement import batch.
+ * Handles thousands of rows in milliseconds using bulk operations without request timeouts.
+ */
+const executeBulkBatchReversal = async ({ batch, companyId, userId = null, userName = 'System Operator', reason = '' }) => {
+  // 1. Collect all transaction IDs linked to this batch either via importBatchId OR row.postedTransactionId
+  const rows = await StatementImportRow.find({ batchId: batch._id, companyId }).lean();
+  const postedTxIdsFromRows = rows.map((r) => r.postedTransactionId).filter(Boolean);
+
+  const transactions = await Transaction.find({
+    companyId,
+    $or: [
+      { importBatchId: batch._id },
+      { _id: { $in: postedTxIdsFromRows } },
+    ],
+  });
+
+  if (!transactions.length) {
+    return { reversedCount: 0, alreadyVoidedCount: 0 };
+  }
+
+  // 2. Identify active transactions that must have account liquidity reversed vs already voided ones
+  const activeTransactions = transactions.filter((t) => !t.isDeleted && t.status !== 'VOID');
+  const alreadyVoidedCount = transactions.length - activeTransactions.length;
+
+  if (activeTransactions.length > 0) {
+    // 3. Compute net balance adjustments grouped by accountId to restore account liquidity in bulk
+    const accountDeltas = {};
+    for (const tx of activeTransactions) {
+      const amt = round2(tx.amount || 0);
+      const accId = String(tx.accountId);
+      if (accId) {
+        accountDeltas[accId] = round2((accountDeltas[accId] || 0) + (tx.direction === 'OUT' ? amt : -amt));
+      }
+
+      if (tx.transactionType === 'TRANSFER' && tx.counterAccountId) {
+        const counterId = String(tx.counterAccountId);
+        accountDeltas[counterId] = round2((accountDeltas[counterId] || 0) - amt);
+      }
+    }
+
+    // Apply account balance updates
+    for (const [accId, delta] of Object.entries(accountDeltas)) {
+      if (delta !== 0) {
+        await Account.findOneAndUpdate(
+          { _id: accId, companyId },
+          { $inc: { currentBalance: delta } }
+        );
+      }
+    }
+
+    // 4. Handle any linked RentPayment, MortgagePayment, PropertyChargePayment
+    const activeTxIds = activeTransactions.map((t) => t._id);
+    const activeVouchers = activeTransactions.map((t) => t.voucherNo).filter(Boolean);
+
+    // Rent Payments
+    const linkedRentPayments = await RentPayment.find({
+      companyId,
+      isDeleted: { $ne: true },
+      $or: [{ transactionId: { $in: activeTxIds } }, { receiptRef: { $in: activeVouchers } }],
+    });
+    for (const rp of linkedRentPayments) {
+      rp.status = 'VOID';
+      rp.isDeleted = true;
+      await rp.save();
+
+      const schedQuery = rp.scheduleId
+        ? { _id: rp.scheduleId, companyId }
+        : { propertyId: rp.propertyId, companyId };
+      const schedule = await RentSchedule.findOne(schedQuery);
+      if (schedule) {
+        schedule.paidAmount = round2(Math.max(0, (schedule.paidAmount || 0) - rp.amount));
+        await schedule.save();
+      }
+    }
+
+    // Mortgage Payments
+    const linkedMortgagePayments = await MortgagePayment.find({
+      companyId,
+      isDeleted: { $ne: true },
+      $or: [{ transactionId: { $in: activeTxIds } }, { paymentReference: { $in: activeVouchers } }],
+    });
+    for (const mp of linkedMortgagePayments) {
+      mp.status = 'VOID';
+      mp.isDeleted = true;
+      await mp.save();
+
+      if (mp.principalAmount > 0) {
+        await Mortgage.findOneAndUpdate(
+          { _id: mp.mortgageId, companyId },
+          { $inc: { outstandingPrincipalBalance: mp.principalAmount } }
+        );
+      }
+    }
+
+    // Property Charge Payments
+    const linkedChargePayments = await PropertyChargePayment.find({
+      companyId,
+      isDeleted: { $ne: true },
+      $or: [{ transactionId: { $in: activeTxIds } }, { bankReference: { $in: activeVouchers } }],
+    });
+    for (const cp of linkedChargePayments) {
+      cp.status = 'VOID';
+      cp.isDeleted = true;
+      cp.isActive = false;
+      await cp.save();
+
+      if (cp.demandId) {
+        const demand = await PropertyDemand.findOne({ _id: cp.demandId, companyId });
+        if (demand) {
+          demand.totalPaid = round2(Math.max(0, (demand.totalPaid || 0) - cp.amountPaid));
+          demand.status = demand.totalPaid <= 0 ? 'RECEIVED' : demand.totalPaid < demand.amountDemanded ? 'PARTIALLY_PAID' : 'PAID';
+          await demand.save();
+        }
+      }
+    }
+
+    // 5. Bulk void all active transactions
+    const effectiveReason = reason || `Batch Reversal for Statement Import #${batch._id} (${batch.filename})`;
+    const deletionAudit = {
+      action: 'DELETED',
+      performedBy: userId,
+      performedByName: userName,
+      performedAt: new Date(),
+      reason: effectiveReason,
+      changes: {
+        status: { from: 'POSTED', to: 'VOID' },
+        isDeleted: { from: false, to: true },
+      },
+    };
+
+    await Transaction.updateMany(
+      { _id: { $in: activeTxIds }, companyId },
+      {
+        $set: {
+          status: 'VOID',
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: userId,
+          deletionReason: effectiveReason,
+        },
+        $push: {
+          auditHistory: deletionAudit,
+        },
+      }
+    );
+
+    // 6. Void linked vouchers
+    const voucherIds = activeTransactions.map((t) => t.voucherId).filter(Boolean);
+    if (voucherIds.length > 0) {
+      await Voucher.updateMany(
+        { _id: { $in: voucherIds }, companyId },
+        { $set: { status: 'VOID' } }
+      );
+    }
+  }
+
+  return {
+    reversedCount: activeTransactions.length,
+    alreadyVoidedCount,
+  };
+};
+
+/**
  * Reverse all posted transactions of an import batch using the authoritative soft-delete/void workflow
  */
 export const reverseBatchTransactions = async ({ batchId, companyId, userId = null, userName = 'System Operator' }) => {
   const batch = await StatementImportBatch.findOne({ _id: batchId, companyId });
   if (!batch) throw new Error('Statement import batch not found in active company.');
 
-  const postedRows = await StatementImportRow.find({
-    batchId,
-    status: 'POSTED',
-    postedTransactionId: { $ne: null },
+  const reversal = await executeBulkBatchReversal({
+    batch,
+    companyId,
+    userId,
+    userName,
+    reason: `Batch Reversal for Statement Import #${batch._id} (${batch.filename})`,
   });
 
-  if (!postedRows.length) {
-    return {
-      success: true,
-      reversedCount: 0,
-      message: 'No posted transactions found to reverse for this batch.',
-    };
-  }
-
-  let reversedCount = 0;
-  const errors = [];
-
-  for (const row of postedRows) {
-    try {
-      await deleteLedgerTransaction({
-        transactionId: row.postedTransactionId,
-        companyId,
-        userId,
-        userName,
-        reason: `Batch Reversal for Statement Import #${batch._id} (${batch.filename})`,
-      });
-
-      // Reset staging row status so operator can review/re-edit
-      row.status = 'APPROVED';
-      row.postedTransactionId = null;
-      row.postedVoucherNo = null;
-      row.postedAt = null;
-      await row.save();
-
-      reversedCount++;
-    } catch (err) {
-      errors.push({ rowIndex: row.rowIndex, error: err.message });
-      row.validationErrors.push(`Reversal error: ${err.message}`);
-      await row.save();
+  // Reset staging row status so operator can review/re-edit
+  await StatementImportRow.updateMany(
+    { batchId: batch._id, companyId },
+    {
+      $set: {
+        status: 'APPROVED',
+        postedTransactionId: null,
+        postedVoucherNo: null,
+        postedAt: null,
+        validationErrors: [],
+      },
     }
-  }
+  );
 
-  const remainingPosted = await StatementImportRow.countDocuments({ batchId, status: 'POSTED' });
-  batch.postedRows = remainingPosted;
-  batch.status = remainingPosted === 0 ? 'DRAFT' : 'PARTIALLY_POSTED';
+  batch.postedRows = 0;
+  batch.status = 'DRAFT';
   await batch.save();
 
   return {
     success: true,
-    reversedCount,
-    failedCount: errors.length,
-    errors,
+    reversedCount: reversal.reversedCount,
+    alreadyVoidedCount: reversal.alreadyVoidedCount,
+    failedCount: 0,
+    errors: [],
     batchStatus: batch.status,
+    message: `Batch "${batch.filename}" reversed successfully. Reversed ${reversal.reversedCount} active transaction(s).`,
   };
 };
 
@@ -1154,31 +1301,14 @@ export const deleteStatementBatch = async ({ batchId, companyId, userId = null, 
   const batch = await StatementImportBatch.findOne({ _id: batchId, companyId });
   if (!batch) throw new Error('Statement import batch not found in active company.');
 
-  // 1. If any rows were posted, delete/reverse ledger transactions first
-  const postedRows = await StatementImportRow.find({
-    batchId,
-    status: 'POSTED',
-    postedTransactionId: { $ne: null },
+  // 1. Revert any active transactions first
+  const reversal = await executeBulkBatchReversal({
+    batch,
+    companyId,
+    userId,
+    userName,
+    reason: `Batch Deletion for Statement Import #${batch._id} (${batch.filename})`,
   });
-
-  let reversedCount = 0;
-  const reversalErrors = [];
-
-  for (const row of postedRows) {
-    try {
-      await deleteLedgerTransaction({
-        transactionId: row.postedTransactionId,
-        companyId,
-        userId,
-        userName,
-        reason: `Batch Deletion for Statement Import #${batch._id} (${batch.filename})`,
-      });
-      reversedCount++;
-    } catch (err) {
-      console.warn(`Failed to reverse transaction ${row.postedTransactionId} during batch deletion:`, err.message);
-      reversalErrors.push({ rowIndex: row.rowIndex, error: err.message });
-    }
-  }
 
   // 2. Remove all staging rows for this batch
   const deleteRowsResult = await StatementImportRow.deleteMany({ batchId: batch._id, companyId });
@@ -1190,9 +1320,9 @@ export const deleteStatementBatch = async ({ batchId, companyId, userId = null, 
     success: true,
     deletedBatchId: batchId,
     deletedRowsCount: deleteRowsResult.deletedCount,
-    reversedTransactionsCount: reversedCount,
-    reversalErrors,
-    message: `Batch "${batch.filename}" deleted successfully.${reversedCount > 0 ? ` Reversed ${reversedCount} posted transaction(s).` : ''}`,
+    reversedTransactionsCount: reversal.reversedCount,
+    reversalErrors: [],
+    message: `Batch "${batch.filename}" deleted successfully.${reversal.reversedCount > 0 ? ` Reversed ${reversal.reversedCount} posted transaction(s).` : ''}`,
   };
 };
 

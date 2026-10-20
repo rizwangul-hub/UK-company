@@ -388,6 +388,7 @@ export const deleteLedgerTransaction = async ({
   userId = null,
   userName = 'System Operator',
   reason = '',
+  allowAlreadyVoided = false,
 }) => {
   if (!transactionId || !companyId) {
     throw new Error('Transaction ID and Company Context are required for deletion.');
@@ -399,6 +400,9 @@ export const deleteLedgerTransaction = async ({
   }
 
   if (transaction.isDeleted || transaction.status === 'VOID') {
+    if (allowAlreadyVoided) {
+      return { success: true, alreadyVoided: true, message: 'Transaction has already been deleted / voided.' };
+    }
     throw new Error('Transaction has already been deleted / voided.');
   }
 
