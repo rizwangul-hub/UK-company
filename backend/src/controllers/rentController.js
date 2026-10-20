@@ -54,7 +54,7 @@ export const generateMonthlySchedules = async (req, res) => {
       }
     }
 
-    // 2. Direct property model: Process active properties with contractual rent that do not have an active agreement
+    // 2. Direct property/unit model: Process active properties with units or contractual rent that do not have an active agreement
     const directProperties = await Property.find({
       companyId: req.companyId,
       isActive: true,
@@ -64,27 +64,59 @@ export const generateMonthlySchedules = async (req, res) => {
     for (const prop of directProperties) {
       if (handledPropertyIds.has(prop._id.toString())) continue;
 
-      const existing = await RentSchedule.findOne({
-        companyId: req.companyId,
-        propertyId: prop._id,
-        billingMonth: month,
-      });
+      const propUnits = await Unit.find({ companyId: req.companyId, propertyId: prop._id, isActive: true }).lean();
+      const dueDate = new Date(Date.UTC(y, m - 1, 1));
 
-      if (!existing) {
-        const dueDate = new Date(Date.UTC(y, m - 1, 1));
-        await RentSchedule.create({
+      if (propUnits.length > 0) {
+        // Multi-unit property: generate schedule for each lettable unit
+        for (const u of propUnits) {
+          const existingUnitSchedule = await RentSchedule.findOne({
+            companyId: req.companyId,
+            propertyId: prop._id,
+            unitId: u._id,
+            billingMonth: month,
+          });
+
+          if (!existingUnitSchedule) {
+            await RentSchedule.create({
+              companyId: req.companyId,
+              agreementId: null,
+              tenantId: null,
+              propertyId: prop._id,
+              unitId: u._id,
+              billingMonth: month,
+              dueDate,
+              expectedAmount: u.targetRent || 0,
+              paidAmount: 0,
+              notes: `${u.unitName} (${u.unitType})`,
+            });
+            createdCount++;
+          }
+        }
+      } else {
+        // Single unit property
+        const existing = await RentSchedule.findOne({
           companyId: req.companyId,
-          agreementId: null,
-          tenantId: null,
           propertyId: prop._id,
           unitId: null,
           billingMonth: month,
-          dueDate,
-          expectedAmount: prop.contractualRent,
-          paidAmount: 0,
-          notes: prop.tenantName ? `Tenant: ${prop.tenantName}` : '',
         });
-        createdCount++;
+
+        if (!existing) {
+          await RentSchedule.create({
+            companyId: req.companyId,
+            agreementId: null,
+            tenantId: null,
+            propertyId: prop._id,
+            unitId: null,
+            billingMonth: month,
+            dueDate,
+            expectedAmount: prop.contractualRent,
+            paidAmount: 0,
+            notes: prop.tenantName ? `Tenant: ${prop.tenantName}` : '',
+          });
+          createdCount++;
+        }
       }
     }
 
@@ -151,6 +183,7 @@ export const recordPayment = async (req, res) => {
     let {
       scheduleId,
       propertyId,
+      unitId,
       billingMonth,
       amount,
       paymentDate = new Date(),
@@ -179,13 +212,17 @@ export const recordPayment = async (req, res) => {
         .populate('unitId');
     }
 
-    // Direct Property Collection fallback if no scheduleId or schedule not found
+    // Direct Property / Unit Collection fallback if no scheduleId or schedule not found
     if (!schedule && propertyId && billingMonth) {
-      schedule = await RentSchedule.findOne({
+      const scheduleFilter = {
         companyId: req.companyId,
         propertyId,
         billingMonth,
-      })
+      };
+      if (unitId && mongoose.Types.ObjectId.isValid(unitId)) {
+        scheduleFilter.unitId = unitId;
+      }
+      schedule = await RentSchedule.findOne(scheduleFilter)
         .populate('tenantId')
         .populate('propertyId')
         .populate('unitId');
@@ -195,21 +232,27 @@ export const recordPayment = async (req, res) => {
         if (!prop) {
           return apiError(res, 'Property not found in active company.', 404);
         }
-        // Create schedule on the fly for this direct property and billing month
+        let unitDoc = null;
+        if (unitId && mongoose.Types.ObjectId.isValid(unitId)) {
+          unitDoc = await Unit.findOne({ _id: unitId, propertyId: prop._id });
+        }
+        const expectedRent = unitDoc?.targetRent || prop.contractualRent || numAmount;
+        // Create schedule on the fly for this direct property/unit and billing month
         schedule = await RentSchedule.create({
           companyId: req.companyId,
           propertyId: prop._id,
-          unitId: null,
+          unitId: unitDoc?._id || (unitId && mongoose.Types.ObjectId.isValid(unitId) ? unitId : null),
           tenantId: null,
           billingMonth,
           dueDate: new Date(`${billingMonth}-01`),
-          expectedAmount: prop.contractualRent || numAmount,
+          expectedAmount: expectedRent,
           paidAmount: 0,
-          outstandingAmount: prop.contractualRent || numAmount,
+          outstandingAmount: expectedRent,
           status: 'PENDING',
-          notes: `Rent billing for ${billingMonth}`,
+          notes: unitDoc ? `Rent billing for ${unitDoc.unitName} - ${billingMonth}` : `Rent billing for ${billingMonth}`,
         });
         await schedule.populate('propertyId');
+        if (schedule.unitId) await schedule.populate('unitId');
       }
     }
 

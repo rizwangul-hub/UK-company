@@ -118,6 +118,9 @@ function ReceiptUploadField({ file, setFile, label = "Upload Receipt / Document 
 export function DataEntryPage({ selectedCompany }) {
   const [activeTab, setActiveTab] = useState('recent'); // 'rent' | 'expense' | 'transfer' | 'other' | 'mortgage' | 'recent'
   const [showRentModal, setShowRentModal] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showOtherIncomeModal, setShowOtherIncomeModal] = useState(false);
   const [showMortgageModal, setShowMortgageModal] = useState(false);
 
   const cachedAccs = getApiCache('/accounts');
@@ -142,6 +145,8 @@ export function DataEntryPage({ selectedCompany }) {
   const [rentForm, setRentForm] = useState({
     scheduleId: '',
     propertyId: '',
+    unitId: '',
+    selectedKey: '',
     billingMonth: new Date().toISOString().slice(0, 7),
     amount: '',
     paymentDate: new Date().toISOString().slice(0, 10),

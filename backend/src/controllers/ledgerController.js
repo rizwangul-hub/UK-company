@@ -451,13 +451,30 @@ export const queryEntityLedger = async (req, res) => {
       }
     }
 
-    // 2. PROPERTY LEDGER
+    // 2. PROPERTY & UNIT LEDGER
     else if (type === 'PROPERTY') {
       let prop = null;
+      let unit = null;
+
+      // Check if entityId is a Unit ID or Property ID
       if (entityId && mongoose.Types.ObjectId.isValid(entityId)) {
-        prop = await Property.findOne({ _id: entityId, companyId: req.companyId }).lean();
+        unit = await Unit.findOne({ _id: entityId, companyId: req.companyId }).populate('propertyId').lean();
+        if (unit && unit.propertyId) {
+          prop = unit.propertyId;
+        } else {
+          prop = await Property.findOne({ _id: entityId, companyId: req.companyId }).lean();
+        }
       }
-      if (!prop) {
+
+      // Check if unitId query param was explicitly provided
+      if (!unit && req.query.unitId && mongoose.Types.ObjectId.isValid(req.query.unitId)) {
+        unit = await Unit.findOne({ _id: req.query.unitId, companyId: req.companyId }).populate('propertyId').lean();
+        if (unit && unit.propertyId) {
+          prop = unit.propertyId;
+        }
+      }
+
+      if (!prop && !unit) {
         prop = await Property.findOne({ companyId: req.companyId, isActive: true }).lean();
       }
 
@@ -470,24 +487,34 @@ export const queryEntityLedger = async (req, res) => {
       } else {
         const effectivePropId = prop._id;
         const propType = formatPropertyType(prop);
-        ledgerTitle = `Property Ledger: ${prop.name} (${propType})`;
-        const locParts = [
-          `Type: ${propType}`,
-          prop.addressLine1,
-          prop.city,
-          prop.postcode,
-        ].filter(Boolean);
-        entitySubtext = `${locParts.join(' · ')} · Valuation: £${(prop.currentValuation || 0).toFixed(2)}`;
+        const unitType = unit ? (unit.unitType === 'RETAIL_SHOP' ? 'Shop' : unit.unitType === 'FLAT' ? 'Flat' : (unit.unitType || 'Unit')) : null;
+
+        if (unit) {
+          ledgerTitle = `Property Ledger: ${unit.unitName} (${unitType})`;
+          entitySubtext = `Property: ${prop.name} · Unit: ${unit.unitName} · Type: ${unitType} · Target Rent: £${(unit.targetRent || 0).toFixed(2)}/mo · Postcode: ${prop.postcode || 'N/A'}`;
+        } else {
+          ledgerTitle = `Property Ledger: ${prop.name} (${propType})`;
+          const locParts = [
+            `Type: ${propType}`,
+            prop.addressLine1,
+            prop.city,
+            prop.postcode,
+          ].filter(Boolean);
+          entitySubtext = `${locParts.join(' · ')} · Valuation: £${(prop.currentValuation || 0).toFixed(2)}`;
+        }
 
         const txQuery = {
           companyId: req.companyId,
           status: 'POSTED',
           isDeleted: { $ne: true },
-          propertyId: effectivePropId,
         };
-        if (req.query.unitId && mongoose.Types.ObjectId.isValid(req.query.unitId)) {
-          txQuery.unitId = new mongoose.Types.ObjectId(req.query.unitId);
+
+        if (unit) {
+          txQuery.unitId = unit._id;
+        } else {
+          txQuery.propertyId = effectivePropId;
         }
+
         if (periodStart && periodEnd) txQuery.transactionDate = { $gte: periodStart, $lte: periodEnd };
         else if (periodStart) txQuery.transactionDate = { $gte: periodStart };
         else if (periodEnd) txQuery.transactionDate = { $lte: periodEnd };
@@ -501,7 +528,7 @@ export const queryEntityLedger = async (req, res) => {
           .sort({ transactionDate: 1, createdAt: 1 })
           .populate('accountId', 'name')
           .populate('categoryId', 'name type')
-          .populate('unitId', 'unitName')
+          .populate('unitId', 'unitName unitType')
           .lean();
 
         let netCashFlow = 0;
@@ -514,6 +541,8 @@ export const queryEntityLedger = async (req, res) => {
           totalDebit += debit;
           totalCredit += credit;
 
+          const rowUnitType = tx.unitId?.unitType === 'RETAIL_SHOP' ? 'Shop' : tx.unitId?.unitType === 'FLAT' ? 'Flat' : (tx.unitId?.unitType || unitType || '');
+
           return {
             _id: tx._id,
             date: tx.transactionDate,
@@ -524,7 +553,8 @@ export const queryEntityLedger = async (req, res) => {
             drAccount: tx.accountId?.name || 'Account',
             crAccount: isIncome ? 'Rental Revenue' : (tx.categoryId?.name || 'Disbursement'),
             propertyName: prop.name,
-            unitName: tx.unitId?.unitName || '',
+            unitName: tx.unitId?.unitName || (unit ? unit.unitName : ''),
+            unitType: rowUnitType,
             reference: tx.reference || '',
             debit: round2(debit),
             credit: round2(credit),

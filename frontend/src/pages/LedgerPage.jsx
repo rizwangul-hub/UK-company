@@ -211,10 +211,21 @@ export function LedgerPage({ selectedCompany }) {
     if (ledgerType === 'RENT' || ledgerType === 'CONSOLIDATED' || ledgerType === 'HEAD') {
       setSelectedEntityId('');
     } else if (currentEntityList.length > 0) {
-      // Keep selected if valid in new list, else pick first
-      const exists = currentEntityList.some((e) => String(e.id) === String(selectedEntityId));
+      // Keep selected if valid in new list (check both parent entity and child units)
+      const exists = currentEntityList.some((e) => {
+        if (String(e.id) === String(selectedEntityId)) return true;
+        if (Array.isArray(e.units)) {
+          return e.units.some((u) => String(u.id) === String(selectedEntityId));
+        }
+        return false;
+      });
       if (!exists) {
-        setSelectedEntityId(String(currentEntityList[0].id));
+        const first = currentEntityList[0];
+        if (ledgerType === 'PROPERTY' && Array.isArray(first.units) && first.units.length > 0) {
+          setSelectedEntityId(String(first.units[0].id));
+        } else {
+          setSelectedEntityId(String(first.id));
+        }
       }
     } else {
       setSelectedEntityId('');
@@ -701,17 +712,35 @@ export function LedgerPage({ selectedCompany }) {
                 </>
               ) : currentEntityList.length === 0 ? (
                 <option value="">{loadingEntities ? 'Loading UK entities...' : 'No entities configured'}</option>
-              ) : (
+              ) : ledgerType === 'PROPERTY' ? (
                 currentEntityList.map((item) => {
-                  const subtext = ledgerType === 'PROPERTY'
-                    ? (item.unitsCount > 1 ? item.subtext : formatPropertyType(item))
-                    : item.subtext;
+                  const hasUnits = Array.isArray(item.units) && item.units.length > 0;
+                  if (hasUnits) {
+                    return (
+                      <optgroup key={String(item.id)} label={`🏢 ${item.name} (${item.units.length} Units)`}>
+                        {item.units.map((u) => (
+                          <option key={String(u.id)} value={String(u.id)}>
+                            ↳ {u.name} — ({u.type || 'Unit'}{u.targetRent ? ` · £${u.targetRent}/mo` : ''})
+                          </option>
+                        ))}
+                        <option value={String(item.id)}>
+                          ★ {item.name} — Consolidated (All Units)
+                        </option>
+                      </optgroup>
+                    );
+                  }
                   return (
                     <option key={String(item.id)} value={String(item.id)}>
-                      {item.name} {subtext ? ` — (${subtext})` : ''}
+                      🏠 {item.name} — ({formatPropertyType(item)})
                     </option>
                   );
                 })
+              ) : (
+                currentEntityList.map((item) => (
+                  <option key={String(item.id)} value={String(item.id)}>
+                    {item.name} {item.subtext ? ` — (${item.subtext})` : ''}
+                  </option>
+                ))
               )}
             </select>
           </div>
@@ -1423,11 +1452,16 @@ export function LedgerPage({ selectedCompany }) {
                           <div className="font-bold text-slate-900 dark:text-white truncate">
                             {tx.detail || 'General transaction'}
                           </div>
-                          {(tx.propertyName || tx.tenantName) && (
+                          {(tx.propertyName || tx.unitName || tx.tenantName) && (
                             <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 flex flex-wrap items-center gap-1">
                               {tx.propertyName && (
                                 <span className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                                   {tx.propertyName}
+                                </span>
+                              )}
+                              {tx.unitName && (
+                                <span className="px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold border border-amber-200 dark:border-amber-800/40">
+                                  {tx.unitName} {tx.unitType ? `(${tx.unitType})` : ''}
                                 </span>
                               )}
                               {tx.tenantName && (
