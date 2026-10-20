@@ -34,6 +34,10 @@ export function RecycleBinPage({ selectedCompany }) {
   const [properties, setProperties] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState(() => new Set());
+  const [showPermanentDeleteModal, setShowPermanentDeleteModal] = useState(false);
+  const [permanentDeleteSubmitting, setPermanentDeleteSubmitting] = useState(false);
+  const [permanentDeleteError, setPermanentDeleteError] = useState('');
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,6 +57,7 @@ export function RecycleBinPage({ selectedCompany }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
+    setSelectedTransactionIds(new Set());
     try {
       const params = {};
       if (typeFilter) params.type = typeFilter;
@@ -82,6 +87,48 @@ export function RecycleBinPage({ selectedCompany }) {
       setLoading(false);
     }
   }, [typeFilter, propertyFilter, startDate, endDate, searchQuery, companySlug]);
+
+  const allTransactionsSelected = transactions.length > 0
+    && transactions.every((tx) => selectedTransactionIds.has(tx._id));
+
+  const toggleTransactionSelection = (transactionId) => {
+    setSelectedTransactionIds((current) => {
+      const updated = new Set(current);
+      if (updated.has(transactionId)) updated.delete(transactionId);
+      else updated.add(transactionId);
+      return updated;
+    });
+  };
+
+  const toggleAllTransactionSelection = () => {
+    setSelectedTransactionIds((current) => (
+      transactions.length > 0 && transactions.every((tx) => current.has(tx._id))
+        ? new Set()
+        : new Set(transactions.map((tx) => tx._id))
+    ));
+  };
+
+  const handlePermanentDelete = async () => {
+    if (selectedTransactionIds.size === 0) return;
+    setPermanentDeleteSubmitting(true);
+    setPermanentDeleteError('');
+    try {
+      const res = await ledgerAPI.permanentlyDeleteTransactions([...selectedTransactionIds]);
+      if (!res?.success) {
+        setPermanentDeleteError(res?.message || 'Failed to permanently delete selected transactions.');
+        return;
+      }
+
+      setShowPermanentDeleteModal(false);
+      setSelectedTransactionIds(new Set());
+      setSuccessMsg(res.message || `${res.data?.deletedCount || 0} transaction records permanently deleted.`);
+      await loadData();
+    } catch (err) {
+      setPermanentDeleteError(err?.response?.data?.message || err?.message || 'Failed to permanently delete selected transactions.');
+    } finally {
+      setPermanentDeleteSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -156,14 +203,30 @@ export function RecycleBinPage({ selectedCompany }) {
           </div>
         </div>
 
-        <button
-          onClick={() => loadData()}
-          disabled={loading}
-          className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-2 self-start sm:self-auto cursor-pointer border border-slate-200 dark:border-slate-700 shadow-sm"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          {selectedTransactionIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setPermanentDeleteError('');
+                setShowPermanentDeleteModal(true);
+              }}
+              disabled={loading || permanentDeleteSubmitting}
+              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Permanently ({selectedTransactionIds.size})</span>
+            </button>
+          )}
+          <button
+            onClick={() => loadData()}
+            disabled={loading}
+            className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700 shadow-sm"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-500' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Success Notification Alert */}
@@ -318,6 +381,16 @@ export function RecycleBinPage({ selectedCompany }) {
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 uppercase font-black border-b border-slate-200 dark:border-slate-700 tracking-wider">
                 <tr>
+                  <th className="p-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={allTransactionsSelected}
+                      onChange={toggleAllTransactionSelection}
+                      aria-label="Select all visible transactions"
+                      title="Select all visible transactions"
+                      className="h-4 w-4 accent-rose-600 cursor-pointer"
+                    />
+                  </th>
                   <th className="p-3 whitespace-nowrap">Deleted Date / By</th>
                   <th className="p-3 whitespace-nowrap">Voucher No</th>
                   <th className="p-3 whitespace-nowrap">Type</th>
@@ -340,6 +413,15 @@ export function RecycleBinPage({ selectedCompany }) {
                       key={tx._id}
                       className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition opacity-85 hover:opacity-100"
                     >
+                      <td className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedTransactionIds.has(tx._id)}
+                          onChange={() => toggleTransactionSelection(tx._id)}
+                          aria-label={`Select transaction ${tx.voucherNo}`}
+                          className="h-4 w-4 accent-rose-600 cursor-pointer"
+                        />
+                      </td>
                       {/* Deleted Date & User */}
                       <td className="p-3 whitespace-nowrap text-slate-500 dark:text-slate-400 text-[11px]">
                         <div>{tx.deletedAt ? new Date(tx.deletedAt).toLocaleString('en-GB') : '-'}</div>
@@ -442,6 +524,55 @@ export function RecycleBinPage({ selectedCompany }) {
           </div>
         )}
       </div>
+
+      {showPermanentDeleteModal && (
+        <ModalPortal isOpen={showPermanentDeleteModal} onClose={() => setShowPermanentDeleteModal(false)}>
+          <div className="bg-slate-900 border border-rose-700/60 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-800 bg-rose-950/30">
+              <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Permanently Delete Transactions?</h2>
+                <p className="text-xs text-rose-300">{selectedTransactionIds.size} selected transaction record(s)</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4 text-xs text-slate-300">
+              <p>
+                This permanently removes the selected transaction record(s) from the database. This cannot be undone,
+                and they cannot be restored from the recycle bin.
+              </p>
+              <p className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400">
+                Linked vouchers, payment records, and standalone audit logs will be retained.
+              </p>
+              {permanentDeleteError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 font-semibold">
+                  {permanentDeleteError}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPermanentDeleteModal(false)}
+                  disabled={permanentDeleteSubmitting}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePermanentDelete}
+                  disabled={permanentDeleteSubmitting || selectedTransactionIds.size === 0}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold inline-flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {permanentDeleteSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  <span>{permanentDeleteSubmitting ? 'Deleting...' : 'Permanently Delete'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
       {/* Restore Confirmation Dialog */}
       {restoringTx && (

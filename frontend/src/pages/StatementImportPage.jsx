@@ -1434,24 +1434,40 @@ export function StatementImportPage({ selectedCompany }) {
                               {/* Property Selector */}
                               <td className="px-3 py-3">
                                 {isPosted ? (
-                                  <span className="text-slate-700 dark:text-slate-300 truncate block max-w-[180px]">
-                                    {row.suggestedPropertyName || '—'}
-                                  </span>
+                                  <div>
+                                    <span className="text-slate-700 dark:text-slate-300 truncate block max-w-[180px] font-medium">
+                                      {row.suggestedPropertyName || '—'}
+                                    </span>
+                                    {row.suggestedUnitName && (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                        Unit: {row.suggestedUnitName}
+                                      </span>
+                                    )}
+                                  </div>
                                 ) : (
-                                  <select
-                                    value={row.suggestedPropertyId?._id || row.suggestedPropertyId || ''}
-                                    onChange={(e) =>
-                                      handleUpdateRow(row._id, 'suggestedPropertyId', e.target.value)
-                                    }
-                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 truncate"
-                                  >
-                                    <option value="">-- No Property --</option>
-                                    {properties.map((p) => (
-                                      <option key={p._id} value={p._id}>
-                                        {p.title || p.addressLine1}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  <div className="flex flex-col gap-1">
+                                    <select
+                                      value={row.suggestedPropertyId?._id || row.suggestedPropertyId || ''}
+                                      onChange={(e) =>
+                                        handleUpdateRow(row._id, 'suggestedPropertyId', e.target.value)
+                                      }
+                                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 truncate"
+                                    >
+                                      <option value="">-- No Property --</option>
+                                      {properties.map((p) => (
+                                        <option key={p._id} value={p._id}>
+                                          {p.title || p.addressLine1}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    {row.suggestedUnitName && (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                        Unit: {row.suggestedUnitName}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </td>
 

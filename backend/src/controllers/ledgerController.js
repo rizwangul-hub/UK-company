@@ -1551,6 +1551,43 @@ export const deleteTransaction = async (req, res) => {
   }
 };
 
+export const permanentlyDeleteTransactions = async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) {
+      return apiError(res, 'Select between 1 and 100 recycle-bin transactions to permanently delete.', 400);
+    }
+
+    const transactionIds = [...new Set(ids.map((id) => String(id)))];
+    if (transactionIds.some((id) => !/^[a-f\d]{24}$/i.test(id))) {
+      return apiError(res, 'One or more transaction IDs are invalid.', 400);
+    }
+
+    const recycleBinFilter = {
+      companyId: req.companyId,
+      _id: { $in: transactionIds },
+      $or: [{ isDeleted: true }, { status: 'VOID' }],
+    };
+    const eligibleCount = await Transaction.countDocuments(recycleBinFilter);
+    if (eligibleCount !== transactionIds.length) {
+      return apiError(res, 'One or more selected transactions are not in this company’s recycle bin.', 404);
+    }
+
+    const result = await Transaction.deleteMany(recycleBinFilter);
+    if (result.deletedCount !== transactionIds.length) {
+      return apiError(res, `Only ${result.deletedCount} of ${transactionIds.length} selected transactions were permanently deleted. Refresh the recycle bin and try again.`, 409);
+    }
+
+    return apiSuccess(
+      res,
+      { deletedCount: result.deletedCount },
+      `${result.deletedCount} transaction record${result.deletedCount === 1 ? '' : 's'} permanently deleted. Linked records and audit logs were retained.`
+    );
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to permanently delete transactions', 500, error);
+  }
+};
+
 export const restoreTransaction = async (req, res) => {
   try {
     const { id } = req.params;

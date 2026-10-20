@@ -6,6 +6,7 @@ import StatementImportRow from '../models/StatementImportRow.js';
 import Transaction from '../models/Transaction.js';
 import Account from '../models/Account.js';
 import Property from '../models/Property.js';
+import Unit from '../models/Unit.js';
 import Category from '../models/Category.js';
 import Tenant from '../models/Tenant.js';
 import Mortgage from '../models/Mortgage.js';
@@ -395,7 +396,7 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
   if (!accountId) throw new Error('Account ID is required for classification.');
 
   // Fetch company context in parallel
-  const [properties, tenants, categories, mortgages, accounts, recentTxns] = await Promise.all([
+  const [properties, tenants, categories, mortgages, accounts, recentTxns, units] = await Promise.all([
     Property.find({ companyId }).lean(),
     Tenant.find({ companyId }).lean(),
     Category.find({ $or: [{ companyId }, { companyId: null }] }).lean(),
@@ -409,6 +410,7 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       .sort({ transactionDate: -1 })
       .limit(2000)
       .lean(),
+    Unit.find({ companyId }).lean(),
   ]);
 
   // Known Category Heads Cache
@@ -562,7 +564,30 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       }
     }
 
-    // 5. CLASSIFICATION INFERENCE ENGINE
+    // 5. CLASSIFICATION INFERENCE & PROPERTY/UNIT RESOLUTION
+    const normText = (str) => {
+      if (!str) return '';
+      return String(str)
+        .toLowerCase()
+        .replace(/claracne|clarance|clarnece|clarnce/g, 'clarence')
+        .replace(/orset\b/g, 'orsett')
+        .replace(/alaxandra|alexander/g, 'alexandra')
+        .replace(/sounthend/g, 'southend')
+        .replace(/protori|pretoria/g, 'pretoria')
+        .replace(/vansitart|vansitratt|vanaitratt|vanistrat/g, 'vansittart')
+        .replace(/landsbury|landsbbury/g, 'lansbury')
+        .replace(/admin expeses/g, 'admin expenses')
+        .replace(/repair and maintainance/g, 'repair and maintenance')
+        .replace(/rent depsit refund/g, 'rent deposit refund')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    const normSearch = normText(`${row.description} ${row.originalNarrative} ${row.reference} ${row.head} ${row.subHead}`);
+    const normHead = normText(row.head);
+    const normSubHead = normText(row.subHead);
+
     let suggestedType = 'UNCATEGORIZED';
     let suggestedCategoryId = null;
     let suggestedCategoryName = '';
@@ -570,8 +595,10 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
     let suggestedHead = (row.head || '').trim();
     let suggestedSubHeadId = null;
     let suggestedSubHead = (row.subHead || '').trim();
-    let suggestedPropertyId = matchedProperty ? matchedProperty._id : null;
-    let suggestedPropertyName = matchedProperty ? (matchedProperty.title || matchedProperty.addressLine1) : '';
+    let suggestedPropertyId = null;
+    let suggestedPropertyName = '';
+    let suggestedUnitId = null;
+    let suggestedUnitName = '';
     let suggestedTenantId = matchedTenant ? matchedTenant._id : null;
     let suggestedTenantName = matchedTenant ? (matchedTenant.name || matchedTenant.fullName) : '';
     let suggestedMortgageId = matchedMortgage ? matchedMortgage._id : null;
@@ -581,195 +608,222 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
     let confidenceScore = 50;
     let classificationReason = 'Heuristic pattern detection';
 
-    const isRentSignal =
-      /rent|tenant|lease|bgc|letting|flat.*rent|shop.*rent/i.test(combinedSearchText) ||
-      (row.head && /income/i.test(row.head) && /rent/i.test(row.subHead));
-
-    const isBankChargeSignal =
-      /bank charges|commission for period|commission|account fee/i.test(combinedSearchText) ||
-      (row.subHead && /bank charge/i.test(row.subHead)) ||
-      (row.description && /bank charge/i.test(row.description));
-
-    const isMortgageSignal =
-      !isBankChargeSignal &&
-      (/quantum|interbay|together commercial|together commercia|commercial acceptn|commercial acceptance|mortgage|interest expenses/i.test(
-        combinedSearchText
-      ) ||
-      (row.head && /interest/i.test(row.head)) ||
-      matchedMortgage !== null);
-
-    const isTransferSignal =
-      /intra.*company|transfer|intral ft|loan return|director loan|dlr ft/i.test(combinedSearchText) ||
-      (row.head && /loan/i.test(row.head));
-
-    // Direct Workbook Head / Sub Head Resolution
-    let workbookMatched = false;
-    if (row.head || row.subHead) {
-      const normHead = (row.head || '').toLowerCase().trim();
-      const normSub = (row.subHead || '').toLowerCase().trim();
-
-      const matchedCat = categories.find((c) => {
-        const cName = c.name.toLowerCase().trim();
-        if (normSub && cName === normSub) return true;
-        if (Array.isArray(c.aliases) && c.aliases.some((a) => a.toLowerCase().trim() === normHead || a.toLowerCase().trim() === normSub)) return true;
-        if (!normSub && normHead && cName === normHead) return true;
-        return false;
-      });
-
-      if (matchedCat) {
-        workbookMatched = true;
-        suggestedCategoryId = matchedCat._id;
-        suggestedCategoryName = matchedCat.name;
-        confidenceScore = 95;
-        classificationReason = `Matched statement workbook Head/Sub Head: "${row.head || ''}${row.subHead ? ` -> ${row.subHead}` : ''}"`;
-
-        if (matchedCat.type === 'INCOME') {
-          suggestedType = normSub === 'rent' || /rent/i.test(row.subHead) ? 'RENT' : 'INCOME';
-        } else if (matchedCat.type === 'FINANCE_COST' || /interest/i.test(normHead)) {
-          suggestedType = 'MORTGAGE_PAYMENT';
-        } else if (matchedCat.type === 'TRANSFER' || /loan|other/i.test(normHead)) {
-          // If no second bank account is designated, loans are income (inflow) or expense (outflow)
-          suggestedType = row.direction === 'IN' ? 'RENT' : 'EXPENSE';
-        } else {
-          suggestedType = 'EXPENSE';
+    // 5.1 Match Property by Address/Street/Postcode
+    let matchedProp = null;
+    for (const p of properties) {
+      const pNameNorm = normText(p.name);
+      if (pNameNorm.includes('cromwell') && (normSearch.includes('cromwell') || normSearch.includes('ceomwell'))) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('clarence') && (normSearch.includes('clarence') || normSearch.includes('claracne') || normSearch.includes('clarnece') || normSearch.includes('clarnce'))) {
+        if (pNameNorm.includes('26') && normSearch.includes('26')) {
+          matchedProp = p; break;
+        } else if (pNameNorm.includes('13') && (normSearch.includes('13') || normSearch.includes('15'))) {
+          matchedProp = p; break;
         }
+      }
+      if (pNameNorm.includes('alexandra') && normSearch.includes('alexandra')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('orsett') && normSearch.includes('orsett')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('southend') && normSearch.includes('southend')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('pretoria') && normSearch.includes('pretoria')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('millard') && normSearch.includes('millard')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('como') && normSearch.includes('como')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('vansittart') && normSearch.includes('vansittart')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('lakewalk') && (normSearch.includes('lakewalk') || normSearch.includes('lake walk'))) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('lansbury') && normSearch.includes('lansbury')) {
+        matchedProp = p; break;
+      }
+      if (pNameNorm.includes('morley') && normSearch.includes('morley')) {
+        matchedProp = p; break;
       }
     }
 
-    if (workbookMatched) {
-      // Workbook explicitly classified
-    } else if (row.direction === 'IN' && isRentSignal) {
+    if (!matchedProp) {
+      matchedProp = matchedProperty;
+    }
+
+    // 5.2 Direct Category & Head / Sub Head Resolution from Workbook
+    const cleanHead = (row.head || '').trim();
+    const cleanSubHead = (row.subHead || '').trim();
+
+    // Match parent Main Head category
+    const mainHeadCat = categories.find((c) => {
+      if (!c.isMainHead && c.parentCategoryId) return false;
+      const cNorm = normText(c.name);
+      return (normHead && cNorm === normHead) || (cNorm === 'admin expenses' && normHead.includes('admin'));
+    });
+
+    if (mainHeadCat) {
+      suggestedHeadId = mainHeadCat._id;
+      suggestedHead = mainHeadCat.name;
+    }
+
+    // Match Sub Head category
+    const subCat = categories.find((c) => {
+      const cNorm = normText(c.name);
+      if (normSubHead && cNorm === normSubHead) return true;
+      if (normSubHead && Array.isArray(c.aliases) && c.aliases.some((a) => normText(a) === normSubHead)) return true;
+      return false;
+    });
+
+    if (subCat) {
+      suggestedSubHeadId = subCat._id;
+      suggestedSubHead = subCat.name;
+      suggestedCategoryId = subCat._id;
+      suggestedCategoryName = subCat.name;
+      if (!suggestedHeadId && subCat.parentCategoryId) {
+        suggestedHeadId = subCat.parentCategoryId?._id || subCat.parentCategoryId;
+      }
+    } else if (mainHeadCat) {
+      suggestedCategoryId = mainHeadCat._id;
+      suggestedCategoryName = mainHeadCat.name;
+    }
+
+    // 5.3 Type & Property / Unit Allocation Rules
+    const isRent = (normHead.includes('income') && normSubHead.includes('rent')) || /rent|tenant/i.test(normSearch);
+    const isInterest = normHead.includes('interest') || normText(cleanHead).includes('interest');
+    const isLoan = normHead.includes('loan') || normText(cleanHead).includes('loan');
+    const isAdmin = normHead.includes('admin') || normText(cleanHead).includes('admin');
+    const isPropertyPurchase = normHead.includes('property purchase') || normSearch.includes('auction deposit');
+
+    let matchedUnit = null;
+
+    if (isRent && row.direction === 'IN') {
       suggestedType = 'RENT';
-      if (/storage/i.test(combinedSearchText) && storageCategory) {
-        suggestedCategoryId = storageCategory._id;
-        suggestedCategoryName = storageCategory.name;
-      } else {
-        suggestedCategoryId = rentCategory ? rentCategory._id : null;
-        suggestedCategoryName = rentCategory ? rentCategory.name : 'Rental Income';
-      }
-      confidenceScore = matchedProperty ? 90 : 75;
-      classificationReason = matchedProperty
-        ? `Identified rental receipt matched to ${suggestedPropertyName}`
-        : 'Identified rental receipt narrative';
-    } else if (row.direction === 'OUT' && isBankChargeSignal) {
-      suggestedType = 'EXPENSE';
-      suggestedCategoryId = bankChargesCategory ? bankChargesCategory._id : null;
-      suggestedCategoryName = bankChargesCategory ? bankChargesCategory.name : 'Bank Charges';
-      suggestedPropertyId = null;
-      suggestedPropertyName = '';
       confidenceScore = 95;
-      classificationReason = 'Bank account servicing commission or service fee';
-    } else if (row.direction === 'OUT' && isMortgageSignal) {
-      suggestedType = 'MORTGAGE_PAYMENT';
-      if (/broker|valuation|arrangement|legal.*charge|fee/i.test(combinedSearchText) && mortgageFeesCategory) {
-        suggestedCategoryId = mortgageFeesCategory._id;
-        suggestedCategoryName = mortgageFeesCategory.name;
-      } else {
-        suggestedCategoryId = mortgageInterestCategory ? mortgageInterestCategory._id : null;
-        suggestedCategoryName = mortgageInterestCategory ? mortgageInterestCategory.name : 'Mortgage Servicing';
-      }
-      if (matchedMortgage && matchedMortgage.propertyId) {
-        suggestedPropertyId = matchedMortgage.propertyId._id || matchedMortgage.propertyId;
-        suggestedPropertyName = matchedMortgage.propertyId.title || matchedMortgage.propertyId.addressLine1 || suggestedPropertyName;
-      }
-      confidenceScore = matchedMortgage ? 95 : 85;
-      classificationReason = matchedMortgage
-        ? `Matched mortgage lender facility: ${suggestedMortgageName}`
-        : 'Mortgage lender servicing debt debit';
-    } else if (isTransferSignal) {
-      const otherAccount = accounts.find((a) => a._id.toString() !== accountId.toString());
-      if (otherAccount) {
-        suggestedType = 'TRANSFER';
-        suggestedCounterAccountId = otherAccount._id;
-        suggestedCounterAccountName = otherAccount.name;
-        confidenceScore = 80;
-        classificationReason = 'Inter-account liquidity movement matched to ' + otherAccount.name;
-      } else {
-        suggestedType = row.direction === 'IN' ? 'RENT' : 'EXPENSE';
-        confidenceScore = 75;
-        classificationReason = 'Company loan or financing transaction';
-      }
-    } else if (row.direction === 'OUT') {
-      suggestedType = 'EXPENSE';
-      if (/repair|paint|plumb|labour|builder|hardware/i.test(combinedSearchText)) {
-        suggestedCategoryId = repairsCategory ? repairsCategory._id : null;
-        suggestedCategoryName = repairsCategory ? repairsCategory.name : 'Repairs & Maintenance';
-        confidenceScore = matchedProperty ? 85 : 70;
-        classificationReason = matchedProperty
-          ? `Property repair allocated to ${suggestedPropertyName}`
-          : 'Property repair / contractor payment';
-      } else if (/electric|water|gas|power|utilities|bill/i.test(combinedSearchText)) {
-        suggestedCategoryId = utilitiesCategory ? utilitiesCategory._id : null;
-        suggestedCategoryName = utilitiesCategory ? utilitiesCategory.name : 'Utilities (Gas, Electric & Water)';
-        confidenceScore = matchedProperty ? 85 : 75;
-        classificationReason = 'Property utility service';
-      } else if (/insurance|deposit insurance/i.test(combinedSearchText)) {
-        suggestedCategoryId = insuranceCategory ? insuranceCategory._id : null;
-        suggestedCategoryName = insuranceCategory ? insuranceCategory.name : 'Landlord & Building Insurance';
-        confidenceScore = 85;
-        classificationReason = 'Building or tenancy deposit insurance';
-      } else if (/legal|solicitor|court|eviction|audit|accountan|companies house/i.test(combinedSearchText)) {
-        suggestedCategoryId = legalCategory ? legalCategory._id : null;
-        suggestedCategoryName = legalCategory ? legalCategory.name : 'Legal, Eviction & Professional Fees';
-        confidenceScore = 85;
-        classificationReason = 'Legal, statutory filing or professional fee';
-      } else if (/commission|management/i.test(combinedSearchText)) {
-        suggestedCategoryId = managementCategory ? managementCategory._id : null;
-        suggestedCategoryName = managementCategory ? managementCategory.name : 'Letting Agent & Management Fees';
-        confidenceScore = 85;
-        classificationReason = 'Letting management fee or agency commission';
-      } else if (/corporation tax|hmrc.*tax|tax payment/i.test(combinedSearchText)) {
-        suggestedCategoryId = taxCategory ? taxCategory._id : null;
-        suggestedCategoryName = taxCategory ? taxCategory.name : 'Taxation / Corporation Tax';
-        confidenceScore = 90;
-        classificationReason = 'HMRC Statutory Tax payment';
-      } else if (/post|nisa|vision|subscription|software|tech|telecom/i.test(combinedSearchText)) {
-        suggestedCategoryId = adminCategory ? adminCategory._id : null;
-        suggestedCategoryName = adminCategory ? adminCategory.name : 'Administrative Expenses';
-        confidenceScore = 80;
-        classificationReason = 'Administrative, software or postage expense';
-      } else {
-        confidenceScore = 55;
-        classificationReason = 'Outflow expense requiring operator confirmation';
-      }
-    } else {
-      suggestedType = 'UNCATEGORIZED';
-      confidenceScore = 40;
-      classificationReason = 'Requires operator review';
-    }
+      classificationReason = 'Rental collection income';
 
-    // Derive Head & Sub Head from category hierarchy if not already populated
-    if (suggestedCategoryId) {
-      const selectedCat = categories.find((c) => c._id?.toString() === suggestedCategoryId?.toString());
-      if (selectedCat) {
-        if (selectedCat.parentCategoryId) {
-          suggestedSubHeadId = selectedCat._id;
-          suggestedSubHead = selectedCat.name;
-          const parent = categories.find(
-            (c) => c._id?.toString() === (selectedCat.parentCategoryId?._id || selectedCat.parentCategoryId)?.toString()
-          );
-          if (parent) {
-            suggestedHeadId = parent._id;
-            suggestedHead = parent.name;
-          } else if (!suggestedHead) {
-            suggestedHead = selectedCat.name;
+      if (matchedProp) {
+        suggestedPropertyId = matchedProp._id;
+        suggestedPropertyName = matchedProp.name;
+
+        const propUnits = units.filter((u) => u.propertyId.toString() === matchedProp._id.toString());
+        if (propUnits.length === 1) {
+          matchedUnit = propUnits[0];
+        } else if (propUnits.length > 1) {
+          const isShop =
+            normSearch.includes('shop') ||
+            normSearch.includes('barber') ||
+            normSearch.includes('latin plaza') ||
+            normSearch.includes('heathway') ||
+            normSearch.includes('penns') ||
+            normSearch.includes('habib') ||
+            normSearch.includes('abualela') ||
+            normSearch.includes('ivape') ||
+            normSearch.includes('shelby') ||
+            normSearch.includes('wickford') ||
+            normSearch.includes('rashed');
+
+          const isFlat =
+            normSearch.includes('flat') ||
+            normSearch.includes('flats') ||
+            normSearch.includes('ideal letting') ||
+            normSearch.includes('12a') ||
+            normSearch.includes('12b') ||
+            normSearch.includes('12c') ||
+            normSearch.includes('12d') ||
+            normSearch.includes('62a') ||
+            normSearch.includes('26a') ||
+            normSearch.includes('127a');
+
+          if (isShop) {
+            if (normSearch.includes('13') && !normSearch.includes('13 15') && !normSearch.includes('13/15')) {
+              matchedUnit = propUnits.find((u) => u.unitName.includes('13') && !u.unitName.includes('15') && u.unitType === 'RETAIL_SHOP');
+            } else if (normSearch.includes('15') && !normSearch.includes('13 15') && !normSearch.includes('13/15')) {
+              matchedUnit = propUnits.find((u) => u.unitName.includes('15') && !u.unitName.includes('13') && u.unitType === 'RETAIL_SHOP');
+            } else {
+              matchedUnit = propUnits.find((u) => u.unitType === 'RETAIL_SHOP' || u.unitName.toLowerCase().includes('shop'));
+            }
+          } else if (isFlat) {
+            matchedUnit = propUnits.find((u) => u.unitType === 'FLAT' || u.unitName.toLowerCase().includes('flat'));
+          } else {
+            const specific = propUnits.find((u) => normSearch.includes(u.unitName.toLowerCase()));
+            if (specific) matchedUnit = specific;
+            else matchedUnit = propUnits.find((u) => u.unitType === 'FLAT') || null;
           }
-        } else if (selectedCat.isMainHead) {
-          suggestedHeadId = selectedCat._id;
-          suggestedHead = selectedCat.name;
-          if (!suggestedSubHead) {
-            suggestedSubHead = (row.subHead || '').trim();
-          }
-        } else if (!suggestedHead) {
-          suggestedHead = selectedCat.name;
         }
       }
+    } else if (isInterest) {
+      suggestedType = 'MORTGAGE_PAYMENT';
+      confidenceScore = 95;
+      classificationReason = 'Mortgage and financing interest expense';
+      if (matchedProp) {
+        suggestedPropertyId = matchedProp._id;
+        suggestedPropertyName = matchedProp.name;
+      }
+      matchedUnit = null; // User rule: whole property finance cost
+    } else if (isLoan) {
+      suggestedType = 'LOAN';
+      confidenceScore = 95;
+      classificationReason = 'Company loan, financing, or remortgage transaction';
+      if (normSubHead.includes('remortgage') && matchedProp) {
+        suggestedPropertyId = matchedProp._id;
+        suggestedPropertyName = matchedProp.name;
+        matchedUnit = null; // User rule: whole property remortgage
+      } else {
+        suggestedPropertyId = null;
+        suggestedPropertyName = '';
+        matchedUnit = null;
+      }
+    } else if (isPropertyPurchase) {
+      suggestedType = 'CAPITAL_EXPENDITURE';
+      confidenceScore = 95;
+      classificationReason = 'Capital property purchase deposit / fee';
+      matchedUnit = null;
+    } else if (isAdmin) {
+      suggestedType = 'EXPENSE';
+      confidenceScore = 95;
+      classificationReason = 'Administrative & Operating overhead expense';
+      if (normSubHead.includes('repair') && matchedProp) {
+        suggestedPropertyId = matchedProp._id;
+        suggestedPropertyName = matchedProp.name;
+      } else {
+        suggestedPropertyId = null;
+        suggestedPropertyName = '';
+      }
+      matchedUnit = null;
+    } else if (normHead.includes('other')) {
+      suggestedType = 'TRANSFER';
+      confidenceScore = 90;
+      classificationReason = 'Sundry movement or cash transaction';
+      matchedUnit = null;
+    } else if (row.direction === 'IN') {
+      suggestedType = 'INCOME';
+      confidenceScore = 90;
+      classificationReason = 'Operating refund or sundry income';
+      matchedUnit = null;
+    } else {
+      suggestedType = 'EXPENSE';
+      confidenceScore = 80;
+      classificationReason = 'Operating expense';
+      matchedUnit = null;
+    }
+
+    if (matchedUnit) {
+      suggestedUnitId = matchedUnit._id;
+      suggestedUnitName = matchedUnit.unitName;
     }
 
     const finalHead = (row.head || suggestedHead || '').trim();
     const finalSubHead = (row.subHead || suggestedSubHead || '').trim();
 
-    // Determine row status
+    // Determine row status (all recognized rows are automatically approved)
     let status = 'NEW';
     if (isDuplicate) {
       status = 'POSSIBLE_DUPLICATE';
@@ -790,6 +844,8 @@ export const classifyAndMatchRows = async (companyId, accountId, parsedRows) => 
       suggestedType,
       suggestedPropertyId,
       suggestedPropertyName,
+      suggestedUnitId,
+      suggestedUnitName,
       suggestedTenantId,
       suggestedTenantName,
       suggestedMortgageId,
@@ -877,6 +933,9 @@ export const saveStatementBatch = async ({
     transactionDate: r.transactionDate || new Date(),
     amount: r.amount > 0 ? r.amount : 0,
     suggestedPropertyId: r.suggestedPropertyId || null,
+    suggestedPropertyName: r.suggestedPropertyName || '',
+    suggestedUnitId: r.suggestedUnitId || null,
+    suggestedUnitName: r.suggestedUnitName || '',
     suggestedCategoryId: r.suggestedCategoryId || null,
     suggestedTenantId: r.suggestedTenantId || null,
     suggestedMortgageId: r.suggestedMortgageId || null,
@@ -966,10 +1025,12 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, limit = nu
       const txType =
         row.suggestedType === 'TRANSFER' && hasValidCounterAccount
           ? 'TRANSFER'
-          : row.suggestedType === 'RENT' || (row.direction === 'IN' && row.suggestedType !== 'EXPENSE')
-          ? 'INCOME'
-          : row.suggestedType === 'MORTGAGE_PAYMENT'
+          : row.suggestedType === 'CAPITAL_EXPENDITURE' || (row.head && /property purchase/i.test(row.head))
+          ? 'CAPITAL_ADJUSTMENT'
+          : row.suggestedType === 'MORTGAGE_PAYMENT' || (row.head && /interest/i.test(row.head))
           ? 'MORTGAGE_PAYMENT'
+          : row.direction === 'IN'
+          ? 'INCOME'
           : 'EXPENSE';
 
       const counterAccountId = txType === 'TRANSFER' ? row.suggestedCounterAccountId : null;
@@ -981,6 +1042,8 @@ export const postBatchTransactions = async ({ batchId, rowIds = null, limit = nu
           ? 'TRF'
           : txType === 'MORTGAGE_PAYMENT'
           ? 'MTG'
+          : txType === 'CAPITAL_ADJUSTMENT'
+          ? 'CAP'
           : 'EXP';
 
       const voucherNo = await getNextVoucherNo(typeCode);

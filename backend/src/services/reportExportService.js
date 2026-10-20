@@ -1486,7 +1486,9 @@ export const generatePdfReport = async (reportData) => {
           rX += colWidths.account;
 
           // Property / Unit
-          const propUnit = tx.propertyName ? `${tx.propertyName} ${tx.unitName !== '-' ? `(${tx.unitName})` : ''}` : '-';
+          const hasProp = Boolean(tx.propertyName && tx.propertyName !== '-');
+          const hasUnit = Boolean(tx.unitName && tx.unitName !== '-');
+          const propUnit = hasProp && hasUnit ? `${tx.propertyName} · ${tx.unitName}` : hasProp ? tx.propertyName : hasUnit ? tx.unitName : '-';
           doc.text(propUnit, rX, currentY + 4, { width: colWidths.property - 4, lineBreak: false });
           rX += colWidths.property;
 

@@ -444,6 +444,10 @@ export const ledgerAPI = {
     const res = await api.delete(`/ledger/transactions/${id}`, { data });
     return res.data;
   },
+  permanentlyDeleteTransactions: async (ids) => {
+    const res = await api.delete('/ledger/transactions/permanent', { data: { ids } });
+    return res.data;
+  },
   restoreTransaction: async (id, data = {}) => {
     const res = await api.post(`/ledger/transactions/${id}/restore`, data);
     return res.data;

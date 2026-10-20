@@ -17,6 +17,7 @@ import {
   applyCategoryBackfillController,
   updateTransaction,
   deleteTransaction,
+  permanentlyDeleteTransactions,
   restoreTransaction,
   getDeletedTransactions,
   getTransactionAudit,
@@ -57,6 +58,7 @@ router.post('/export/pdf', exportLedgerPdf);
 
 // Transaction Management & Recycle Bin
 router.get('/transactions/recycle-bin', getDeletedTransactions);
+router.delete('/transactions/permanent', permanentlyDeleteTransactions);
 router.get('/transactions', getTransactions);
 router.get('/transactions/:id', getTransactionById);
 router.get('/transactions/:id/audit', getTransactionAudit);
