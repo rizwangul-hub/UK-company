@@ -21,15 +21,26 @@ export const getPropertyDocuments = async (req, res) => {
     const { propertyId } = req.params;
     const { category, status, search } = req.query;
 
-    const property = await Property.findOne({ _id: propertyId, companyId: req.companyId }).lean();
+    let property = await Property.findOne({ _id: propertyId, companyId: req.companyId }).lean();
+    let targetUnit = null;
+
+    if (!property) {
+      targetUnit = await Unit.findOne({ _id: propertyId, companyId: req.companyId }).lean();
+      if (targetUnit) {
+        property = await Property.findOne({ _id: targetUnit.propertyId, companyId: req.companyId }).lean();
+      }
+    }
+
     if (!property) {
       return apiError(res, 'Property not found or does not belong to the active company', 404);
     }
 
     const filter = {
       companyId: req.companyId,
-      propertyId,
       isActive: true,
+      ...(targetUnit
+        ? { $or: [{ unitId: targetUnit._id }, { propertyId: property._id }] }
+        : { propertyId: property._id }),
     };
 
     if (category && category !== 'ALL') {
@@ -152,7 +163,14 @@ export const createPropertyDocument = async (req, res) => {
       epcRating,
     } = req.body;
 
-    const property = await Property.findOne({ _id: propertyId, companyId: req.companyId });
+    let property = await Property.findOne({ _id: propertyId, companyId: req.companyId });
+    let targetUnit = null;
+    if (!property) {
+      targetUnit = await Unit.findOne({ _id: propertyId, companyId: req.companyId });
+      if (targetUnit) {
+        property = await Property.findOne({ _id: targetUnit.propertyId, companyId: req.companyId });
+      }
+    }
     if (!property) {
       return apiError(res, 'Property not found or access denied for this company', 404);
     }
@@ -205,7 +223,8 @@ export const createPropertyDocument = async (req, res) => {
 
     const document = await PropertyDocument.create({
       companyId: req.companyId,
-      propertyId,
+      propertyId: property._id,
+      ...(targetUnit ? { unitId: targetUnit._id } : {}),
       category,
       subCategory: subCategory || '',
       title,

@@ -234,6 +234,7 @@ function UnitDetailModal({ unit, parentProperty, selectedCompany, onClose }) {
 }
 
 export function PropertiesPage({ onSelectProperty, selectedCompany }) {
+  const compSlug = selectedCompany?.slug || 'old-street';
   const initialCache = getApiCache('/properties', {
     params: {
       search: '',
@@ -241,10 +242,12 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
     },
   });
   const [properties, setProperties] = useState(initialCache?.data?.properties || []);
+  const [buildings, setBuildings] = useState(initialCache?.data?.buildings || []);
   const [summary, setSummary] = useState(initialCache?.data?.summary || null);
   const [loading, setLoading] = useState(!initialCache?.data?.properties);
   const [search, setSearch] = useState('');
   const [tenureFilter, setTenureFilter] = useState('');
+  const [portfolioViewMode, setPortfolioViewMode] = useState('UNITS'); // 'UNITS' (default) | 'BUILDINGS'
 
   // Property Create / Edit Modal State
   const [showModal, setShowModal] = useState(false);
@@ -305,6 +308,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
       }, { forceRefresh });
       if (res?.success) {
         setProperties(res.data.properties || []);
+        setBuildings(res.data.buildings || []);
         setSummary(res.data.summary || null);
       }
     } catch (err) {
@@ -324,8 +328,9 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
     setSelectedProperty(prop);
     setDetailedPropertyData(prop);
     setLoadingDetails(true);
-    // If property has multiple units, default to 'units' tab so user sees all other units immediately
-    const targetTab = defaultTab || (prop.units && prop.units.length > 1 ? 'units' : 'overview');
+    // If property is an umbrella building with multiple units and NOT an individual unit child, default to 'units' tab; otherwise overview
+    const isChild = prop.isMultiUnitChild || prop.isUnit;
+    const targetTab = defaultTab || (prop.units && prop.units.length > 1 && !isChild ? 'units' : 'overview');
     setDetailTab(targetTab);
     if (onSelectProperty) onSelectProperty(prop._id);
 
@@ -526,8 +531,14 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
               <span>Back to Properties</span>
             </button>
             <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
-              <span>Properties</span>
+              <button onClick={handleCloseDetails} className="hover:text-white transition cursor-pointer">Properties</button>
               <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+              {propDetail?.parentPropertyName && (
+                <>
+                  <span className="text-slate-400">{propDetail.parentPropertyName}</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+                </>
+              )}
               <span className="text-white font-semibold">{propDetail?.name}</span>
             </div>
           </div>
@@ -568,12 +579,23 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                  <Building2 className="w-6 h-6" />
+                  {propDetail?.propertyType === 'Shop' || propDetail?.name?.toLowerCase().includes('shop') ? (
+                    <Store className="w-6 h-6 text-amber-400" />
+                  ) : (
+                    <Building2 className="w-6 h-6 text-indigo-400" />
+                  )}
                 </div>
                 <div>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
-                    {propDetail?.name}
-                  </h1>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white tracking-tight">
+                      {propDetail?.name}
+                    </h1>
+                    {propDetail?.parentPropertyName && (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                        Unit inside {propDetail.parentPropertyName}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs sm:text-sm text-slate-400 flex items-center gap-1.5 mt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span>
@@ -602,9 +624,21 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                   {propDetail?.propertyType?.replace(/_/g, ' ')}
                 </span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  {propDetail?.units?.length > 1 ? `${propDetail.units.length} Units` : '1 Unit'}
-                </span>
+                {!propDetail?.isUnit && !propDetail?.isMultiUnitChild && propDetail?.units?.length > 1 && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    {propDetail.units.length} Units
+                  </span>
+                )}
+                {(propDetail?.isUnit || propDetail?.isMultiUnitChild) && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    Individual Unit
+                  </span>
+                )}
+                {propDetail?.floor && (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    Floor: {propDetail.floor}
+                  </span>
+                )}
                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                   {propDetail?.tenure?.replace(/_/g, ' ')}
                 </span>
@@ -736,7 +770,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
         <div className="flex items-center gap-0.5 border-b border-slate-800 overflow-x-auto bg-slate-900/60 rounded-t-2xl px-3">
           {[
             { id: 'overview',   label: 'Overview' },
-            ...(propDetail?.units && propDetail.units.length > 0
+            ...(!propDetail?.isUnit && !propDetail?.isMultiUnitChild && propDetail?.units && propDetail.units.length > 1
               ? [{ id: 'units', label: `Units (${propDetail.units.length})` }]
               : []),
             { id: 'rent',       label: 'Rent Ledger' },

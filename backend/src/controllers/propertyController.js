@@ -79,16 +79,64 @@ export const getProperties = async (req, res) => {
       };
     });
 
+    // Flatten so every individual unit/property is displayed as its OWN independent property
+    const individualProperties = [];
+
+    enriched.forEach((prop) => {
+      if (prop.units && prop.units.length > 1) {
+        prop.units.forEach((u) => {
+          const isShop = u.unitType === 'RETAIL_SHOP' || u.unitName?.toLowerCase().includes('shop');
+          individualProperties.push({
+            _id: u._id,
+            unitId: u._id,
+            parentPropertyId: prop._id,
+            parentPropertyName: prop.name,
+            name: u.unitName,
+            addressLine1: prop.addressLine1,
+            addressLine2: prop.addressLine2,
+            city: prop.city,
+            postcode: prop.postcode,
+            propertyType: isShop ? 'Shop' : 'Flat',
+            contractualRent: u.contractualRent || u.targetRent || 0,
+            rentFrequency: 'MONTHLY',
+            status: u.status === 'OCCUPIED' ? 'Occupied' : 'Available',
+            tenantName: u.tenantName || '',
+            tenantPhone: u.tenantPhone || '',
+            tenantEmail: u.tenantEmail || '',
+            floor: u.floor || 'Ground',
+            floorAreaSqFt: u.floorAreaSqFt || 0,
+            notes: u.notes || prop.notes,
+            tenure: prop.tenure,
+            compliance: prop.compliance,
+            purchasePrice: Math.round((prop.purchasePrice || 0) / prop.units.length),
+            currentValuation: Math.round((prop.currentValuation || prop.purchasePrice || 0) / prop.units.length),
+            totalMortgageDebt: Math.round((prop.totalMortgageDebt || 0) / prop.units.length),
+            activeMortgagesCount: prop.activeMortgagesCount || 0,
+            isMultiUnitChild: true,
+            units: [u],
+          });
+        });
+      } else {
+        individualProperties.push(prop);
+      }
+    });
+
     const portfolioSummary = {
-      totalProperties: enriched.length,
-      totalContractualRent: enriched.reduce((sum, p) => sum + (p.contractualRent || 0), 0),
+      totalProperties: individualProperties.length,
+      totalBuildings: enriched.length,
+      totalContractualRent: individualProperties.reduce((sum, p) => sum + (p.contractualRent || 0), 0),
       totalValuation: enriched.reduce((sum, p) => sum + (p.currentValuation || p.purchasePrice || 0), 0),
       totalMortgageDebt: enriched.reduce((sum, p) => sum + (p.totalMortgageDebt || 0), 0),
-      occupiedCount: enriched.filter((p) => p.occupiedUnits > 0).length,
-      availableCount: enriched.filter((p) => p.occupiedUnits === 0).length,
+      occupiedCount: individualProperties.filter((p) => p.status === 'Occupied' || p.tenantName).length,
+      availableCount: individualProperties.filter((p) => p.status !== 'Occupied' && !p.tenantName).length,
     };
 
-    return apiSuccess(res, { properties: enriched, total: enriched.length, summary: portfolioSummary });
+    return apiSuccess(res, {
+      properties: individualProperties,
+      buildings: enriched,
+      total: individualProperties.length,
+      summary: portfolioSummary,
+    });
   } catch (error) {
     return apiError(res, 'Failed to fetch properties', 500, error);
   }
@@ -96,8 +144,78 @@ export const getProperties = async (req, res) => {
 
 export const getPropertyById = async (req, res) => {
   try {
-    const property = await Property.findOne({ _id: req.params.id, companyId: req.companyId }).lean();
+    let property = await Property.findOne({ _id: req.params.id, companyId: req.companyId }).lean();
+    let targetUnit = null;
+
+    if (!property) {
+      targetUnit = await Unit.findOne({ _id: req.params.id, companyId: req.companyId }).lean();
+      if (targetUnit) {
+        property = await Property.findOne({ _id: targetUnit.propertyId, companyId: req.companyId }).lean();
+      }
+    }
+
     if (!property) return apiError(res, 'Property not found', 404);
+
+    if (targetUnit) {
+      // Return dedicated property details for this specific individual unit
+      const [mortgages, activeTenancy, latestTenancy, schedules, recentTx, appliances] = await Promise.all([
+        Mortgage.find({ companyId: req.companyId, propertyId: property._id, status: 'ACTIVE' }).populate('paymentAccountId', 'name sortCode accountNumber').lean(),
+        TenancyAgreement.findOne({ companyId: req.companyId, unitId: targetUnit._id, status: 'ACTIVE' }).populate('tenantId', 'fullName email phone').lean(),
+        TenancyAgreement.findOne({ companyId: req.companyId, unitId: targetUnit._id }).sort({ createdAt: -1 }).populate('tenantId', 'fullName email phone').lean(),
+        RentSchedule.find({ companyId: req.companyId, unitId: targetUnit._id }).sort({ billingMonth: -1 }).limit(12).lean(),
+        Transaction.find({ companyId: req.companyId, unitId: targetUnit._id, status: 'POSTED', isDeleted: { $ne: true } }).populate('accountId', 'name').populate('categoryId', 'name code').sort({ transactionDate: -1 }).limit(10).lean(),
+        Appliance.find({ companyId: req.companyId, $or: [{ unitId: targetUnit._id }, { propertyId: property._id }] }).sort({ createdAt: -1 }).lean(),
+      ]);
+
+      const effectiveTenancy = activeTenancy || latestTenancy;
+      const isOccupied = Boolean(activeTenancy);
+      const contractualRent = activeTenancy?.rentAmount || targetUnit.targetRent || 0;
+      const annualRent = contractualRent * 12;
+
+      const totalBuildingDebt = mortgages.reduce((sum, m) => sum + (m.outstandingPrincipalBalance || 0), 0);
+      const totalUnitsInBuilding = await Unit.countDocuments({ propertyId: property._id, isActive: true });
+      const unitShare = totalUnitsInBuilding > 0 ? (1 / totalUnitsInBuilding) : 1;
+
+      const assetVal = Math.round((property.currentValuation || property.purchasePrice || 0) * unitShare);
+      const unitDebt = Math.round(totalBuildingDebt * unitShare);
+      const equity = Math.max(0, assetVal - unitDebt);
+      const ltv = assetVal > 0 ? Number(((unitDebt / assetVal) * 100).toFixed(1)) : 0;
+      const grossYield = assetVal > 0 ? Number(((annualRent / assetVal) * 100).toFixed(2)) : 0;
+      const isShop = targetUnit.unitType === 'RETAIL_SHOP' || targetUnit.unitName?.toLowerCase().includes('shop');
+
+      return apiSuccess(res, {
+        _id: targetUnit._id,
+        unitId: targetUnit._id,
+        parentPropertyId: property._id,
+        parentPropertyName: property.name,
+        name: targetUnit.unitName,
+        propertyType: isShop ? 'Shop' : 'Flat',
+        contractualRent,
+        rentFrequency: 'MONTHLY',
+        status: isOccupied ? 'Occupied' : 'Available',
+        tenantName: activeTenancy ? (activeTenancy.tenantId?.fullName || '') : (latestTenancy?.tenantId?.fullName ? `${latestTenancy.tenantId.fullName} (Previous)` : ''),
+        addressLine1: property.addressLine1,
+        addressLine2: property.addressLine2,
+        city: property.city,
+        postcode: property.postcode,
+        tenure: property.tenure,
+        compliance: property.compliance,
+        tenancy: effectiveTenancy,
+        schedules,
+        recentTransactions: recentTx,
+        appliances,
+        mortgages,
+        totalMortgageDebt: unitDebt,
+        equity,
+        ltv,
+        annualRent,
+        grossYield,
+        floor: targetUnit.floor || 'Ground',
+        floorAreaSqFt: targetUnit.floorAreaSqFt || 0,
+        notes: targetUnit.notes || property.notes,
+        isUnit: true,
+      });
+    }
 
     const [unitsRaw, mortgages, tenancy, schedules, recentTx, appliances, unitTenancies] = await Promise.all([
       Unit.find({ companyId: req.companyId, propertyId: property._id, isActive: true }).sort({ unitName: 1 }).lean(),
@@ -168,7 +286,7 @@ export const updateProperty = async (req, res) => {
     const updateData = { ...req.body };
     delete updateData.companyId; // Never permit client to reassign companyId
 
-    const property = await Property.findOneAndUpdate(
+    let property = await Property.findOneAndUpdate(
       { _id: req.params.id, companyId: req.companyId },
       updateData,
       {
@@ -176,7 +294,23 @@ export const updateProperty = async (req, res) => {
         runValidators: true,
       }
     );
-    if (!property) return apiError(res, 'Property not found', 404);
+    if (!property) {
+      // Check if this id belongs to a Unit
+      const unit = await Unit.findOne({ _id: req.params.id, companyId: req.companyId });
+      if (unit) {
+        if (updateData.name) unit.unitName = updateData.name;
+        if (updateData.contractualRent !== undefined) unit.contractualRent = updateData.contractualRent;
+        if (updateData.status) unit.status = updateData.status.toUpperCase() === 'OCCUPIED' ? 'OCCUPIED' : updateData.status.toUpperCase();
+        if (updateData.tenantName !== undefined) unit.tenantName = updateData.tenantName;
+        if (updateData.notes !== undefined) unit.notes = updateData.notes;
+        if (updateData.propertyType) {
+          unit.unitType = updateData.propertyType.toUpperCase().includes('SHOP') ? 'RETAIL_SHOP' : 'FLAT';
+        }
+        await unit.save();
+        return apiSuccess(res, unit, 'Unit updated successfully');
+      }
+      return apiError(res, 'Property not found', 404);
+    }
     return apiSuccess(res, property, 'Property updated successfully');
   } catch (error) {
     return apiError(res, error.message || 'Failed to update property', 400, error);

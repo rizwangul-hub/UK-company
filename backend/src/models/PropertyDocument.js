@@ -66,6 +66,12 @@ const propertyDocumentSchema = new mongoose.Schema(
       required: [true, 'Linked property ID is required'],
       index: true,
     },
+    unitId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Unit',
+      default: null,
+      index: true,
+    },
     category: {
       type: String,
       required: [true, 'Document category is required'],
