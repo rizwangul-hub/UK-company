@@ -1078,6 +1078,7 @@ export function SettingsPage({ user }) {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* UK Localization Parameters */}

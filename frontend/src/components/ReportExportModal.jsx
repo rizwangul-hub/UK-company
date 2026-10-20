@@ -753,6 +753,7 @@ export default function ReportExportModal({
           </div>
         </div>
       </div>
+    </div>
     </ModalPortal>
   );
 }
