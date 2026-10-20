@@ -36,6 +36,7 @@ import { pnlAPI, propertiesAPI, getApiCache } from '../services/api.js';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import SingleVoucherPrintModal from '../components/SingleVoucherPrintModal.jsx';
 import pixxLogo from '../assets/logo.png';
+import { ModalPortal } from '../components/ModalPortal.jsx';
 
 export function ProfitLossPage({ selectedCompany }) {
   const companySlug = selectedCompany?.slug || selectedCompany?.id || 'old-street';
@@ -431,10 +432,24 @@ export function ProfitLossPage({ selectedCompany }) {
       {/* Top 5 Summary KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {/* 1. Total Operating Revenue */}
-        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+        <div
+          onClick={() => {
+            const allIncomeTxs = reportData?.breakdown?.income?.flatMap((c) => c.transactions || []) || [];
+            if (allIncomeTxs.length > 0) {
+              setActiveDrilldown({
+                title: 'All Operating Revenue & Rental Receipts',
+                type: 'INCOME',
+                transactions: allIncomeTxs,
+                total: summary.totalIncome,
+              });
+            }
+          }}
+          className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden cursor-pointer hover:border-emerald-500/50 hover:shadow-md transition group"
+          title="Click to view all revenue vouchers in popup"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider">Total Revenue</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+            <span className="text-[11px] font-black uppercase tracking-wider group-hover:text-emerald-500 transition">Total Revenue</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20 transition">
               <ArrowDownLeft size={16} />
             </div>
           </div>
@@ -453,10 +468,24 @@ export function ProfitLossPage({ selectedCompany }) {
         </div>
 
         {/* 2. Total Operating Expenses */}
-        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+        <div
+          onClick={() => {
+            const allExpTxs = reportData?.breakdown?.operatingExpenses?.flatMap((c) => c.transactions || []) || [];
+            if (allExpTxs.length > 0) {
+              setActiveDrilldown({
+                title: 'All Operating Overheads & Property Expenses',
+                type: 'OPERATING_EXPENSE',
+                transactions: allExpTxs,
+                total: summary.operatingExpenses,
+              });
+            }
+          }}
+          className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden cursor-pointer hover:border-rose-500/50 hover:shadow-md transition group"
+          title="Click to view all operating expense vouchers in popup"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider">Operating Expenses</span>
-            <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
+            <span className="text-[11px] font-black uppercase tracking-wider group-hover:text-rose-500 transition">Operating Expenses</span>
+            <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 group-hover:bg-rose-500/20 transition">
               <ArrowUpRight size={16} />
             </div>
           </div>
@@ -469,10 +498,24 @@ export function ProfitLossPage({ selectedCompany }) {
         </div>
 
         {/* 3. Finance Costs (Mortgage Interest) */}
-        <div className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+        <div
+          onClick={() => {
+            const allFinTxs = reportData?.breakdown?.financeCosts?.flatMap((c) => c.transactions || []) || [];
+            if (allFinTxs.length > 0) {
+              setActiveDrilldown({
+                title: 'All Mortgage & Loan Interest Expenditure',
+                type: 'FINANCE_COST',
+                transactions: allFinTxs,
+                total: summary.financeCosts,
+              });
+            }
+          }}
+          className="executive-card rounded-2xl p-4 sm:p-5 relative overflow-hidden cursor-pointer hover:border-indigo-500/50 hover:shadow-md transition group"
+          title="Click to view all finance cost vouchers in popup"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider">Finance Costs</span>
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
+            <span className="text-[11px] font-black uppercase tracking-wider group-hover:text-indigo-400 transition">Finance Costs</span>
+            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20 transition">
               <Landmark size={16} />
             </div>
           </div>
@@ -1045,26 +1088,32 @@ export function ProfitLossPage({ selectedCompany }) {
       {/* TRANSACTION DRILLDOWN MODAL                                           */}
       {/* ===================================================================== */}
       {activeDrilldown && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+        <ModalPortal isOpen={Boolean(activeDrilldown)} onClose={() => setActiveDrilldown(null)} zIndex="z-[9999]">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-                    {activeDrilldown.title}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
-                    {activeDrilldown.transactions?.length || 0} Transactions
-                  </span>
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-900/80">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                  <Receipt size={18} />
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                  Total Reconciled Amount: <span className="font-mono font-bold text-slate-900 dark:text-white">{formatGBP(activeDrilldown.total)}</span>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                      {activeDrilldown.title}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
+                      {activeDrilldown.transactions?.length || 0} Transactions
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
+                    Total Reconciled Amount: <span className="font-mono font-bold text-slate-900 dark:text-white">{formatGBP(activeDrilldown.total)}</span>
+                  </div>
                 </div>
               </div>
               <button
                 onClick={() => setActiveDrilldown(null)}
                 className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                aria-label="Close modal"
               >
                 <X size={18} />
               </button>
@@ -1086,45 +1135,53 @@ export function ProfitLossPage({ selectedCompany }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-medium">
-                    {activeDrilldown.transactions?.map((tx) => (
-                      <tr key={tx._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="p-2.5 font-mono whitespace-nowrap text-slate-500">
-                          {formatUKDate(tx.date)}
-                        </td>
-                        <td className="p-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
-                          {tx.voucherNo}
-                        </td>
-                        <td className="p-2.5 max-w-xs truncate" title={tx.narration}>
-                          <div className="font-bold text-slate-900 dark:text-white truncate">{tx.narration}</div>
-                          {tx.head && (
-                            <span className="text-[10px] text-slate-400 font-semibold">{tx.head} &bull; {tx.subHead}</span>
-                          )}
-                        </td>
-                        <td className="p-2.5 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                          {tx.propertyName}
-                        </td>
-                        <td className="p-2.5 whitespace-nowrap text-slate-500">{tx.accountName}</td>
-                        <td className="p-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">
-                          {formatGBP(tx.amount)}
-                        </td>
-                        <td className="p-2.5 text-center whitespace-nowrap">
-                          <button
-                            onClick={() => setActiveVoucher(tx)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] transition cursor-pointer"
-                          >
-                            <Eye size={11} />
-                            <span>Voucher</span>
-                          </button>
+                    {activeDrilldown.transactions?.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-400">
+                          No transaction records found for this category head.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      activeDrilldown.transactions?.map((tx) => (
+                        <tr key={tx._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="p-2.5 font-mono whitespace-nowrap text-slate-500">
+                            {formatUKDate(tx.date)}
+                          </td>
+                          <td className="p-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+                            {tx.voucherNo}
+                          </td>
+                          <td className="p-2.5 max-w-xs truncate" title={tx.narration}>
+                            <div className="font-bold text-slate-900 dark:text-white truncate">{tx.narration}</div>
+                            {tx.head && (
+                              <span className="text-[10px] text-slate-400 font-semibold">{tx.head} &bull; {tx.subHead}</span>
+                            )}
+                          </td>
+                          <td className="p-2.5 whitespace-nowrap text-slate-600 dark:text-slate-300">
+                            {tx.propertyName || '-'}
+                          </td>
+                          <td className="p-2.5 whitespace-nowrap text-slate-500">{tx.accountName || '-'}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                            {formatGBP(tx.amount)}
+                          </td>
+                          <td className="p-2.5 text-center whitespace-nowrap">
+                            <button
+                              onClick={() => setActiveVoucher(tx)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] transition cursor-pointer shadow-xs"
+                            >
+                              <Eye size={12} />
+                              <span>Voucher</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end bg-slate-50/70 dark:bg-slate-900/80">
               <button
                 onClick={() => setActiveDrilldown(null)}
                 className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition cursor-pointer"
@@ -1133,7 +1190,7 @@ export function ProfitLossPage({ selectedCompany }) {
               </button>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Voucher Modal */}

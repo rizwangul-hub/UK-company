@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import pixxLogo from '../assets/logo.png';
+import { ModalPortal } from './ModalPortal.jsx';
 
 export function SingleVoucherPrintModal({ voucher, selectedCompany, onClose, onEdit }) {
   if (!voucher) return null;
@@ -42,8 +43,8 @@ export function SingleVoucherPrintModal({ voucher, selectedCompany, onClose, onE
   const displayReg = selectedCompany?.registrationNo ? `Reg: ${selectedCompany.registrationNo} • ` : '';
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm overflow-y-auto flex justify-center p-2 sm:p-4 md:p-6 font-sans">
-      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col my-auto border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <ModalPortal isOpen={Boolean(voucher)} onClose={onClose} zIndex="z-[10000]">
+      <div className="relative bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col my-auto border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[92vh]">
         {/* Top Action Bar (Hidden when printing) */}
         <div className="bg-slate-900 text-white px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 no-print border-b border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -366,7 +367,7 @@ export function SingleVoucherPrintModal({ voucher, selectedCompany, onClose, onE
           }
         }
       `}</style>
-    </div>
+    </ModalPortal>
   );
 }
 
