@@ -4,11 +4,18 @@ import nodemailer from 'nodemailer';
  * Builds a Nodemailer transporter based on DB config or environment variables
  */
 export const createTransporter = (config = {}) => {
-  const host = config.smtpHost || process.env.SMTP_HOST;
-  const port = Number(config.smtpPort || process.env.SMTP_PORT || 587);
-  const secure = config.smtpSecure !== undefined ? Boolean(config.smtpSecure) : (port === 465 || process.env.SMTP_SECURE === 'true');
-  const user = config.smtpUser || process.env.SMTP_USER;
-  const pass = config.smtpPass || process.env.SMTP_PASS;
+  const user = (config.smtpUser || process.env.SMTP_USER || process.env.EMAIL_USER || '').trim();
+  const pass = (config.smtpPass || process.env.SMTP_PASS || process.env.EMAIL_PASS || '').trim();
+
+  let host = (config.smtpHost || process.env.SMTP_HOST || '').trim();
+  if (!host && user.toLowerCase().endsWith('@gmail.com')) {
+    host = 'smtp.gmail.com';
+  }
+
+  const port = Number(config.smtpPort || process.env.SMTP_PORT || (host === 'smtp.gmail.com' ? 465 : 587));
+  const secure = config.smtpSecure !== undefined
+    ? Boolean(config.smtpSecure)
+    : (port === 465 || process.env.SMTP_SECURE === 'true');
 
   if (!host || !user || !pass) {
     return null;
