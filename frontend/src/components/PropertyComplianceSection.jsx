@@ -98,6 +98,37 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
   const [corrDate, setCorrDate] = useState(new Date().toISOString().slice(0, 10));
   const [corrFile, setCorrFile] = useState(null);
 
+  // Email Notification Quick Status
+  const [attachedEmail, setAttachedEmail] = useState('');
+  const [emailCheckLoading, setEmailCheckLoading] = useState(false);
+  const [emailFeedback, setEmailFeedback] = useState('');
+
+  const loadEmailAlertStatus = async () => {
+    try {
+      const res = await complianceAPI.getEmailSettings();
+      if (res?.success && res.data) {
+        setAttachedEmail(res.data.recipientEmail || '');
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleRunEmailAlerts = async () => {
+    setEmailCheckLoading(true);
+    setEmailFeedback('');
+    try {
+      const res = await complianceAPI.checkExpiryEmailsNow({ forceSend: false });
+      if (res?.success) {
+        setEmailFeedback(`Expiry check complete! Evaluated: ${res.data?.evaluatedCount || 0} documents. ${res.data?.emailsSent || 0} alert email(s) sent.`);
+      }
+    } catch (err) {
+      setEmailFeedback('Failed to dispatch expiry emails: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setEmailCheckLoading(false);
+    }
+  };
+
   const loadData = async (force = false) => {
     if (!propertyId) return;
     setLoading(true);
@@ -123,6 +154,7 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
 
   useEffect(() => {
     loadData();
+    loadEmailAlertStatus();
   }, [propertyId, activeCategory, statusFilter]);
 
   const allDisplayDocs = [
@@ -396,6 +428,54 @@ export function PropertyComplianceSection({ propertyId, propertyName, onRefreshP
           </button>
         </div>
       </div>
+
+      {/* Attached Email Alert Status Banner */}
+      <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+            <Mail className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-white">Automated Expiry Email Notifications</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                attachedEmail
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+              }`}>
+                {attachedEmail ? `Alerts sent to: ${attachedEmail}` : 'No email attached yet (Configure in Settings)'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Gas Safety (CP12), EICR, EPC, and Insurance policies automatically trigger renewal warning emails prior to expiration.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={handleRunEmailAlerts}
+            disabled={emailCheckLoading}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition cursor-pointer text-xs disabled:opacity-50 shadow-md shadow-indigo-600/20"
+          >
+            <Send className={`w-3.5 h-3.5 ${emailCheckLoading ? 'animate-spin' : ''}`} />
+            <span>{emailCheckLoading ? 'Sending Alerts...' : 'Dispatch Expiry Alerts Now'}</span>
+          </button>
+        </div>
+      </div>
+
+      {emailFeedback && (
+        <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{emailFeedback}</span>
+          </div>
+          <button onClick={() => setEmailFeedback('')} className="text-slate-400 hover:text-white cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Property document upload dialog */}
       {uploadModalOpen && (

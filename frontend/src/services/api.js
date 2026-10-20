@@ -787,6 +787,22 @@ export const complianceAPI = {
     triggerBlobDownload(res.data, customFilename || defaultFilename);
     return true;
   },
+  getEmailSettings: async () => {
+    const res = await api.get('/compliance/email-settings');
+    return res.data;
+  },
+  updateEmailSettings: async (data) => {
+    const res = await api.put('/compliance/email-settings', data);
+    return res.data;
+  },
+  sendTestEmail: async (data) => {
+    const res = await api.post('/compliance/email-settings/test', data);
+    return res.data;
+  },
+  checkExpiryEmailsNow: async (data = {}) => {
+    const res = await api.post('/compliance/email-settings/check-now', data);
+    return res.data;
+  },
 };
 
 export const propertyChargesAPI = {

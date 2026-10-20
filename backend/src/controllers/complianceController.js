@@ -6,6 +6,10 @@ import Appliance from '../models/Appliance.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
 import cloudinary, { isCloudinaryConfigured, CLOUDINARY_FOLDER } from '../config/cloudinary.js';
 import { checkAndGenerateComplianceReminders } from '../services/complianceReminderService.js';
+import EmailNotificationConfig from '../models/EmailNotificationConfig.js';
+import User from '../models/User.js';
+import { sendTestEmail } from '../services/emailService.js';
+import { evaluateAndSendExpiryEmails } from '../services/documentExpiryEmailEngine.js';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 
@@ -1020,5 +1024,150 @@ export const exportComplianceReport = async (req, res) => {
     doc.end();
   } catch (error) {
     return apiError(res, 'Failed to export compliance report', 500, error);
+  }
+};
+
+/**
+ * 15. Get Document Expiry Email Notification Settings
+ */
+export const getEmailSettings = async (req, res) => {
+  try {
+    let config = await EmailNotificationConfig.findOne({ companyId: 'GLOBAL' });
+    if (!config) {
+      const defaultUser = await User.findOne({ isActive: true }).lean();
+      config = await EmailNotificationConfig.create({
+        companyId: 'GLOBAL',
+        recipientEmail: defaultUser?.email || '',
+        enabled: true,
+        alertDays: [60, 45, 30, 14, 7, 0],
+      });
+    }
+
+    return apiSuccess(res, {
+      recipientEmail: config.recipientEmail,
+      enabled: config.enabled,
+      alertDays: config.alertDays,
+      smtpHost: config.smtpHost || '',
+      smtpPort: config.smtpPort || 587,
+      smtpSecure: config.smtpSecure || false,
+      smtpUser: config.smtpUser || '',
+      hasSmtpPass: Boolean(config.smtpPass),
+      fromEmail: config.fromEmail || '',
+      fromName: config.fromName || 'UK Property Management Alerts',
+      lastCheckedAt: config.lastCheckedAt,
+      lastEmailSentAt: config.lastEmailSentAt,
+      sentAlertsHistory: config.sentAlertsHistory || [],
+    });
+  } catch (error) {
+    return apiError(res, 'Failed to fetch email notification settings', 500, error);
+  }
+};
+
+/**
+ * 16. Update Document Expiry Email Notification Settings
+ */
+export const updateEmailSettings = async (req, res) => {
+  try {
+    const {
+      recipientEmail,
+      enabled,
+      alertDays,
+      smtpHost,
+      smtpPort,
+      smtpSecure,
+      smtpUser,
+      smtpPass,
+      fromEmail,
+      fromName,
+    } = req.body;
+
+    let config = await EmailNotificationConfig.findOne({ companyId: 'GLOBAL' });
+    if (!config) {
+      config = new EmailNotificationConfig({ companyId: 'GLOBAL' });
+    }
+
+    if (recipientEmail !== undefined) config.recipientEmail = recipientEmail.trim();
+    if (enabled !== undefined) config.enabled = Boolean(enabled);
+    if (alertDays !== undefined && Array.isArray(alertDays)) config.alertDays = alertDays;
+    if (smtpHost !== undefined) config.smtpHost = smtpHost.trim();
+    if (smtpPort !== undefined) config.smtpPort = Number(smtpPort) || 587;
+    if (smtpSecure !== undefined) config.smtpSecure = Boolean(smtpSecure);
+    if (smtpUser !== undefined) config.smtpUser = smtpUser.trim();
+    if (smtpPass !== undefined && smtpPass !== '') config.smtpPass = smtpPass;
+    if (fromEmail !== undefined) config.fromEmail = fromEmail.trim();
+    if (fromName !== undefined) config.fromName = fromName.trim();
+
+    await config.save();
+
+    return apiSuccess(res, {
+      recipientEmail: config.recipientEmail,
+      enabled: config.enabled,
+      alertDays: config.alertDays,
+      smtpHost: config.smtpHost,
+      smtpPort: config.smtpPort,
+      smtpSecure: config.smtpSecure,
+      smtpUser: config.smtpUser,
+      hasSmtpPass: Boolean(config.smtpPass),
+      fromEmail: config.fromEmail,
+      fromName: config.fromName,
+      lastCheckedAt: config.lastCheckedAt,
+      lastEmailSentAt: config.lastEmailSentAt,
+      sentAlertsHistory: config.sentAlertsHistory || [],
+    }, 'Email settings updated successfully');
+  } catch (error) {
+    return apiError(res, 'Failed to update email notification settings', 500, error);
+  }
+};
+
+/**
+ * 17. Send Test Email Notification
+ */
+export const sendTestNotificationEmail = async (req, res) => {
+  try {
+    const { toEmail, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, fromEmail, fromName } = req.body;
+    const config = await EmailNotificationConfig.findOne({ companyId: 'GLOBAL' }).lean() || {};
+
+    const targetEmail = toEmail || config.recipientEmail;
+    if (!targetEmail) {
+      return apiError(res, 'Please provide or save a recipient email address to receive the test email.', 400);
+    }
+
+    // Merge transient test credentials if passed from modal
+    const effectiveConfig = {
+      ...config,
+      smtpHost: smtpHost !== undefined ? smtpHost : config.smtpHost,
+      smtpPort: smtpPort !== undefined ? smtpPort : config.smtpPort,
+      smtpSecure: smtpSecure !== undefined ? smtpSecure : config.smtpSecure,
+      smtpUser: smtpUser !== undefined ? smtpUser : config.smtpUser,
+      smtpPass: smtpPass !== undefined && smtpPass !== '' ? smtpPass : config.smtpPass,
+      fromEmail: fromEmail !== undefined ? fromEmail : config.fromEmail,
+      fromName: fromName !== undefined ? fromName : config.fromName,
+    };
+
+    const result = await sendTestEmail(targetEmail, effectiveConfig);
+    if (result.success) {
+      return apiSuccess(res, result, `Test notification sent successfully to ${targetEmail}`);
+    } else {
+      return apiError(res, result.error || 'Failed to dispatch test email', 400);
+    }
+  } catch (error) {
+    return apiError(res, 'Failed to send test email', 500, error);
+  }
+};
+
+/**
+ * 18. Trigger Manual Expiry Email Evaluation
+ */
+export const triggerExpiryEmailCheckNow = async (req, res) => {
+  try {
+    const { forceSend } = req.body || {};
+    const results = await evaluateAndSendExpiryEmails({
+      targetCompanyId: req.companyId,
+      forceSend: Boolean(forceSend),
+    });
+
+    return apiSuccess(res, results, 'Document expiry email check completed');
+  } catch (error) {
+    return apiError(res, 'Failed to execute expiry email check', 500, error);
   }
 };

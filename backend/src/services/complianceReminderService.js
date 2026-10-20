@@ -251,5 +251,14 @@ export const checkAndGenerateComplianceReminders = async (targetCompanyId = null
     }
   }
 
+  // Trigger automated document expiry emails
+  try {
+    const { evaluateAndSendExpiryEmails } = await import('./documentExpiryEmailEngine.js');
+    const emailResults = await evaluateAndSendExpiryEmails({ targetCompanyId });
+    results.emailResults = emailResults;
+  } catch (emailErr) {
+    console.warn('[ComplianceReminderService] Expiry email dispatch error:', emailErr.message);
+  }
+
   return results;
 };

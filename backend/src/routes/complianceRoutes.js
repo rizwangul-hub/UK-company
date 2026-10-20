@@ -18,6 +18,10 @@ import {
   markAllNotificationsRead,
   runRemindersCheck,
   exportComplianceReport,
+  getEmailSettings,
+  updateEmailSettings,
+  sendTestNotificationEmail,
+  triggerExpiryEmailCheckNow,
 } from '../controllers/complianceController.js';
 import { protect } from '../middleware/auth.js';
 import { requireCompanyContext } from '../middleware/companyContext.js';
@@ -39,6 +43,12 @@ router.patch('/notifications/:id/read', markNotificationRead);
 router.post('/notifications/mark-all-read', markAllNotificationsRead);
 router.post('/reminders/check', runRemindersCheck);
 router.get('/reports/export', exportComplianceReport);
+
+// Document Expiry Email Notifications & Alert Center
+router.get('/email-settings', getEmailSettings);
+router.put('/email-settings', updateEmailSettings);
+router.post('/email-settings/test', sendTestNotificationEmail);
+router.post('/email-settings/check-now', triggerExpiryEmailCheckNow);
 
 // Council Applications & Correspondence
 router.get('/council-applications', getCouncilApplications);

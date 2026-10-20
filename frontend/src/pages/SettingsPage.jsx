@@ -14,8 +14,18 @@ import {
   Trash2,
   X,
   SlidersHorizontal,
+  Mail,
+  Send,
+  Bell,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  FileText,
+  Building2,
+  Check,
 } from 'lucide-react';
-import { authAPI, ledgerAPI } from '../services/api.js';
+import { authAPI, ledgerAPI, complianceAPI } from '../services/api.js';
+import { formatUKDate } from '../utils/formatters.js';
 
 export function SettingsPage({ user }) {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -58,6 +68,31 @@ export function SettingsPage({ user }) {
     isActive: true,
   });
 
+  // Email & Document Expiry Notification Settings
+  const [emailSettings, setEmailSettings] = useState({
+    recipientEmail: '',
+    enabled: true,
+    alertDays: [60, 45, 30, 14, 7, 0],
+    smtpHost: '',
+    smtpPort: 587,
+    smtpSecure: false,
+    smtpUser: '',
+    smtpPass: '',
+    hasSmtpPass: false,
+    fromEmail: '',
+    fromName: 'UK Property Management Alerts',
+    lastCheckedAt: null,
+    lastEmailSentAt: null,
+    sentAlertsHistory: [],
+  });
+  const [emailLoading, setEmailLoading] = useState(true);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [testSending, setTestSending] = useState(false);
+  const [checkingExpiry, setCheckingExpiry] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [showSmtpConfig, setShowSmtpConfig] = useState(false);
+
   const loadCategories = async () => {
     setCatLoading(true);
     try {
@@ -72,9 +107,89 @@ export function SettingsPage({ user }) {
     }
   };
 
+  const loadEmailSettings = async () => {
+    setEmailLoading(true);
+    try {
+      const res = await complianceAPI.getEmailSettings();
+      if (res?.success && res.data) {
+        setEmailSettings(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load email notification settings:', err);
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadCategories();
+    loadEmailSettings();
   }, []);
+
+  const handleSaveEmailSettings = async (e) => {
+    if (e) e.preventDefault();
+    setEmailSaving(true);
+    setEmailSuccess('');
+    setEmailError('');
+    try {
+      const res = await complianceAPI.updateEmailSettings(emailSettings);
+      if (res?.success) {
+        setEmailSuccess('Email notification settings saved successfully.');
+        if (res.data) setEmailSettings(res.data);
+      }
+    } catch (err) {
+      setEmailError(err.response?.data?.message || 'Failed to save email settings.');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!emailSettings.recipientEmail) {
+      setEmailError('Please enter an alert email address before sending a test.');
+      return;
+    }
+    setTestSending(true);
+    setEmailSuccess('');
+    setEmailError('');
+    try {
+      const res = await complianceAPI.sendTestEmail({
+        toEmail: emailSettings.recipientEmail,
+        smtpHost: emailSettings.smtpHost,
+        smtpPort: emailSettings.smtpPort,
+        smtpSecure: emailSettings.smtpSecure,
+        smtpUser: emailSettings.smtpUser,
+        smtpPass: emailSettings.smtpPass,
+        fromEmail: emailSettings.fromEmail,
+        fromName: emailSettings.fromName,
+      });
+      if (res?.success) {
+        setEmailSuccess(`Test email sent successfully to ${emailSettings.recipientEmail}! Check your inbox.`);
+      }
+    } catch (err) {
+      setEmailError(err.response?.data?.message || 'Failed to send test email. Check SMTP configuration.');
+    } finally {
+      setTestSending(false);
+    }
+  };
+
+  const handleCheckExpiryNow = async () => {
+    setCheckingExpiry(true);
+    setEmailSuccess('');
+    setEmailError('');
+    try {
+      const res = await complianceAPI.checkExpiryEmailsNow({ forceSend: false });
+      if (res?.success) {
+        const d = res.data;
+        setEmailSuccess(`Document check complete! Evaluated: ${d.evaluatedCount || 0} documents. Emails sent: ${d.emailsSent || 0}. Already notified: ${d.alreadyNotifiedCount || 0}.`);
+        loadEmailSettings();
+      }
+    } catch (err) {
+      setEmailError(err.response?.data?.message || 'Failed to check document expiries.');
+    } finally {
+      setCheckingExpiry(false);
+    }
+  };
 
   const handleAddCatSubmit = async (e) => {
     e.preventDefault();
@@ -279,6 +394,312 @@ export function SettingsPage({ user }) {
             <span>Update Password</span>
           </button>
         </form>
+      </div>
+
+      {/* Property Document Expiry & Statutory Email Alert Center */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-bold text-white">
+                  Property Document Expiry &amp; Statutory Email Alerts
+                </h2>
+                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  emailSettings.enabled && emailSettings.recipientEmail
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                }`}>
+                  {emailSettings.enabled && emailSettings.recipientEmail ? 'Active & Monitoring' : 'Setup Required'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                The system monitors all property documents (Gas Safety CP12, EICR, EPC, Building Insurance, Council Licenses) and automatically sends renewal emails before they expire.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {emailSuccess && (
+          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{emailSuccess}</span>
+            </div>
+            <button onClick={() => setEmailSuccess('')} className="text-slate-400 hover:text-white cursor-pointer">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {emailError && (
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{emailError}</span>
+            </div>
+            <button onClick={() => setEmailError('')} className="text-slate-400 hover:text-white cursor-pointer">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveEmailSettings} className="space-y-4 text-xs">
+          {/* Attached Email Address */}
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <label className="block text-slate-200 font-bold text-xs">
+              Attached Alert Email Address <span className="text-rose-400">*</span>
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <div className="relative flex-1">
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <input
+                  type="email"
+                  required
+                  value={emailSettings.recipientEmail}
+                  onChange={(e) => setEmailSettings({ ...emailSettings, recipientEmail: e.target.value })}
+                  placeholder="e.g. yourname@gmail.com, management@domain.co.uk"
+                  className="w-full bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-medium"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={testSending || !emailSettings.recipientEmail}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                {testSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>Send Test Email</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              When any document of any property is approaching its expiry deadline, the system will send an email alert to this attached address. You can separate multiple addresses with a comma.
+            </p>
+          </div>
+
+          {/* Enable Toggle & Alert Milestone Intervals */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-slate-200 block">Automated Expiry Alerts</span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    Background scheduler evaluates documents every 12 hours
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  id="emailAlertsToggle"
+                  checked={emailSettings.enabled}
+                  onChange={(e) => setEmailSettings({ ...emailSettings, enabled: e.target.checked })}
+                  className="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+              <span className="font-bold text-slate-200 block">Alert Milestones</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {[60, 45, 30, 14, 7, 0].map((days) => {
+                  const isChecked = emailSettings.alertDays?.includes(days);
+                  return (
+                    <button
+                      type="button"
+                      key={days}
+                      onClick={() => {
+                        const current = emailSettings.alertDays || [];
+                        const updated = current.includes(days)
+                          ? current.filter((d) => d !== days)
+                          : [...current, days].sort((a, b) => b - a);
+                        setEmailSettings({ ...emailSettings, alertDays: updated });
+                      }}
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                        isChecked
+                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {days === 0 ? 'On Expiry' : `${days}d`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Collapsible SMTP Configuration */}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowSmtpConfig(!showSmtpConfig)}
+              className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/60 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+                <span className="font-bold text-slate-200 text-xs">
+                  Custom SMTP / Email Dispatch Server Settings (Optional)
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {emailSettings.smtpHost ? `Configured (${emailSettings.smtpHost})` : 'Default System Dispatch'}
+                </span>
+              </div>
+              <div className="text-slate-400">
+                {showSmtpConfig ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
+
+            {showSmtpConfig && (
+              <div className="p-4 pt-0 space-y-3.5 border-t border-slate-800/80 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-300 font-medium mb-1">SMTP Server Host</label>
+                    <input
+                      type="text"
+                      value={emailSettings.smtpHost}
+                      onChange={(e) => setEmailSettings({ ...emailSettings, smtpHost: e.target.value })}
+                      placeholder="e.g. smtp.gmail.com or smtp.office365.com"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Port</label>
+                    <input
+                      type="number"
+                      value={emailSettings.smtpPort}
+                      onChange={(e) => setEmailSettings({ ...emailSettings, smtpPort: Number(e.target.value) || 587 })}
+                      placeholder="587"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">SMTP Username / Email</label>
+                    <input
+                      type="text"
+                      value={emailSettings.smtpUser}
+                      onChange={(e) => setEmailSettings({ ...emailSettings, smtpUser: e.target.value })}
+                      placeholder="your-email@gmail.com"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      SMTP Password or App Password {emailSettings.hasSmtpPass && <span className="text-emerald-400 font-normal">(Saved)</span>}
+                    </label>
+                    <input
+                      type="password"
+                      value={emailSettings.smtpPass}
+                      onChange={(e) => setEmailSettings({ ...emailSettings, smtpPass: e.target.value })}
+                      placeholder={emailSettings.hasSmtpPass ? '•••••••• (leave blank to keep current)' : 'App Password'}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">From Sender Name</label>
+                    <input
+                      type="text"
+                      value={emailSettings.fromName}
+                      onChange={(e) => setEmailSettings({ ...emailSettings, fromName: e.target.value })}
+                      placeholder="UK Property Management Alerts"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">From Email Address</label>
+                    <input
+                      type="email"
+                      value={emailSettings.fromEmail}
+                      onChange={(e) => setEmailSettings({ ...emailSettings, fromEmail: e.target.value })}
+                      placeholder="alerts@pixxtechnologies.co.uk"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-slate-300 leading-relaxed">
+                  💡 <strong>Gmail Tip:</strong> If using Gmail, go to Google Account &gt; Security &gt; 2-Step Verification &gt; App Passwords, generate a 16-character App Password, and paste it here. Use host: <code>smtp.gmail.com</code> and port: <code>587</code>.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Row */}
+          <div className="pt-2 flex items-center justify-between flex-wrap gap-2.5">
+            <button
+              type="button"
+              onClick={handleCheckExpiryNow}
+              disabled={checkingExpiry}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${checkingExpiry ? 'animate-spin' : ''}`} />
+              <span>{checkingExpiry ? 'Checking Expiries...' : 'Check Expiries & Send Alerts Now'}</span>
+            </button>
+
+            <button
+              type="submit"
+              disabled={emailSaving}
+              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {emailSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              <span>Save Email Settings</span>
+            </button>
+          </div>
+        </form>
+
+        {/* Recent Sent Alerts History */}
+        {emailSettings.sentAlertsHistory && emailSettings.sentAlertsHistory.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-800 space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+              <span className="flex items-center gap-1.5 text-indigo-400">
+                <Bell className="w-3.5 h-3.5" />
+                <span>Recent Dispatched Expiry Alert Emails ({emailSettings.sentAlertsHistory.length})</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-normal">
+                Last checked: {emailSettings.lastCheckedAt ? new Date(emailSettings.lastCheckedAt).toLocaleString('en-GB') : 'Never'}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {emailSettings.sentAlertsHistory.slice(0, 10).map((h, hIdx) => (
+                <div
+                  key={h._id || hIdx}
+                  className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-white flex items-center gap-1.5 truncate">
+                      <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span className="truncate">{h.documentTitle}</span>
+                      <span className="text-slate-400 font-normal truncate">• {h.propertyName}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                      <span>Expires: {formatUKDate(h.expiryDate)}</span>
+                      <span>• Sent to: {h.sentTo}</span>
+                      <span>• {new Date(h.sentAt).toLocaleDateString('en-GB')}</span>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 ml-3">
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                      h.status === 'SENT'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                    }`}>
+                      {h.status === 'SENT' ? 'SENT' : 'FAILED'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Chart of Accounts: Nominal Heads & Expense Categories */}

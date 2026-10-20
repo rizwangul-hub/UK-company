@@ -231,9 +231,14 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
       await checkAndGenerateDemandReminders().catch((remErr) => {
         console.warn('  [Demand Reminders Check Notice]:', remErr.message);
       });
+      const { evaluateAndSendExpiryEmails } = await import('./services/documentExpiryEmailEngine.js');
+      await evaluateAndSendExpiryEmails().catch((emailErr) => {
+        console.warn('  [Document Expiry Email Notice]:', emailErr.message);
+      });
       setInterval(() => {
         checkAndGenerateComplianceReminders().catch(() => {});
         checkAndGenerateDemandReminders().catch(() => {});
+        evaluateAndSendExpiryEmails().catch(() => {});
       }, 12 * 60 * 60 * 1000);
     } catch (dbErr) {
       console.error(`  [Database Connection Failed]: ${dbErr.message}`);
