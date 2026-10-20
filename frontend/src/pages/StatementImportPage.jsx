@@ -43,6 +43,7 @@ export function StatementImportPage({ selectedCompany }) {
   const [accounts, setAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [properties, setProperties] = useState([]);
+  const [buildings, setBuildings] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
@@ -115,8 +116,34 @@ export function StatementImportPage({ selectedCompany }) {
           setSelectedAccountId(accs[0]._id);
         }
 
+        const bldgs = propRes?.data?.buildings || [];
         const props = propRes?.data?.properties || propRes?.properties || [];
         setProperties(props);
+
+        if (Array.isArray(bldgs) && bldgs.length > 0) {
+          setBuildings(bldgs);
+        } else {
+          // Fallback: Reconstruct buildings with units from flattened properties
+          const map = new Map();
+          props.forEach((p) => {
+            const parentId = String(p.parentPropertyId || p._id);
+            if (!map.has(parentId)) {
+              map.set(parentId, {
+                _id: parentId,
+                name: p.parentPropertyName || p.name || p.addressLine1,
+                addressLine1: p.addressLine1,
+                units: [],
+              });
+            }
+            const b = map.get(parentId);
+            if (p.isMultiUnitChild || p.unitId) {
+              b.units.push({ _id: p.unitId || p._id, unitName: p.name });
+            } else if (Array.isArray(p.units)) {
+              b.units = p.units;
+            }
+          });
+          setBuildings(Array.from(map.values()));
+        }
 
         const cats = catRes?.data?.categories || catRes?.categories || [];
         setCategories(cats);
@@ -340,6 +367,88 @@ export function StatementImportPage({ selectedCompany }) {
       await statementImportAPI.updateBatchRow(activeBatchId, rowId, payload);
     } catch (err) {
       console.error('Failed to update staged row:', err);
+    }
+  };
+
+  /**
+   * Determine the current select value `${buildingId}:::${unitId || ''}` for a row
+   */
+  const getSelectedPropertyUnitValue = (row) => {
+    const rawPropId = String(row.suggestedPropertyId?._id || row.suggestedPropertyId || '');
+    const rawUnitId = String(row.suggestedUnitId?._id || row.suggestedUnitId || '');
+
+    if (!rawPropId) return '';
+
+    // 1. Check if rawPropId is actually a unitId (legacy / misassigned rows)
+    for (const b of buildings) {
+      const matchingUnit = b.units?.find((u) => String(u._id) === rawPropId);
+      if (matchingUnit) {
+        return `${b._id}:::${matchingUnit._id}`;
+      }
+    }
+
+    // 2. Check if rawPropId matches a building
+    const bldg = buildings.find((b) => String(b._id) === rawPropId);
+    if (!bldg) return '';
+
+    if (bldg.units && bldg.units.length > 1) {
+      if (rawUnitId) {
+        const uMatch = bldg.units.find((u) => String(u._id) === rawUnitId);
+        if (uMatch) return `${bldg._id}:::${uMatch._id}`;
+      }
+      return `${bldg._id}:::`; // Multi-unit, whole building
+    }
+
+    // Single unit or building with 1 unit
+    const soleUnitId = bldg.units?.[0]?._id ? String(bldg.units[0]._id) : rawUnitId;
+    return `${bldg._id}:::${soleUnitId}`;
+  };
+
+  /**
+   * Handle assigning or switching a Property / Unit from the dropdown
+   */
+  const handlePropertyChange = async (rowId, compositeValue) => {
+    try {
+      if (!compositeValue) {
+        const payload = {
+          suggestedPropertyId: null,
+          suggestedPropertyName: '',
+          suggestedUnitId: null,
+          suggestedUnitName: '',
+          status: 'APPROVED',
+        };
+        setStagedRows((prev) =>
+          prev.map((r) => (r._id === rowId ? { ...r, ...payload } : r))
+        );
+        await statementImportAPI.updateBatchRow(activeBatchId, rowId, payload);
+        return;
+      }
+
+      const [propId, unitId] = compositeValue.split(':::');
+      const bldg = buildings.find((b) => String(b._id) === String(propId));
+      const propName = bldg ? (bldg.name || bldg.addressLine1) : '';
+
+      let unitName = '';
+      if (unitId && bldg?.units) {
+        const u = bldg.units.find((u) => String(u._id) === String(unitId));
+        unitName = u ? (u.unitName || u.name) : '';
+      }
+
+      const payload = {
+        suggestedPropertyId: propId,
+        suggestedPropertyName: propName,
+        suggestedUnitId: unitId || null,
+        suggestedUnitName: unitName,
+        status: 'APPROVED',
+      };
+
+      setStagedRows((prev) =>
+        prev.map((r) => (r._id === rowId ? { ...r, ...payload } : r))
+      );
+
+      await statementImportAPI.updateBatchRow(activeBatchId, rowId, payload);
+    } catch (err) {
+      console.error('Failed to update property/unit for row:', err);
     }
   };
 
@@ -1448,18 +1557,34 @@ export function StatementImportPage({ selectedCompany }) {
                                 ) : (
                                   <div className="flex flex-col gap-1">
                                     <select
-                                      value={row.suggestedPropertyId?._id || row.suggestedPropertyId || ''}
-                                      onChange={(e) =>
-                                        handleUpdateRow(row._id, 'suggestedPropertyId', e.target.value)
-                                      }
+                                      value={getSelectedPropertyUnitValue(row)}
+                                      onChange={(e) => handlePropertyChange(row._id, e.target.value)}
                                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 truncate"
                                     >
                                       <option value="">-- No Property --</option>
-                                      {properties.map((p) => (
-                                        <option key={p._id} value={p._id}>
-                                          {p.title || p.addressLine1}
-                                        </option>
-                                      ))}
+                                      {buildings.map((b) => {
+                                        const hasMultipleUnits = Array.isArray(b.units) && b.units.length > 1;
+                                        if (hasMultipleUnits) {
+                                          return (
+                                            <optgroup key={b._id} label={`🏢 ${b.name || b.addressLine1}`}>
+                                              <option value={`${b._id}:::`}>
+                                                {b.name || b.addressLine1} (Entire Property / All Units)
+                                              </option>
+                                              {b.units.map((u) => (
+                                                <option key={u._id} value={`${b._id}:::${u._id}`}>
+                                                  ↳ {u.unitName}
+                                                </option>
+                                              ))}
+                                            </optgroup>
+                                          );
+                                        }
+                                        const soleUnitId = b.units?.[0]?._id || '';
+                                        return (
+                                          <option key={b._id} value={`${b._id}:::${soleUnitId}`}>
+                                            🏠 {b.name || b.addressLine1}
+                                          </option>
+                                        );
+                                      })}
                                     </select>
                                     {row.suggestedUnitName && (
                                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">

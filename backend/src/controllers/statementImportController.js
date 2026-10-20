@@ -257,7 +257,11 @@ export const updateBatchRow = async (req, res) => {
 
     allowedFields.forEach((field) => {
       if (updates[field] !== undefined) {
-        row[field] = updates[field];
+        if (field.endsWith('Id') && (updates[field] === '' || updates[field] === null)) {
+          row[field] = null;
+        } else {
+          row[field] = updates[field];
+        }
       }
     });
 
