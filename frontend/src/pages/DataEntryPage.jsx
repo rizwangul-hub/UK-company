@@ -285,48 +285,74 @@ export function DataEntryPage({ selectedCompany }) {
     loadData();
   }, [loadData]);
 
-  // Unique single properties list for rent collection (no duplicate month rows)
-  const uniqueProperties = useMemo(() => {
-    const map = new Map();
+  // Clean unit type formatter helper
+  const cleanUnitType = (type) => {
+    if (!type) return 'Unit';
+    const t = String(type).toUpperCase();
+    if (t === 'RETAIL_SHOP' || t === 'SHOP') return 'Shop';
+    if (t === 'FLAT' || t === 'APARTMENT') return 'Flat';
+    if (t === 'HOUSE') return 'House';
+    if (t === 'OFFICE') return 'Office';
+    return type;
+  };
 
-    // 1. Add from properties master list
+  // Structured selectable items for rent collection:
+  // Breaks multi-unit properties down into individual lettable units with their contractual target rents,
+  // while keeping single-unit properties as their own item.
+  const rentSelectableItems = useMemo(() => {
+    const items = [];
+
     (properties || []).forEach((p) => {
-      if (p._id) {
-        map.set(String(p._id), {
-          _id: String(p._id),
-          name: p.name || p.addressLine1 || p.address?.line1 || 'Property',
+      if (!p || !p._id) return;
+      const pId = String(p._id);
+      const propUnits = Array.isArray(p.units) ? p.units : [];
+
+      if (propUnits.length > 0) {
+        // Multi-unit property: add each unit with key `${pId}___${u._id}`
+        propUnits.forEach((u) => {
+          const uType = cleanUnitType(u.unitType);
+          items.push({
+            key: `${pId}___${u._id}`,
+            propertyId: pId,
+            unitId: String(u._id),
+            propertyName: p.name,
+            unitName: u.unitName,
+            unitType: uType,
+            displayName: `${p.name} ➔ ${u.unitName} (${uType})`,
+            tenantName: u.tenantName || p.tenantName || '',
+            contractualRent: Number(u.targetRent || 0),
+            isUnit: true,
+          });
+        });
+      } else {
+        // Single unit property
+        items.push({
+          key: pId,
+          propertyId: pId,
+          unitId: '',
+          propertyName: p.name,
+          unitName: '',
+          unitType: 'Property',
+          displayName: p.name,
           tenantName: p.tenantName || '',
-          contractualRent: p.contractualRent || 0,
-          postcode: p.postcode || '',
+          contractualRent: Number(p.contractualRent || 0),
+          isUnit: false,
         });
       }
     });
 
-    // 2. Add from rentSchedules if any property is not yet in properties list
-    (rentSchedules || []).forEach((s) => {
-      const p = s.propertyId;
-      if (p && p._id && !map.has(String(p._id))) {
-        map.set(String(p._id), {
-          _id: String(p._id),
-          name: p.name || p.addressLine1 || 'Property',
-          tenantName: s.tenantId?.fullName || p.tenantName || '',
-          contractualRent: p.contractualRent || s.expectedAmount || 0,
-          postcode: p.postcode || '',
-        });
-      }
-    });
+    return items.sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [properties]);
 
-    // Sort alphabetically by property name
-    return Array.from(map.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [properties, rentSchedules]);
-
-  // Handle Single Property Selection for Rent Collection
+  // Handle Selection for Rent Collection
   const handlePropertySelect = (e) => {
-    const pId = e.target.value;
-    if (!pId) {
+    const selectedKey = e.target.value;
+    if (!selectedKey) {
       setRentForm((prev) => ({
         ...prev,
+        selectedKey: '',
         propertyId: '',
+        unitId: '',
         scheduleId: '',
         amount: '',
         notes: '',
@@ -334,24 +360,34 @@ export function DataEntryPage({ selectedCompany }) {
       return;
     }
 
-    const prop = uniqueProperties.find((p) => p._id === pId) || properties.find((p) => p._id === pId);
-    const propName = prop?.name || 'Property';
-    const tenantName = prop?.tenantName || '';
+    const item = rentSelectableItems.find((it) => it.key === selectedKey);
+    const pId = item?.propertyId || selectedKey;
+    const uId = item?.unitId || '';
+    const propName = item?.displayName || item?.propertyName || 'Property';
+    const tenantName = item?.tenantName || '';
 
-    // Check if there is an active invoice schedule for this property and current billingMonth
+    // Check if there is an active invoice schedule for this property/unit and current billingMonth
     const currentMonth = new Date().toISOString().slice(0, 7);
     const monthToUse = rentForm.billingMonth || currentMonth;
-    const matchingSchedule = rentSchedules.find(
-      (s) => String(s.propertyId?._id || s.propertyId) === String(pId) && s.billingMonth === monthToUse
-    );
+    const matchingSchedule = rentSchedules.find((s) => {
+      const matchP = String(s.propertyId?._id || s.propertyId) === String(pId);
+      const matchMonth = s.billingMonth === monthToUse;
+      if (!matchP || !matchMonth) return false;
+      if (uId) {
+        return String(s.unitId?._id || s.unitId) === String(uId);
+      }
+      return true;
+    });
 
     const amountToUse = matchingSchedule
       ? (matchingSchedule.outstandingAmount || matchingSchedule.expectedAmount)
-      : (prop?.contractualRent || '');
+      : (item?.contractualRent || '');
 
     setRentForm((prev) => ({
       ...prev,
+      selectedKey,
       propertyId: pId,
+      unitId: uId,
       billingMonth: monthToUse,
       scheduleId: matchingSchedule ? matchingSchedule._id : '',
       amount: amountToUse ? String(amountToUse) : '',
@@ -368,22 +404,26 @@ export function DataEntryPage({ selectedCompany }) {
       let notesToUse = prev.notes;
 
       if (prev.propertyId) {
-        const prop = uniqueProperties.find((p) => p._id === prev.propertyId) || properties.find((p) => p._id === prev.propertyId);
-        // Find if this property has a schedule for the newly selected month
-        const matchingSchedule = rentSchedules.find(
-          (s) => String(s.propertyId?._id || s.propertyId) === String(prev.propertyId) && s.billingMonth === newMonth
-        );
+        const item = rentSelectableItems.find((it) => it.key === prev.selectedKey);
+        const matchingSchedule = rentSchedules.find((s) => {
+          const matchP = String(s.propertyId?._id || s.propertyId) === String(prev.propertyId);
+          const matchMonth = s.billingMonth === newMonth;
+          if (!matchP || !matchMonth) return false;
+          if (prev.unitId) {
+            return String(s.unitId?._id || s.unitId) === String(prev.unitId);
+          }
+          return true;
+        });
 
         if (matchingSchedule) {
           scheduleIdToUse = matchingSchedule._id;
           amountToUse = String(matchingSchedule.outstandingAmount || matchingSchedule.expectedAmount || '');
-        } else if (prop) {
-          amountToUse = prop.contractualRent ? String(prop.contractualRent) : prev.amount;
+        } else if (item && item.contractualRent) {
+          amountToUse = String(item.contractualRent);
         }
 
-        if (prop) {
-          notesToUse = `Rent for ${prop.name}${prop.tenantName ? ` (Tenant: ${prop.tenantName})` : ''} - Month: ${newMonth}`;
-        }
+        const propName = item?.displayName || 'Property';
+        notesToUse = `Rent for ${propName}${item?.tenantName ? ` (Tenant: ${item.tenantName})` : ''} - Month: ${newMonth}`;
       }
 
       return {
@@ -474,6 +514,7 @@ export function DataEntryPage({ selectedCompany }) {
       const res = await rentAPI.recordPayment({
         scheduleId: rentForm.scheduleId || undefined,
         propertyId: rentForm.propertyId || undefined,
+        unitId: rentForm.unitId || undefined,
         billingMonth: rentForm.billingMonth,
         amount: Number(rentForm.amount),
         paymentDate: rentForm.paymentDate,
@@ -494,6 +535,8 @@ export function DataEntryPage({ selectedCompany }) {
           ...prev,
           scheduleId: '',
           propertyId: '',
+          unitId: '',
+          selectedKey: '',
           amount: '',
           notes: '',
         }));
@@ -528,7 +571,7 @@ export function DataEntryPage({ selectedCompany }) {
         categoryId: expenseForm.categoryId,
         amount: Number(expenseForm.amount),
         propertyId: expenseForm.propertyId || null,
-        unitId: null,
+        unitId: expenseForm.unitId || null,
         narration: expenseForm.narration,
         reference: expenseForm.reference,
         periodMonth: expenseForm.transactionDate.slice(0, 7),
@@ -545,9 +588,13 @@ export function DataEntryPage({ selectedCompany }) {
         setExpenseForm((prev) => ({
           ...prev,
           amount: '',
+          propertyId: '',
+          unitId: '',
           narration: '',
           reference: '',
         }));
+        setShowExpenseModal(false);
+        setActiveTab('recent');
         await loadData();
       }
     } catch (err) {
@@ -598,6 +645,8 @@ export function DataEntryPage({ selectedCompany }) {
           reference: '',
           narration: '',
         }));
+        setShowTransferModal(false);
+        setActiveTab('recent');
         await loadData();
       }
     } catch (err) {
@@ -626,8 +675,8 @@ export function DataEntryPage({ selectedCompany }) {
         accountId: otherIncomeForm.accountId,
         categoryId: otherIncomeForm.categoryId,
         amount: Number(otherIncomeForm.amount),
-        propertyId: null,
-        unitId: null,
+        propertyId: otherIncomeForm.propertyId || null,
+        unitId: otherIncomeForm.unitId || null,
         narration: otherIncomeForm.receivedFrom
           ? `${otherIncomeForm.narration} (Received from: ${otherIncomeForm.receivedFrom})`
           : otherIncomeForm.narration,
@@ -646,10 +695,14 @@ export function DataEntryPage({ selectedCompany }) {
         setOtherIncomeForm((prev) => ({
           ...prev,
           amount: '',
+          propertyId: '',
+          unitId: '',
           receivedFrom: '',
           narration: '',
           reference: '',
         }));
+        setShowOtherIncomeModal(false);
+        setActiveTab('recent');
         await loadData();
       }
     } catch (err) {
@@ -797,35 +850,42 @@ export function DataEntryPage({ selectedCompany }) {
   const unitsForOtherIncome = otherIncomePropObj?.units || [];
 
   // Selected property & tenant helpers for Rent Collection
-  const selectedRentProp =
-    properties.find((p) => p._id === rentForm.propertyId) ||
-    rentSchedules.find((s) => (s.propertyId?._id || s.propertyId) === rentForm.propertyId)?.propertyId;
+  const currentRentItem = useMemo(() => {
+    if (!rentForm.selectedKey && !rentForm.propertyId) return null;
+    return (
+      rentSelectableItems.find((it) => it.key === rentForm.selectedKey) ||
+      rentSelectableItems.find((it) => it.propertyId === rentForm.propertyId && (!rentForm.unitId || it.unitId === rentForm.unitId)) ||
+      null
+    );
+  }, [rentForm.selectedKey, rentForm.propertyId, rentForm.unitId, rentSelectableItems]);
+
   const selectedRentSchedule = rentSchedules.find((s) => s._id === rentForm.scheduleId);
   const currentRentPropertyName =
-    selectedRentProp?.name ||
+    currentRentItem?.displayName ||
     selectedRentSchedule?.propertyId?.name ||
     selectedRentSchedule?.propertyId?.addressLine1 ||
     '';
   const currentRentTenantName =
     selectedRentSchedule?.tenantId?.fullName ||
-    selectedRentProp?.tenantName ||
+    currentRentItem?.tenantName ||
     (selectedRentSchedule?.notes && !selectedRentSchedule.notes.startsWith('Invoice') ? selectedRentSchedule.notes : '') ||
     '';
 
-  // Get all past overdue unpaid schedules for selected property (strictly from October 2026 onwards and strictly before current month)
+  // Get all past overdue unpaid schedules for selected property and unit (strictly from October 2026 onwards and strictly before current month)
   const unpaidSchedulesForSelectedProp = useMemo(() => {
     if (!rentForm.propertyId) return [];
     const currentMonth = new Date().toISOString().slice(0, 7);
     return rentSchedules
       .filter((s) => {
         const matchesProp = String(s.propertyId?._id || s.propertyId) === String(rentForm.propertyId);
+        const matchesUnit = rentForm.unitId ? String(s.unitId?._id || s.unitId) === String(rentForm.unitId) : true;
         const isUnpaid = s.status !== 'PAID';
         const isFromBaseline = (s.billingMonth || '') >= '2026-10';
         const isPastMonth = (s.billingMonth || '') < currentMonth;
-        return matchesProp && isUnpaid && isFromBaseline && isPastMonth;
+        return matchesProp && matchesUnit && isUnpaid && isFromBaseline && isPastMonth;
       })
       .sort((a, b) => (a.billingMonth || '').localeCompare(b.billingMonth || ''));
-  }, [rentForm.propertyId, rentSchedules]);
+  }, [rentForm.propertyId, rentForm.unitId, rentSchedules]);
 
   // Filter recent transactions
   const filteredRecent = recentTransactions.filter((tx) => {
@@ -952,7 +1012,7 @@ export function DataEntryPage({ selectedCompany }) {
         </button>
 
         <button
-          onClick={() => { setActiveTab('expense'); setFeedback({ text: '', type: '' }); }}
+          onClick={() => { setActiveTab('expense'); setShowExpenseModal(true); setFeedback({ text: '', type: '' }); }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'expense'
               ? 'bg-rose-600 text-white shadow-md'
@@ -964,7 +1024,7 @@ export function DataEntryPage({ selectedCompany }) {
         </button>
 
         <button
-          onClick={() => { setActiveTab('transfer'); setFeedback({ text: '', type: '' }); }}
+          onClick={() => { setActiveTab('transfer'); setShowTransferModal(true); setFeedback({ text: '', type: '' }); }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'transfer'
               ? 'bg-sky-600 text-white shadow-md'
@@ -976,7 +1036,7 @@ export function DataEntryPage({ selectedCompany }) {
         </button>
 
         <button
-          onClick={() => { setActiveTab('other'); setFeedback({ text: '', type: '' }); }}
+          onClick={() => { setActiveTab('other'); setShowOtherIncomeModal(true); setFeedback({ text: '', type: '' }); }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeTab === 'other'
               ? 'bg-amber-600 text-white shadow-md'
@@ -1073,24 +1133,43 @@ export function DataEntryPage({ selectedCompany }) {
               <div className="lg:col-span-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Select Property <span className="text-rose-400">*</span>
+                    Select Property / Unit <span className="text-rose-400">*</span>
                   </label>
                   <span className="text-[11px] text-emerald-400 font-medium">
-                    {uniqueProperties.length} propert{uniqueProperties.length === 1 ? 'y' : 'ies'} available
+                    {rentSelectableItems.length} lettable item{rentSelectableItems.length === 1 ? '' : 's'} available
                   </span>
                 </div>
                 <select
-                  value={rentForm.propertyId}
+                  value={rentForm.selectedKey || (rentForm.unitId ? `${rentForm.propertyId}___${rentForm.unitId}` : rentForm.propertyId)}
                   onChange={handlePropertySelect}
                   required
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-emerald-500 focus:outline-none"
                 >
-                  <option value="">-- Choose Property for Rent Collection --</option>
-                  {uniqueProperties.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      🏠 {p.name} {p.tenantName ? `• Tenant: ${p.tenantName}` : ''} • Monthly Rent: {formatGBP(p.contractualRent || 0)}
-                    </option>
-                  ))}
+                  <option value="">-- Choose Property or Specific Unit for Rent Collection --</option>
+                  {properties.map((p) => {
+                    const pId = String(p._id);
+                    const propUnits = Array.isArray(p.units) ? p.units : [];
+                    if (propUnits.length > 0) {
+                      return (
+                        <optgroup key={pId} label={`🏢 ${p.name} (${propUnits.length} Units)`}>
+                          {propUnits.map((u) => {
+                            const uKey = `${pId}___${u._id}`;
+                            const uType = cleanUnitType(u.unitType);
+                            return (
+                              <option key={uKey} value={uKey}>
+                                ↳ {u.unitName} ({uType}) &bull; Monthly Rent: {formatGBP(u.targetRent || 0)}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      );
+                    }
+                    return (
+                      <option key={pId} value={pId}>
+                        🏠 {p.name} {p.tenantName ? `• Tenant: ${p.tenantName}` : ''} &bull; Monthly Rent: {formatGBP(p.contractualRent || 0)}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 {/* Selected Property Preview Badge */}
@@ -1268,20 +1347,33 @@ export function DataEntryPage({ selectedCompany }) {
       {/* ------------------------------------------------------------------ */}
       {/* TAB 2: RECORD EXPENSE */}
       {/* ------------------------------------------------------------------ */}
-      {activeTab === 'expense' && (
+      {activeTab === 'expense' && showExpenseModal && (
+        <ModalPortal>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
-          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
-            <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400">
-              <FileText className="w-5 h-5" />
+          <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-rose-500/15 text-rose-400">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white">
+                  Record Property Operational Expense
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Post repair invoices, insurance, maintenance, agent fees, or council taxes against bank accounts.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">
-                Record Property Operational Expense
-              </h2>
-              <p className="text-xs text-slate-400">
-                Post repair invoices, insurance, maintenance, agent fees, or council taxes against bank accounts.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => { setShowExpenseModal(false); setActiveTab('recent'); }}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              aria-label="Close expense form"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           <form onSubmit={handleExpenseSubmit} className="space-y-4">
@@ -1320,11 +1412,11 @@ export function DataEntryPage({ selectedCompany }) {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                  Property Allocation (Main Head)
+                  Property Allocation
                 </label>
                 <select
                   value={expenseForm.propertyId}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, propertyId: e.target.value })}
+                  onChange={(e) => setExpenseForm({ ...expenseForm, propertyId: e.target.value, unitId: '' })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
                 >
                   <option value="">-- General / Non-Property Specific --</option>
@@ -1335,6 +1427,26 @@ export function DataEntryPage({ selectedCompany }) {
                   ))}
                 </select>
               </div>
+
+              {unitsForExpense.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Specific Unit / Flat / Shop (Optional)
+                  </label>
+                  <select
+                    value={expenseForm.unitId}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, unitId: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-rose-500 focus:outline-none"
+                  >
+                    <option value="">-- Entire Property ({selectedPropObj?.name}) --</option>
+                    {unitsForExpense.map((u) => (
+                      <option key={u._id} value={u._id}>
+                        ↳ {u.unitName} ({cleanUnitType(u.unitType)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="relative">
                 <div className="flex items-center justify-between mb-1.5">
@@ -1509,25 +1621,41 @@ export function DataEntryPage({ selectedCompany }) {
             </div>
           </form>
         </div>
+        </div>
+        </div>
+        </ModalPortal>
       )}
 
       {/* ------------------------------------------------------------------ */}
       {/* TAB 3: INTERNAL TRANSFER */}
       {/* ------------------------------------------------------------------ */}
-      {activeTab === 'transfer' && (
+      {activeTab === 'transfer' && showTransferModal && (
+        <ModalPortal>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
-          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
-            <div className="p-2 rounded-xl bg-sky-500/15 text-sky-400">
-              <ArrowLeftRight className="w-5 h-5" />
+          <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-sky-500/15 text-sky-400">
+                <ArrowLeftRight className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white">
+                  Execute Internal Bank Transfer
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Move cash funds between UK bank accounts with double-entry balance updates.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">
-                Execute Internal Bank Transfer
-              </h2>
-              <p className="text-xs text-slate-400">
-                Move cash funds between UK bank accounts with double-entry balance updates.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => { setShowTransferModal(false); setActiveTab('recent'); }}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              aria-label="Close transfer form"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           <form onSubmit={handleTransferSubmit} className="space-y-4">
@@ -1645,25 +1773,41 @@ export function DataEntryPage({ selectedCompany }) {
             </div>
           </form>
         </div>
+        </div>
+        </div>
+        </ModalPortal>
       )}
 
       {/* ------------------------------------------------------------------ */}
       {/* TAB 4: OTHER INCOME */}
       {/* ------------------------------------------------------------------ */}
-      {activeTab === 'other' && (
+      {activeTab === 'other' && showOtherIncomeModal && (
+        <ModalPortal>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div className="w-full max-w-5xl max-h-[92vh] overflow-y-auto custom-scrollbar">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm">
-          <div className="flex items-center gap-2 pb-4 mb-5 border-b border-slate-800">
-            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
-              <TrendingUp className="w-5 h-5" />
+          <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white">
+                  Record Other Income / Non-Rent Receipts
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Deposit miscellaneous revenue, parking fees, insurance payouts, or director equity into bank account.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">
-                Record Other Income / Non-Rent Receipts
-              </h2>
-              <p className="text-xs text-slate-400">
-                Deposit miscellaneous revenue, parking fees, insurance payouts, or director equity into bank account.
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => { setShowOtherIncomeModal(false); setActiveTab('recent'); }}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              aria-label="Close other income form"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           <form onSubmit={handleOtherIncomeSubmit} className="space-y-4">
@@ -1718,6 +1862,44 @@ export function DataEntryPage({ selectedCompany }) {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Property Allocation (Optional)
+                </label>
+                <select
+                  value={otherIncomeForm.propertyId}
+                  onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, propertyId: e.target.value, unitId: '' })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="">-- General / Non-Property Specific --</option>
+                  {properties.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      🏢 {p.name} ({p.postcode || p.city || 'UK'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {unitsForOtherIncome.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Specific Unit / Flat / Shop (Optional)
+                  </label>
+                  <select
+                    value={otherIncomeForm.unitId}
+                    onChange={(e) => setOtherIncomeForm({ ...otherIncomeForm, unitId: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 font-medium focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="">-- Entire Property ({otherIncomePropObj?.name}) --</option>
+                    {unitsForOtherIncome.map((u) => (
+                      <option key={u._id} value={u._id}>
+                        ↳ {u.unitName} ({cleanUnitType(u.unitType)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
@@ -1795,6 +1977,9 @@ export function DataEntryPage({ selectedCompany }) {
             </div>
           </form>
         </div>
+        </div>
+        </div>
+        </ModalPortal>
       )}
 
       {/* ------------------------------------------------------------------ */}
@@ -1993,10 +2178,9 @@ export function DataEntryPage({ selectedCompany }) {
       )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* TAB 6: RECENT ENTRIES JOURNAL */}
+      {/* RECENT ENTRIES JOURNAL (Permanent Workspace) */}
       {/* ------------------------------------------------------------------ */}
-      {activeTab === 'recent' && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm space-y-4">
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-white">
@@ -2153,7 +2337,6 @@ export function DataEntryPage({ selectedCompany }) {
             </table>
           </div>
         </div>
-      )}
 
       {/* Quick Attach Receipt Modal */}
       {attachModalTx && (

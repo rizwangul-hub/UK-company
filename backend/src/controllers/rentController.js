@@ -312,7 +312,7 @@ export const recordPayment = async (req, res) => {
       amount: numAmount,
       direction: 'IN',
       propertyId: propId,
-      unitId: schedule.unitId?._id || null,
+      unitId: schedule.unitId?._id || schedule.unitId || null,
       periodMonth: schedule.billingMonth,
       narration: `Rent received from ${tenantName} for ${propName}${unitNamePart} - Period: ${schedule.billingMonth}`,
       reference: receiptRef,
