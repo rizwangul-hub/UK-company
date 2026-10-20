@@ -1,6 +1,7 @@
 import Property from '../models/Property.js';
 import Unit from '../models/Unit.js';
 import Mortgage from '../models/Mortgage.js';
+import Tenant from '../models/Tenant.js';
 import TenancyAgreement from '../models/TenancyAgreement.js';
 import RentSchedule from '../models/RentSchedule.js';
 import Transaction from '../models/Transaction.js';
@@ -25,15 +26,30 @@ export const getProperties = async (req, res) => {
 
     const properties = await Property.find(query).sort({ createdAt: -1 }).lean();
 
-    // Populate units count & active mortgages for each property
+    // Populate units count, active mortgages & tenancies for each property
     const propertyIds = properties.map((p) => p._id);
-    const [units, mortgages] = await Promise.all([
+    const [units, mortgages, tenancies] = await Promise.all([
       Unit.find({ companyId: req.companyId, propertyId: { $in: propertyIds }, isActive: true }).lean(),
       Mortgage.find({ companyId: req.companyId, propertyId: { $in: propertyIds }, status: 'ACTIVE' }).lean(),
+      TenancyAgreement.find({ companyId: req.companyId, propertyId: { $in: propertyIds } }).sort({ createdAt: -1 }).populate('tenantId', 'fullName email phone').lean(),
     ]);
 
     const enriched = properties.map((prop) => {
-      const propUnits = units.filter((u) => u.propertyId.toString() === prop._id.toString());
+      const propUnitsRaw = units.filter((u) => u.propertyId.toString() === prop._id.toString());
+      const propUnits = propUnitsRaw.map((u) => {
+        const activeTenancy = tenancies.find((t) => t.unitId && t.unitId.toString() === u._id.toString() && t.status === 'ACTIVE');
+        const latestTenancy = tenancies.find((t) => t.unitId && t.unitId.toString() === u._id.toString());
+        const uTenancy = activeTenancy || latestTenancy;
+        const isOccupied = !!activeTenancy;
+        return {
+          ...u,
+          tenantName: activeTenancy ? (activeTenancy.tenantId?.fullName || '') : (latestTenancy?.tenantId?.fullName ? `${latestTenancy.tenantId.fullName} (Previous)` : ''),
+          tenantEmail: uTenancy?.tenantId?.email || '',
+          tenantPhone: uTenancy?.tenantId?.phone || '',
+          contractualRent: activeTenancy?.rentAmount || u.targetRent || 0,
+          status: isOccupied ? 'OCCUPIED' : (u.status || 'AVAILABLE'),
+        };
+      });
       const propMortgages = mortgages.filter((m) => m.propertyId.toString() === prop._id.toString());
       const totalDebt = propMortgages.reduce((sum, m) => sum + (m.outstandingPrincipalBalance || 0), 0);
       
@@ -83,14 +99,30 @@ export const getPropertyById = async (req, res) => {
     const property = await Property.findOne({ _id: req.params.id, companyId: req.companyId }).lean();
     if (!property) return apiError(res, 'Property not found', 404);
 
-    const [units, mortgages, tenancy, schedules, recentTx, appliances] = await Promise.all([
+    const [unitsRaw, mortgages, tenancy, schedules, recentTx, appliances, unitTenancies] = await Promise.all([
       Unit.find({ companyId: req.companyId, propertyId: property._id, isActive: true }).sort({ unitName: 1 }).lean(),
       Mortgage.find({ companyId: req.companyId, propertyId: property._id }).populate('paymentAccountId', 'name sortCode accountNumber').lean(),
       TenancyAgreement.findOne({ companyId: req.companyId, propertyId: property._id, status: 'ACTIVE' }).populate('tenantId', 'fullName email phone').lean(),
       RentSchedule.find({ companyId: req.companyId, propertyId: property._id }).sort({ billingMonth: -1 }).limit(12).lean(),
       Transaction.find({ companyId: req.companyId, propertyId: property._id, status: 'POSTED', isDeleted: { $ne: true } }).populate('accountId', 'name').populate('categoryId', 'name code').sort({ transactionDate: -1 }).limit(10).lean(),
       Appliance.find({ companyId: req.companyId, propertyId: property._id }).sort({ createdAt: -1 }).lean(),
+      TenancyAgreement.find({ companyId: req.companyId, propertyId: property._id }).sort({ createdAt: -1 }).populate('tenantId', 'fullName email phone').lean(),
     ]);
+
+    const units = unitsRaw.map((u) => {
+      const activeTenancy = unitTenancies.find((t) => t.unitId && t.unitId.toString() === u._id.toString() && t.status === 'ACTIVE');
+      const latestTenancy = unitTenancies.find((t) => t.unitId && t.unitId.toString() === u._id.toString());
+      const uTenancy = activeTenancy || latestTenancy;
+      const isOccupied = !!activeTenancy;
+      return {
+        ...u,
+        tenantName: activeTenancy ? (activeTenancy.tenantId?.fullName || '') : (latestTenancy?.tenantId?.fullName ? `${latestTenancy.tenantId.fullName} (Previous)` : ''),
+        tenantEmail: uTenancy?.tenantId?.email || '',
+        tenantPhone: uTenancy?.tenantId?.phone || '',
+        contractualRent: activeTenancy?.rentAmount || u.targetRent || 0,
+        status: isOccupied ? 'OCCUPIED' : (u.status || 'AVAILABLE'),
+      };
+    });
 
     const totalDebt = mortgages
       .filter((m) => m.status === 'ACTIVE')

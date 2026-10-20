@@ -7,6 +7,8 @@ import {
   Landmark,
   ShieldAlert,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   ShieldCheck,
   Percent,
   X,
@@ -28,6 +30,11 @@ import {
   FileText,
   CreditCard,
   Upload,
+  Layers,
+  Eye,
+  DoorOpen,
+  Store,
+  ExternalLink,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { propertiesAPI, getApiCache } from '../services/api.js';
@@ -35,6 +42,196 @@ import PropertyAppliancesSection from '../components/PropertyAppliancesSection.j
 import PropertyComplianceSection from '../components/PropertyComplianceSection.jsx';
 import PropertyChargesSection from '../components/PropertyChargesSection.jsx';
 import { ModalPortal } from '../components/ModalPortal.jsx';
+
+function formatUnitTypeLabel(type, name = '') {
+  if (type === 'RETAIL_SHOP' || name?.toLowerCase().includes('shop')) return 'Shop';
+  if (type === 'FLAT' || name?.toLowerCase().includes('flat') || name?.toLowerCase().includes('apartment')) return 'Flat';
+  if (type === 'STUDIO' || name?.toLowerCase().includes('studio')) return 'Studio';
+  return 'Unit';
+}
+
+function getUnitTypesSummary(units = []) {
+  const types = Array.from(new Set(units.map((u) => formatUnitTypeLabel(u.unitType, u.unitName))));
+  return types.join(', ');
+}
+
+// ── Unit Detail Modal ───────────────────────────────────────
+function UnitDetailModal({ unit, parentProperty, selectedCompany, onClose }) {
+  if (!unit) return null;
+  const isShop = unit.unitType === 'RETAIL_SHOP' || unit.unitName?.toLowerCase().includes('shop');
+  const UnitIcon = isShop ? Store : Home;
+  const monthlyRent = unit.contractualRent || unit.targetRent || 0;
+  const annualRent = monthlyRent * 12;
+  const compSlug = selectedCompany?.slug || 'old-street';
+
+  return (
+    <ModalPortal isOpen={Boolean(unit)} onClose={onClose} zIndex="z-[9999]">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+        <div
+          className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 space-y-5 text-slate-100 my-8 max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-800">
+            <div className="flex items-start gap-3">
+              <div className={`p-2.5 rounded-xl ${isShop ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
+                <UnitIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>{unit.unitName}</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>Part of {unit.parentPropertyName || parentProperty?.name || 'Property'}</span>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${
+              isShop
+                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+            }`}>
+              {isShop ? 'Shop' : 'Flat'}
+            </span>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${
+              unit.status === 'OCCUPIED'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}>
+              {unit.status || 'AVAILABLE'}
+            </span>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+              Floor: {unit.floor || 'Ground'}
+            </span>
+            {unit.floorAreaSqFt > 0 && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                {unit.floorAreaSqFt} sq ft
+              </span>
+            )}
+          </div>
+
+          {/* Financials Box */}
+          <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">
+                Contractual Rent
+              </span>
+              <div className="text-xl font-extrabold text-emerald-400 tabular-nums mt-1">
+                {formatGBP(monthlyRent)}
+                <span className="text-xs font-normal text-slate-400"> / mo</span>
+              </div>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block">
+                Annual Equivalent
+              </span>
+              <div className="text-xl font-extrabold text-white tabular-nums mt-1">
+                {formatGBP(annualRent)}
+                <span className="text-xs font-normal text-slate-400"> / yr</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tenant Particulars */}
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+              <span className="flex items-center gap-1.5 text-indigo-400">
+                <User className="w-3.5 h-3.5" />
+                Active Tenant Particulars
+              </span>
+              <span className="text-[11px] text-slate-500">
+                {unit.status === 'OCCUPIED' ? 'Tenanted' : 'Vacant'}
+              </span>
+            </div>
+
+            {unit.tenantName ? (
+              <div className="space-y-2 pt-1 text-xs">
+                <div className="font-semibold text-slate-100 text-sm">
+                  {unit.tenantName}
+                </div>
+                {unit.tenantPhone && (
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <a href={`tel:${unit.tenantPhone}`} className="hover:text-indigo-400 transition">
+                      {unit.tenantPhone}
+                    </a>
+                  </div>
+                )}
+                {unit.tenantEmail && (
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <a href={`mailto:${unit.tenantEmail}`} className="hover:text-indigo-400 transition">
+                      {unit.tenantEmail}
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 italic pt-1">
+                This unit is currently vacant or available for letting.
+              </p>
+            )}
+          </div>
+
+          {/* Unit Notes */}
+          {unit.notes && (
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60 text-xs text-slate-400">
+              <span className="text-[10px] text-slate-500 font-semibold block uppercase tracking-wider mb-1">
+                Unit Notes
+              </span>
+              {unit.notes}
+            </div>
+          )}
+
+          {/* Actions Footer */}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer font-medium"
+            >
+              Close
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/company/${compSlug}/ledger?type=PROPERTY&entityId=${unit._id}`;
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/20 transition cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Unit Ledger</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/company/${compSlug}/rent`;
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md shadow-emerald-600/20 transition cursor-pointer"
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>Collect Rent</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+}
 
 export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   const initialCache = getApiCache('/properties', {
@@ -60,6 +257,21 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   const [detailedPropertyData, setDetailedPropertyData] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [detailTab, setDetailTab] = useState('overview');
+  const [expandedPropertyIds, setExpandedPropertyIds] = useState(new Set());
+  const [selectedUnit, setSelectedUnit] = useState(null);
+
+  const togglePropertyExpansion = (propertyId, e) => {
+    if (e) e.stopPropagation();
+    setExpandedPropertyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(propertyId)) {
+        next.delete(propertyId);
+      } else {
+        next.add(propertyId);
+      }
+      return next;
+    });
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -107,12 +319,14 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
   }, [search, tenureFilter]);
 
   // Open Property Dashboard
-  const handleOpenDetails = async (prop, e) => {
+  const handleOpenDetails = async (prop, e, defaultTab = null) => {
     if (e) e.stopPropagation();
     setSelectedProperty(prop);
     setDetailedPropertyData(prop);
     setLoadingDetails(true);
-    setDetailTab('overview'); // reset to overview tab on every open
+    // If property has multiple units, default to 'units' tab so user sees all other units immediately
+    const targetTab = defaultTab || (prop.units && prop.units.length > 1 ? 'units' : 'overview');
+    setDetailTab(targetTab);
     if (onSelectProperty) onSelectProperty(prop._id);
 
     try {
@@ -833,7 +1047,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                     <span>Property Units Breakdown</span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Individual lettable shops, flats, and studios within {propDetail?.name}.
+                    Individual lettable shops, flats, and units within {propDetail?.name}.
                   </p>
                 </div>
                 <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -846,42 +1060,130 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                   This property is configured as a single standalone unit.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                  {propDetail.units.map((u) => (
-                    <div key={u._id} className="bg-slate-950/80 border border-slate-800 hover:border-slate-700/80 rounded-xl p-4 space-y-3 transition">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-white truncate" title={u.unitName}>{u.unitName}</h4>
-                          <span className="text-[10px] text-slate-500 block mt-0.5">Floor: {u.floor || 'Ground'}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {propDetail.units.map((u, uIdx) => {
+                    const isShop = u.unitType === 'RETAIL_SHOP' || u.unitName?.toLowerCase().includes('shop');
+                    const UnitIcon = isShop ? Store : Home;
+                    const monthlyRent = u.contractualRent || u.targetRent || 0;
+                    const annualRent = monthlyRent * 12;
+
+                    return (
+                      <div
+                        key={u._id || uIdx}
+                        onClick={() => setSelectedUnit({ ...u, parentPropertyName: propDetail?.name })}
+                        className="bg-slate-950/90 hover:bg-slate-850 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 transition cursor-pointer flex flex-col justify-between group shadow-sm hover:shadow-xl"
+                      >
+                        <div className="space-y-3">
+                          {/* Unit Header */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition truncate flex items-center gap-1.5">
+                                <UnitIcon className={`w-4 h-4 shrink-0 ${isShop ? 'text-amber-400' : 'text-indigo-400'}`} />
+                                <span className="truncate">{u.unitName}</span>
+                              </h4>
+                              <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-1">
+                                <span>Floor: {u.floor || 'Ground'}</span>
+                                {u.floorAreaSqFt > 0 && <span>• {u.floorAreaSqFt} sq ft</span>}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                                u.status === 'OCCUPIED'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}>
+                                {u.status || 'AVAILABLE'}
+                              </span>
+                              <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${
+                                isShop
+                                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                  : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                              }`}>
+                                {isShop ? 'Shop' : 'Flat'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Rent Highlight Box */}
+                          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
+                                Contractual Rent
+                              </span>
+                              <div className="text-base font-extrabold text-emerald-400 font-display tabular-nums mt-0.5">
+                                {formatGBP(monthlyRent)}
+                                <span className="text-[11px] font-normal text-slate-400"> / mo</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 tabular-nums">
+                                {formatGBP(annualRent)} / yr
+                              </span>
+                            </div>
+
+                            <div className="text-right max-w-[140px]">
+                              <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
+                                Tenant
+                              </span>
+                              {u.tenantName ? (
+                                <div>
+                                  <span className="text-xs font-semibold text-slate-200 truncate block mt-0.5" title={u.tenantName}>
+                                    {u.tenantName}
+                                  </span>
+                                  {u.tenantPhone && (
+                                    <span className="text-[10px] text-slate-400 truncate block">
+                                      {u.tenantPhone}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-slate-500 italic">Vacant / Unlet</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
-                          u.unitType === 'RETAIL_SHOP'
-                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                            : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
-                        }`}>
-                          {u.unitType?.replace(/_/g, ' ')}
-                        </span>
-                      </div>
 
-                      <div className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60 flex items-center justify-between">
-                        <span className="text-[10px] text-slate-400 font-medium">Target Rent</span>
-                        <span className="text-sm font-extrabold text-emerald-400 tabular-nums">
-                          {formatGBP(u.targetRent || 0)} <span className="text-[10px] font-normal text-slate-400">/ mo</span>
-                        </span>
+                        {/* Action row */}
+                        <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedUnit({ ...u, parentPropertyName: propDetail?.name });
+                            }}
+                            className="text-slate-400 hover:text-white transition cursor-pointer text-[11px] py-1 px-2 rounded-lg hover:bg-slate-800 flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>View Particulars</span>
+                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const compSlug = selectedCompany?.slug || 'old-street';
+                                window.location.href = `/company/${compSlug}/ledger?type=PROPERTY&entityId=${u._id}`;
+                              }}
+                              className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition font-semibold text-[11px]"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Unit Ledger</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const compSlug = selectedCompany?.slug || 'old-street';
+                                window.location.href = `/company/${compSlug}/rent`;
+                              }}
+                              className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition font-semibold text-[11px]"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              <span>Rent</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
-
-                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/60">
-                        <span className="text-slate-400">Occupancy</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                          u.status === 'OCCUPIED'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                            : 'bg-slate-800 text-slate-400 border-slate-700'
-                        }`}>
-                          {u.status || 'OCCUPIED'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1039,6 +1341,16 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
 
         {/* Modal for editing property details */}
         {showModal && renderEditModal()}
+
+        {/* Modal for individual unit particulars */}
+        {selectedUnit && (
+          <UnitDetailModal
+            unit={selectedUnit}
+            parentProperty={detailedPropertyData || selectedProperty}
+            selectedCompany={selectedCompany}
+            onClose={() => setSelectedUnit(null)}
+          />
+        )}
       </div>
     );
   }
@@ -1186,167 +1498,339 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {properties.map((prop) => (
-            <div
-              key={prop._id}
-              onClick={() => handleOpenDetails(prop)}
-              className="bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 transition cursor-pointer flex flex-col justify-between group shadow-sm hover:shadow-xl"
-            >
-              <div>
-                {/* Header & Badges */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-bold text-white group-hover:text-indigo-400 transition truncate flex items-center gap-1.5">
-                      <Home className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                      <span className="truncate">{prop.name}</span>
-                    </h3>
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span className="truncate">
-                        {prop.addressLine1}
-                        {prop.city && !prop.addressLine1?.toLowerCase().includes(prop.city.toLowerCase()) ? `, ${prop.city}` : ''}
-                        {prop.postcode ? ` (${prop.postcode})` : ''}
-                      </span>
-                    </div>
-                  </div>
+          {properties.map((prop) => {
+            const hasMultipleUnits = prop.units && prop.units.length > 1;
+            const isExpanded = expandedPropertyIds.has(prop._id);
+            const unitSummary = hasMultipleUnits ? getUnitTypesSummary(prop.units) : '';
 
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        prop.status === 'Occupied'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : prop.status === 'Active'
-                          ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
-                          : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
-                      }`}
-                    >
-                      {prop.status || 'Available'}
-                    </span>
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                      {prop.propertyType?.replace(/_/g, ' ')}
-                    </span>
-                    {prop.units && prop.units.length > 1 && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                        {prop.units.length} Units
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Contractual Rent Highlight Box */}
-                <div className="mt-3.5 p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
-                      Contractual Rent
-                    </span>
-                    <div className="text-base font-extrabold text-emerald-400 font-display tabular-nums mt-0.5">
-                      {formatGBP(prop.contractualRent || 0)}
-                      <span className="text-[11px] font-normal text-slate-400">
-                        {' '}/ {prop.rentFrequency === 'ANNUALLY' ? 'yr' : 'mo'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    {prop.tenantName ? (
-                      <div className="max-w-[140px]">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
-                          Tenant
-                        </span>
-                        <span className="text-xs font-semibold text-slate-200 truncate block mt-0.5" title={prop.tenantName}>
-                          {prop.tenantName}
+            return (
+              <div
+                key={prop._id}
+                onClick={() => {
+                  if (hasMultipleUnits) {
+                    togglePropertyExpansion(prop._id);
+                  } else {
+                    handleOpenDetails(prop);
+                  }
+                }}
+                className={`bg-slate-900/90 hover:bg-slate-850 border ${
+                  isExpanded ? 'border-indigo-500/50 ring-1 ring-indigo-500/30' : 'border-slate-800 hover:border-slate-700/80'
+                } rounded-2xl p-5 transition cursor-pointer flex flex-col justify-between group shadow-sm hover:shadow-xl`}
+              >
+                <div>
+                  {/* Header & Badges */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-bold text-white group-hover:text-indigo-400 transition truncate flex items-center gap-1.5">
+                        <Home className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span className="truncate">{prop.name}</span>
+                      </h3>
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate">
+                          {prop.addressLine1}
+                          {prop.city && !prop.addressLine1?.toLowerCase().includes(prop.city.toLowerCase()) ? `, ${prop.city}` : ''}
+                          {prop.postcode ? ` (${prop.postcode})` : ''}
                         </span>
                       </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-500 italic">Vacant / Unlet</span>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          prop.status === 'Occupied'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : prop.status === 'Active'
+                            ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                            : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'
+                        }`}
+                      >
+                        {prop.status || 'Available'}
+                      </span>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        {prop.propertyType?.replace(/_/g, ' ')}
+                      </span>
+                      {hasMultipleUnits && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          {prop.units.length} Units ({unitSummary})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Contractual Rent Highlight Box */}
+                  <div className="mt-3.5 p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
+                        Contractual Rent
+                      </span>
+                      <div className="text-base font-extrabold text-emerald-400 font-display tabular-nums mt-0.5">
+                        {formatGBP(prop.contractualRent || 0)}
+                        <span className="text-[11px] font-normal text-slate-400">
+                          {' '}/ {prop.rentFrequency === 'ANNUALLY' ? 'yr' : 'mo'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      {prop.tenantName ? (
+                        <div className="max-w-[140px]">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-semibold">
+                            Tenant
+                          </span>
+                          <span className="text-xs font-semibold text-slate-200 truncate block mt-0.5" title={prop.tenantName}>
+                            {prop.tenantName}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-500 italic">Vacant / Unlet</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Multi-Unit Expander & Child Units Cards */}
+                  {hasMultipleUnits && (
+                    <div className="mt-3 space-y-2.5">
+                      <button
+                        type="button"
+                        onClick={(e) => togglePropertyExpansion(prop._id, e)}
+                        className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition cursor-pointer text-xs font-semibold border ${
+                          isExpanded
+                            ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
+                            : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/15 border-indigo-500/20'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <span>{isExpanded ? 'Hide' : 'View'} {prop.units.length} Units ({unitSummary})</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          <span className="text-slate-400 font-normal">{isExpanded ? 'Collapse' : 'Click to View'}</span>
+                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div
+                          className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-200 px-0.5">
+                            <span className="flex items-center gap-1.5 text-indigo-400">
+                              <DoorOpen className="w-4 h-4" />
+                              <span>Units inside {prop.name}</span>
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-normal">
+                              {prop.units.length} lettable units
+                            </span>
+                          </div>
+
+                          <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                            {prop.units.map((u, uIdx) => {
+                              const isShop = u.unitType === 'RETAIL_SHOP' || u.unitName?.toLowerCase().includes('shop');
+                              const UnitIcon = isShop ? Store : Home;
+                              const monthlyRent = u.contractualRent || u.targetRent || 0;
+                              const annualRent = monthlyRent * 12;
+
+                              return (
+                                <div
+                                  key={u._id || uIdx}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedUnit({ ...u, parentPropertyName: prop.name });
+                                  }}
+                                  className="bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-slate-700/80 rounded-xl p-3.5 transition cursor-pointer space-y-3 shadow-sm hover:shadow-md group/unit"
+                                >
+                                  {/* Unit Header */}
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="text-xs font-bold text-white group-hover/unit:text-indigo-300 transition truncate flex items-center gap-1.5">
+                                        <UnitIcon className={`w-3.5 h-3.5 shrink-0 ${isShop ? 'text-amber-400' : 'text-indigo-400'}`} />
+                                        <span className="truncate">{u.unitName}</span>
+                                      </h4>
+                                      <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                        <span>Floor: {u.floor || 'Ground'}</span>
+                                        {u.floorAreaSqFt > 0 && <span>• {u.floorAreaSqFt} sq ft</span>}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                        isShop
+                                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                          : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                                      }`}>
+                                        {isShop ? 'Shop' : 'Flat'}
+                                      </span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                        u.status === 'OCCUPIED'
+                                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                                      }`}>
+                                        {u.status || 'AVAILABLE'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Contractual Rent Highlight Box */}
+                                  <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+                                    <div>
+                                      <span className="text-[9px] text-slate-500 uppercase tracking-wider block font-semibold">
+                                        Contractual Rent
+                                      </span>
+                                      <div className="text-sm font-extrabold text-emerald-400 font-display tabular-nums mt-0.5">
+                                        {formatGBP(monthlyRent)}
+                                        <span className="text-[10px] font-normal text-slate-400"> / mo</span>
+                                      </div>
+                                      <span className="text-[9px] text-slate-500 tabular-nums">
+                                        {formatGBP(annualRent)} / yr
+                                      </span>
+                                    </div>
+
+                                    <div className="text-right max-w-[140px]">
+                                      <span className="text-[9px] text-slate-500 uppercase tracking-wider block font-semibold">
+                                        Tenant
+                                      </span>
+                                      {u.tenantName ? (
+                                        <div>
+                                          <span className="text-xs font-semibold text-slate-200 truncate block mt-0.5" title={u.tenantName}>
+                                            {u.tenantName}
+                                          </span>
+                                          {u.tenantPhone && (
+                                            <span className="text-[10px] text-slate-400 truncate block">
+                                              {u.tenantPhone}
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-[11px] text-slate-500 italic">Vacant / Unlet</span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Unit Actions */}
+                                  <div className="flex items-center justify-between pt-1 text-[11px]">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedUnit({ ...u, parentPropertyName: prop.name });
+                                      }}
+                                      className="text-slate-300 hover:text-white flex items-center gap-1 font-medium px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 transition"
+                                    >
+                                      <Eye className="w-3 h-3 text-indigo-400" />
+                                      <span>Unit Details</span>
+                                    </button>
+
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const compSlug = selectedCompany?.slug || 'old-street';
+                                          window.location.href = `/company/${compSlug}/ledger?type=PROPERTY&entityId=${u._id}`;
+                                        }}
+                                        className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 transition font-medium"
+                                        title="View unit's individual ledger"
+                                      >
+                                        <FileText className="w-3 h-3" />
+                                        <span>Ledger</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const compSlug = selectedCompany?.slug || 'old-street';
+                                          window.location.href = `/company/${compSlug}/rent`;
+                                        }}
+                                        className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition font-medium"
+                                        title="Manage rent collection for unit"
+                                      >
+                                        <Receipt className="w-3 h-3" />
+                                        <span>Rent</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Valuation & Debt Grid */}
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-800/80 text-xs">
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider">Asset Value</div>
+                      <div className="text-xs font-bold text-slate-200 mt-0.5 tabular-nums">
+                        {formatGBP(prop.currentValuation || prop.purchasePrice)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wider">Mortgage Debt</div>
+                      <div className={`text-xs font-bold mt-0.5 tabular-nums ${prop.totalMortgageDebt > 0 ? 'text-rose-300' : 'text-slate-400'}`}>
+                        {prop.totalMortgageDebt > 0 ? formatGBP(prop.totalMortgageDebt) : 'Unencumbered'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Info Badges */}
+                  <div className="mt-3 flex items-center gap-2 text-[10px] flex-wrap">
+                    {prop.tenure && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {prop.tenure.replace('_', ' ')}
+                      </span>
+                    )}
+                    {prop.compliance?.epcRating && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        EPC: <span className="font-bold text-indigo-400">{prop.compliance.epcRating}</span>
+                      </span>
+                    )}
+                    {prop.activeMortgagesCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                        {prop.activeMortgagesCount} {prop.activeMortgagesCount === 1 ? 'Mortgage' : 'Mortgages'}
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {/* Child Units Breakdown for Multi-Unit Properties */}
-                {prop.units && prop.units.length > 1 && (
-                  <div className="mt-2.5 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-slate-400 px-0.5">
-                      <span>Internal Units ({prop.units.length})</span>
-                      <span className="text-slate-500 font-normal">Monthly Rent</span>
-                    </div>
-                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
-                      {prop.units.map((u) => (
-                        <div key={u._id} className="flex items-center justify-between text-[11px] py-0.5 px-1 rounded bg-slate-900/60 border border-slate-800/40">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${u.unitType === 'RETAIL_SHOP' ? 'bg-amber-400' : 'bg-indigo-400'}`} />
-                            <span className="text-slate-200 font-medium truncate" title={u.unitName}>{u.unitName}</span>
-                          </div>
-                          <span className="text-emerald-400 font-semibold tabular-nums text-[10px] shrink-0 ml-2">
-                            {formatGBP(u.targetRent || 0)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Valuation & Debt Grid */}
-                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-800/80 text-xs">
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Asset Value</div>
-                    <div className="text-xs font-bold text-slate-200 mt-0.5 tabular-nums">
-                      {formatGBP(prop.currentValuation || prop.purchasePrice)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Mortgage Debt</div>
-                    <div className={`text-xs font-bold mt-0.5 tabular-nums ${prop.totalMortgageDebt > 0 ? 'text-rose-300' : 'text-slate-400'}`}>
-                      {prop.totalMortgageDebt > 0 ? formatGBP(prop.totalMortgageDebt) : 'Unencumbered'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Info Badges */}
-                <div className="mt-3 flex items-center gap-2 text-[10px] flex-wrap">
-                  {prop.tenure && (
-                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                      {prop.tenure.replace('_', ' ')}
-                    </span>
-                  )}
-                  {prop.compliance?.epcRating && (
-                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                      EPC: <span className="font-bold text-indigo-400">{prop.compliance.epcRating}</span>
-                    </span>
-                  )}
-                  {prop.activeMortgagesCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
-                      {prop.activeMortgagesCount} {prop.activeMortgagesCount === 1 ? 'Mortgage' : 'Mortgages'}
-                    </span>
-                  )}
+                {/* Action row */}
+                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                  <button
+                    type="button"
+                    onClick={(e) => handleOpenEdit(prop, e)}
+                    className="text-slate-400 hover:text-white transition cursor-pointer text-[11px] py-1 px-1.5 rounded hover:bg-slate-800"
+                  >
+                    Edit Property
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleOpenDetails(prop, e)}
+                    className="text-indigo-400 hover:text-indigo-300 group-hover:translate-x-0.5 transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer py-1 px-2 rounded-lg hover:bg-indigo-500/10"
+                  >
+                    <span>Open Full Dashboard</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
-
-              {/* Action row */}
-              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <button
-                  type="button"
-                  onClick={(e) => handleOpenEdit(prop, e)}
-                  className="text-slate-400 hover:text-white transition cursor-pointer text-[11px] py-1 px-1.5 rounded hover:bg-slate-800"
-                >
-                  Edit Property
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => handleOpenDetails(prop, e)}
-                  className="text-indigo-400 hover:text-indigo-300 group-hover:translate-x-0.5 transition flex items-center gap-1 text-[11px] font-semibold cursor-pointer py-1 px-2 rounded-lg hover:bg-indigo-500/10"
-                >
-                  <span>Open Full Dashboard</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Add / Edit Property Modal */}
       {showModal && renderEditModal()}
+
+      {/* Modal for individual unit particulars */}
+      {selectedUnit && (
+        <UnitDetailModal
+          unit={selectedUnit}
+          parentProperty={properties.find((p) => p._id === selectedUnit.propertyId)}
+          selectedCompany={selectedCompany}
+          onClose={() => setSelectedUnit(null)}
+        />
+      )}
     </div>
   );
 

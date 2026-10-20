@@ -176,6 +176,20 @@ export function LedgerPage({ selectedCompany }) {
   useEffect(() => {
     loadEntities();
     loadAuxData();
+
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlType = searchParams.get('type');
+      const urlEntityId = searchParams.get('entityId');
+      if (urlType) {
+        setLedgerType(urlType);
+      }
+      if (urlEntityId) {
+        setSelectedEntityId(urlEntityId);
+      }
+    } catch (e) {
+      // ignore param parsing error
+    }
   }, []);
 
   // Determine selectable list based on ledgerType
