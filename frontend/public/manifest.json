@@ -1,7 +1,7 @@
 {
-  "name": "UK-Company",
-  "short_name": "UK-Company",
-  "description": "PIXX Technologies UK Property Finance & Portfolio Management System",
+  "name": "UK Company",
+  "short_name": "UK Company",
+  "description": "UK Company Property Finance & Portfolio Management System",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -12,6 +12,12 @@
   "theme_color": "#4f46e5",
   "categories": ["business", "finance", "productivity"],
   "icons": [
+    {
+      "src": "/UK.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
@@ -35,12 +41,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "/UK.png",
-      "sizes": "1254x1254",
-      "type": "image/png",
-      "purpose": "any"
     }
   ]
 }

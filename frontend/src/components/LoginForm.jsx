@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Lock, Mail, User, ShieldCheck, AlertCircle, Building2, Landmark, ArrowRight, Loader2 } from 'lucide-react';
 import { authAPI } from '../services/api.js';
 import { ThemeToggle } from './ThemeToggle.jsx';
+import { LoginAppInstallSection } from './LoginAppInstallSection.jsx';
 import pixxLogo from '../assets/logo.png';
 
 export function LoginForm({ onLoginSuccess }) {
@@ -239,6 +240,9 @@ export function LoginForm({ onLoginSuccess }) {
             </p>
           </div>
         </div>
+
+        {/* Mobile App (Web View / PWA) Install Section for Android & iPhone */}
+        <LoginAppInstallSection />
       </div>
     </div>
   );
