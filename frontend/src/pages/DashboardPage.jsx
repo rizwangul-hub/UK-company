@@ -281,7 +281,6 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
         </div>
       ) : (
-      ) : (
         <>
           {/* Sensible Zero-State Onboarding Banner for Empty Companies */}
           {isEmptyCompany && (
