@@ -35,11 +35,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    singleUserLock: {
+    role: {
       type: String,
-      default: 'SINGLE_AUTHORIZED_OPERATOR',
-      unique: true,
-      index: true,
+      enum: ['admin', 'manager', 'operator', 'viewer'],
+      default: 'admin',
     },
     allowedCompanies: {
       type: [String],

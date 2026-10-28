@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
+import { BackToPortalButton } from '../components/BackToPortalButton.jsx';
 import pixxLogo from '../assets/logo.png';
 import { COMPANIES } from '../config/companies.js';
 
@@ -58,6 +59,9 @@ export function CompanySelectionPage({ user, onSelectCompany, onLogout, onSelect
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Back to Central Portal Button */}
+          <BackToPortalButton />
+
           {/* Master Group Action in Header */}
           {onSelectMasterGroup && (
             <button

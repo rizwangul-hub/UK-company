@@ -24,6 +24,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
+import { BackToPortalButton } from '../components/BackToPortalButton.jsx';
 import pixxLogo from '../assets/logo.png';
 import { getPageAnimationClass } from '../utils/pageAnimations.js';
 
@@ -94,6 +95,9 @@ export function MainLayout({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Back to Central Portal Button for Mobile */}
+          <BackToPortalButton label="← Portal" className="px-2 py-1 text-[11px]" />
+
           {/* Master Group Dashboard Button for Mobile */}
           {onOpenMasterDashboard && (
             <button
@@ -332,6 +336,9 @@ export function MainLayout({
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* Back to Central Portal Button */}
+            <BackToPortalButton />
+
             {/* Admin Profile Pill on Top Header */}
             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/25">

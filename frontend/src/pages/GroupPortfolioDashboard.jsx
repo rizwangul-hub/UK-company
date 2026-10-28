@@ -23,6 +23,7 @@ import {
 import { formatGBP } from '../utils/formatters.js';
 import { reportsAPI, getApiCache } from '../services/api.js';
 import { COMPANIES } from '../config/companies.js';
+import { BackToPortalButton } from '../components/BackToPortalButton.jsx';
 import pixxLogo from '../assets/logo.png';
 
 export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingleCompany }) {
@@ -163,6 +164,9 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
 
         {/* Header Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Back to Central Portal Button */}
+          <BackToPortalButton />
+
           <button
             onClick={loadData}
             disabled={loading}
