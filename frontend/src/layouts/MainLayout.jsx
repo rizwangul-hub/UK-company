@@ -22,9 +22,14 @@ import {
   Trash2,
   FileUp,
   TrendingUp,
+  Eye,
+  EyeOff,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import { BackToPortalButton } from '../components/BackToPortalButton.jsx';
+import { useNavigation } from '../context/NavigationContext.jsx';
 import pixxLogo from '../assets/logo.png';
 import { getPageAnimationClass } from '../utils/pageAnimations.js';
 
@@ -57,6 +62,14 @@ export function MainLayout({
   children,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const {
+    sidebarHidden,
+    navbarHidden,
+    isAllNavHidden,
+    toggleSidebar,
+    toggleNavbar,
+    toggleAllNav,
+  } = useNavigation();
 
   const displayLogo = selectedCompany?.logo || pixxLogo;
   const displayName = selectedCompany?.name || 'PIXX TECHNOLOGIES';
@@ -65,7 +78,33 @@ export function MainLayout({
   const adminEmail = user?.email || 'fahad@gmail.com';
 
   return (
-    <div className="h-screen h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
+    <div className="h-screen h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row relative">
+      {/* Floating Restore Controls when Navbar or Sidebar is Hidden */}
+      {(navbarHidden || sidebarHidden) && (
+        <div className="fixed top-3 right-4 z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          {navbarHidden && (
+            <button
+              onClick={toggleNavbar}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600/95 hover:bg-indigo-600 text-white text-xs font-bold shadow-xl shadow-indigo-600/30 backdrop-blur-md transition-all border border-indigo-400/40 cursor-pointer hover:scale-105 active:scale-95"
+              title="Click to show Navbar"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Show Navbar</span>
+            </button>
+          )}
+          {sidebarHidden && (
+            <button
+              onClick={toggleSidebar}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white dark:bg-slate-800/90 dark:hover:bg-slate-700 text-xs font-bold shadow-xl shadow-black/30 backdrop-blur-md transition-all border border-slate-700/60 cursor-pointer hover:scale-105 active:scale-95"
+              title="Click to show Sidebar"
+            >
+              <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Show Sidebar</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Mobile Drawer Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -76,7 +115,7 @@ export function MainLayout({
       )}
 
       {/* Mobile Top Header - Displays Company Brand & Admin Info on Top */}
-      <div className="md:hidden flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shrink-0">
+      <div className={`md:hidden ${navbarHidden ? 'hidden' : 'flex'} items-center justify-between px-3.5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shrink-0`}>
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="animated-logo-box w-12 h-12 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1 shadow-md shrink-0">
             <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
@@ -145,8 +184,10 @@ export function MainLayout({
 
       {/* Sidebar Navigation - Pure White in Light Mode, Dark Slate in Dark Mode */}
       <aside
-        className={`sidebar-layout fixed md:relative top-0 left-0 bottom-0 md:bottom-auto h-screen h-[100dvh] max-h-[100dvh] w-72 lg:w-80 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 shrink-0 transition-transform duration-200 ease-in-out shadow-2xl md:shadow-none ${
-          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`sidebar-layout fixed md:relative top-0 left-0 bottom-0 md:bottom-auto h-screen h-[100dvh] max-h-[100dvh] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none ${
+          sidebarHidden
+            ? 'w-0 max-w-0 -translate-x-full md:w-0 md:max-w-0 md:-translate-x-full opacity-0 pointer-events-none p-0 m-0 border-0 overflow-hidden'
+            : `w-72 lg:w-80 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`
         }`}
       >
         {/* Mobile Drawer Header with Close Button */}
@@ -314,30 +355,61 @@ export function MainLayout({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto overflow-x-hidden">
         {/* Top Header Bar for Desktop - Displays Company Brand, Admin Name & Email, Actions, Theme Toggle, Sign Out */}
-        <header className="hidden md:flex items-center justify-between px-6 py-2.5 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              {NAV_ITEMS.find((item) => item.id === currentView)?.label || 'System Portal'}
-            </span>
-            <span className="text-slate-400 dark:text-slate-600">/</span>
-            <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-              {displayName}
-            </span>
-            {selectedCompany?.legalName && (
-              <>
-                <span className="text-slate-400 dark:text-slate-600 hidden xl:inline">/</span>
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400 hidden xl:inline">
-                  {displayLegalName}
-                </span>
-              </>
-            )}
+        <header className={`${navbarHidden ? 'hidden' : 'hidden md:flex'} items-center justify-between px-4 lg:px-6 py-2.5 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 transition-all duration-200`}>
+          <div className="flex items-center gap-3">
+            {/* Desktop Sidebar Toggle Button */}
+            <button
+              onClick={toggleSidebar}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 transition border border-slate-200 dark:border-slate-700/80 cursor-pointer shadow-xs"
+              title={sidebarHidden ? "Show Sidebar Navigation" : "Hide Sidebar Navigation"}
+            >
+              {sidebarHidden ? (
+                <>
+                  <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="hidden xl:inline">Show Sidebar</span>
+                </>
+              ) : (
+                <>
+                  <PanelLeftClose className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden xl:inline">Hide Sidebar</span>
+                </>
+              )}
+            </button>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                {NAV_ITEMS.find((item) => item.id === currentView)?.label || 'System Portal'}
+              </span>
+              <span className="text-slate-400 dark:text-slate-600">/</span>
+              <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                {displayName}
+              </span>
+              {selectedCompany?.legalName && (
+                <>
+                  <span className="text-slate-400 dark:text-slate-600 hidden xl:inline">/</span>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 hidden xl:inline">
+                    {displayLegalName}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {/* Back to Central Portal Button */}
             <BackToPortalButton />
+
+            {/* Hide Navbar Toggle Button */}
+            <button
+              onClick={toggleNavbar}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 dark:bg-slate-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-500/40 transition shadow-xs cursor-pointer"
+              title="Hide Top Navbar (Click floating button anytime to show again)"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+              <span className="hidden lg:inline">Hide Navbar</span>
+            </button>
 
             {/* Admin Profile Pill on Top Header */}
             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 shadow-xs">

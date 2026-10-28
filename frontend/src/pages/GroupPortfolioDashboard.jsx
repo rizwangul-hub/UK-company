@@ -19,9 +19,6 @@ import {
   Layers,
   Sparkles,
   ArrowRightLeft,
-  Eye,
-  EyeOff,
-  Wallet,
 } from 'lucide-react';
 import { formatGBP } from '../utils/formatters.js';
 import { reportsAPI, getApiCache } from '../services/api.js';
@@ -46,9 +43,6 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
   const [excelDownloading, setExcelDownloading] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const [singlePdfDownloading, setSinglePdfDownloading] = useState({});
-  const [isDashboardHidden, setIsDashboardHidden] = useState(() => {
-    return localStorage.getItem('master_dashboard_hidden') === 'true';
-  });
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'properties' | 'mortgages'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCompany, setFilterCompany] = useState('ALL');
@@ -173,27 +167,6 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
           {/* Back to Central Portal Button */}
           <BackToPortalButton />
 
-          {/* Hide / Show Master Dashboard Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsDashboardHidden((prev) => {
-                const next = !prev;
-                localStorage.setItem('master_dashboard_hidden', next ? 'true' : 'false');
-                return next;
-              });
-            }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer select-none active:scale-95 ${
-              isDashboardHidden
-                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/50'
-                : 'bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700'
-            }`}
-            title={isDashboardHidden ? 'Click to show the full master dashboard' : 'Click to hide the master dashboard and prevent scrolling'}
-          >
-            {isDashboardHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-            <span>{isDashboardHidden ? 'Show Dashboard' : 'Hide Dashboard'}</span>
-          </button>
-
           <button
             onClick={loadData}
             disabled={loading}
@@ -263,7 +236,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
       </header>
 
       {/* Main Container */}
-      <main className={`flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 ${isDashboardHidden ? 'overflow-hidden' : 'pb-page-safe'}`}>
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6 pb-page-safe">
         {/* Loading State */}
         {loading && !data && (
           <div className="flex flex-col items-center justify-center py-20 space-y-3">
@@ -283,80 +256,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
         )}
 
         {data && data.totals && (
-          isDashboardHidden ? (
-            /* Compact Zero-Scroll Collapsed View */
-            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
-              {/* Quick 4-Tile Group Snapshot Ribbon */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Direct Assets</div>
-                    <div className="text-sm font-extrabold text-white truncate">{data.totals?.totalProperties ?? 0} Properties</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                    <TrendingUp className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly Rent Roll</div>
-                    <div className="text-sm font-extrabold text-emerald-300 truncate">{formatGBP(data.totals?.totalMonthlyRent ?? 0)}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/20">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Combined Valuation</div>
-                    <div className="text-sm font-extrabold text-sky-300 truncate">{formatGBP(data.totals?.totalValuation ?? 0)}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20">
-                    <Wallet className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Bank Liquidity</div>
-                    <div className="text-sm font-extrabold text-purple-300 truncate">{formatGBP(data.totals?.totalBankLiquidity ?? 0)}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Minimal Clean Zero-Scroll Banner */}
-              <div className="p-6 sm:p-8 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm text-center flex flex-col items-center justify-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shadow-sm">
-                  <EyeOff className="w-6 h-6" />
-                </div>
-                <div className="max-w-md">
-                  <h3 className="text-base font-bold text-white">
-                    Master Dashboard View is Hidden (Zero-Scroll Mode)
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Company breakdown matrix, debt overview, and property registers are collapsed so no page scrolling is required.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDashboardHidden(false);
-                    localStorage.setItem('master_dashboard_view_hidden', 'false');
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/25 transition cursor-pointer active:scale-95"
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>Show Full Master Dashboard</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
+          <>
             {/* Top KPI Metric Cards (6 Tiles) */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm hover:border-slate-700 transition">
@@ -722,8 +622,7 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
               </div>
             )}
           </>
-        )
-      )}
+        )}
       </main>
     </div>
   );
