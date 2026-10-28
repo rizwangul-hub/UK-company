@@ -23,6 +23,8 @@ import {
   AlertCircle,
   Bell,
   Download,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
 import { reportsAPI, complianceAPI, propertyChargesAPI, pnlAPI, getApiCache } from '../services/api.js';
@@ -33,6 +35,9 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthVal);
   const [data, setData] = useState(initialCache?.data || null);
   const [loading, setLoading] = useState(!initialCache?.data);
+  const [isDashboardHidden, setIsDashboardHidden] = useState(() => {
+    return localStorage.getItem('dashboard_view_hidden') === 'true';
+  });
   const [complianceData, setComplianceData] = useState(null);
   const [chargesOverview, setChargesOverview] = useState(null);
   const [pnlSummary, setPnlSummary] = useState(null);
@@ -125,7 +130,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   const isEmptyCompany = !loading && data && (p.totalProperties === 0) && (p.totalLiquidity === 0) && (recentTransactions.length === 0);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+    <div className={`p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 ${isDashboardHidden ? 'overflow-hidden' : ''}`}>
       {/* Executive Brand Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gradient-to-r dark:from-slate-900/90 dark:via-slate-900/80 dark:to-indigo-950/40 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm dashboard-header-banner">
         <div className="flex items-center gap-4">
@@ -146,8 +151,30 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
         </div>
 
-        {/* Month Selector */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        {/* Actions & Month Selector */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {/* Hide / Show Dashboard Toggle Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsDashboardHidden((prev) => {
+                const next = !prev;
+                localStorage.setItem('dashboard_view_hidden', next ? 'true' : 'false');
+                return next;
+              });
+            }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer select-none active:scale-95 ${
+              isDashboardHidden
+                ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 ring-2 ring-indigo-400/50'
+                : 'bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800'
+            }`}
+            title={isDashboardHidden ? 'Click to show the full dashboard' : 'Click to hide the dashboard and prevent scrolling'}
+          >
+            {isDashboardHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <span>{isDashboardHidden ? 'Show Dashboard' : 'Hide Dashboard'}</span>
+          </button>
+
+          {/* Month Selector */}
           <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 shadow-sm">
             <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <input
@@ -157,6 +184,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               className="bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer font-medium"
             />
           </div>
+
           <button
             onClick={fetchStats}
             disabled={loading}
@@ -178,6 +206,81 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
           <div className="h-64 rounded-2xl bg-slate-900/40 border border-slate-800/60 animate-pulse p-4" />
         </div>
+      ) : isDashboardHidden ? (
+        /* Compact Zero-Scroll Collapsed View */
+        <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          {/* Quick Single-Line Snapshot Ribbon */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Properties</div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{p.totalProperties ?? 0} Properties</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                <Landmark className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Portfolio Value</div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{formatGBP(p.totalValuation || 0)}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0 border border-sky-500/20">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly Net Flow</div>
+                <div className={`text-sm font-extrabold truncate ${(m.netCashFlow || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {formatGBP(m.netCashFlow || 0)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 border border-purple-500/20">
+                <Wallet className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bank Liquidity</div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{formatGBP(p.totalLiquidity || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Minimal Clean Zero-Scroll Banner */}
+          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm text-center flex flex-col items-center justify-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-sm">
+              <EyeOff className="w-6 h-6" />
+            </div>
+            <div className="max-w-md">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Dashboard View is Hidden (Zero-Scroll Mode)
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Detailed charts, breakdown tables, and metric cards are collapsed so no page scrolling is required.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDashboardHidden(false);
+                localStorage.setItem('dashboard_view_hidden', 'false');
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/25 transition cursor-pointer active:scale-95"
+            >
+              <Eye className="w-4 h-4" />
+              <span>Show Full Dashboard</span>
+            </button>
+          </div>
+        </div>
+      ) : (
       ) : (
         <>
           {/* Sensible Zero-State Onboarding Banner for Empty Companies */}

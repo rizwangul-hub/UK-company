@@ -19,6 +19,9 @@ import {
   Layers,
   Sparkles,
   ArrowRightLeft,
+  Eye,
+  EyeOff,
+  Wallet,
 } from 'lucide-react';
 import { formatGBP } from '../utils/formatters.js';
 import { reportsAPI, getApiCache } from '../services/api.js';
@@ -43,6 +46,9 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
   const [excelDownloading, setExcelDownloading] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const [singlePdfDownloading, setSinglePdfDownloading] = useState({});
+  const [isDashboardHidden, setIsDashboardHidden] = useState(() => {
+    return localStorage.getItem('master_dashboard_hidden') === 'true';
+  });
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'properties' | 'mortgages'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCompany, setFilterCompany] = useState('ALL');
@@ -166,6 +172,27 @@ export function GroupPortfolioDashboard({ user, onSelectCompany, onSwitchToSingl
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Back to Central Portal Button */}
           <BackToPortalButton />
+
+          {/* Hide / Show Master Dashboard Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsDashboardHidden((prev) => {
+                const next = !prev;
+                localStorage.setItem('master_dashboard_hidden', next ? 'true' : 'false');
+                return next;
+              });
+            }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer select-none active:scale-95 ${
+              isDashboardHidden
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/50'
+                : 'bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700'
+            }`}
+            title={isDashboardHidden ? 'Click to show the full master dashboard' : 'Click to hide the master dashboard and prevent scrolling'}
+          >
+            {isDashboardHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <span>{isDashboardHidden ? 'Show Dashboard' : 'Hide Dashboard'}</span>
+          </button>
 
           <button
             onClick={loadData}
