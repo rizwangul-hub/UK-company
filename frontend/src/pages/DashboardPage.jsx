@@ -23,27 +23,27 @@ import {
   AlertCircle,
   Bell,
   Download,
-  Eye,
-  EyeOff,
   PanelLeftClose,
   PanelLeftOpen,
-  Maximize2,
-  Minimize2,
 } from 'lucide-react';
-import { useNavigation } from '../context/NavigationContext.jsx';
 import { formatGBP, formatUKDate, formatMonthLabel, getCurrentMonth } from '../utils/formatters.js';
 import { reportsAPI, complianceAPI, propertyChargesAPI, pnlAPI, getApiCache } from '../services/api.js';
 
-export function DashboardPage({ onNavigate, selectedCompany }) {
-  const {
-    sidebarHidden,
-    navbarHidden,
-    isAllNavHidden,
-    toggleSidebar,
-    toggleNavbar,
-    toggleAllNav,
-  } = useNavigation();
+export function DashboardPage({
+  onNavigate,
+  selectedCompany,
+  isSidebarCollapsed: propIsSidebarCollapsed,
+  onToggleSidebar,
+}) {
+  const isSidebarCollapsed = Boolean(propIsSidebarCollapsed);
 
+  const handleToggleSidebar = () => {
+    if (onToggleSidebar) {
+      onToggleSidebar();
+    } else {
+      window.dispatchEvent(new CustomEvent('pixx:toggle-sidebar'));
+    }
+  };
   const currentMonthVal = getCurrentMonth();
   const initialCache = getApiCache('/reports/dashboard', { params: { month: currentMonthVal } });
   const [selectedMonth, setSelectedMonth] = useState(currentMonthVal);
@@ -143,21 +143,21 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
   return (
     <div
       className={`mx-auto transition-all duration-300 overflow-x-hidden ${
-        sidebarHidden
-          ? 'w-full max-w-full px-3 sm:px-6 py-3 space-y-3.5'
+        isSidebarCollapsed
+          ? 'w-full max-w-[1920px] p-3 sm:p-4 lg:p-5 space-y-3.5'
           : 'max-w-7xl p-4 sm:p-6 lg:p-8 space-y-6'
       }`}
     >
-      {/* Executive Brand Header with Navigation Controls */}
+      {/* Executive Brand Header */}
       <div
-        className={`flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 bg-white dark:bg-gradient-to-r dark:from-slate-900/90 dark:via-slate-900/80 dark:to-indigo-950/40 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dashboard-header-banner ${
-          sidebarHidden ? 'p-3 sm:p-4' : 'p-4 sm:p-5'
+        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-gradient-to-r dark:from-slate-900/90 dark:via-slate-900/80 dark:to-indigo-950/40 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dashboard-header-banner ${
+          isSidebarCollapsed ? 'p-3 sm:p-4' : 'p-4 sm:p-5'
         }`}
       >
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className={`${sidebarHidden ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'} font-black text-slate-900 dark:text-white tracking-tight`}>
+              <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
                 {selectedCompany ? `${selectedCompany.name} Financial Dashboard` : 'Portfolio Financial Dashboard'}
               </h1>
               <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30">
@@ -172,82 +172,34 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
         </div>
 
-        {/* Dashboard Action Controls: Hide/Show Navbar, Hide/Show Sidebar, Month Selector */}
-        <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
-          {/* Hide/Show Top Navbar Toggle */}
+        {/* Action Controls & Month Selector */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {/* Hide / Show Sidebar Toggle Button */}
           <button
             type="button"
-            onClick={toggleNavbar}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border ${
-              navbarHidden
-                ? 'bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500'
-                : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+            onClick={handleToggleSidebar}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer shadow-xs ${
+              isSidebarCollapsed
+                ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 shadow-indigo-600/20'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
             }`}
-            title={navbarHidden ? "Click to Show Navbar" : "Click to Hide Navbar"}
+            title={isSidebarCollapsed ? 'Show Sidebar navigation' : 'Hide Sidebar for expanded view (No scrolling)'}
           >
-            {navbarHidden ? (
-              <>
-                <Eye className="w-3.5 h-3.5" />
-                <span>Show Navbar</span>
-              </>
-            ) : (
-              <>
-                <EyeOff className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                <span>Hide Navbar</span>
-              </>
-            )}
-          </button>
-
-          {/* Hide/Show Sidebar Navigation Toggle */}
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border ${
-              sidebarHidden
-                ? 'bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500'
-                : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200 dark:hover:bg-slate-800'
-            }`}
-            title={sidebarHidden ? "Click to Show Sidebar" : "Click to Hide Sidebar (Expand View, No Scroll)"}
-          >
-            {sidebarHidden ? (
+            {isSidebarCollapsed ? (
               <>
                 <PanelLeftOpen className="w-3.5 h-3.5" />
                 <span>Show Sidebar</span>
               </>
             ) : (
               <>
-                <PanelLeftClose className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <PanelLeftClose className="w-3.5 h-3.5" />
                 <span>Hide Sidebar</span>
               </>
             )}
           </button>
 
-          {/* Full Screen View Toggle (Hides both Navbar and Sidebar) */}
-          <button
-            type="button"
-            onClick={toggleAllNav}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border ${
-              isAllNavHidden
-                ? 'bg-emerald-600 text-white border-emerald-500 hover:bg-emerald-500'
-                : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-200 dark:hover:bg-slate-800'
-            }`}
-            title={isAllNavHidden ? "Exit Full View" : "Full View (Zero-Scroll Mode)"}
-          >
-            {isAllNavHidden ? (
-              <>
-                <Minimize2 className="w-3.5 h-3.5" />
-                <span>Exit Full View</span>
-              </>
-            ) : (
-              <>
-                <Maximize2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                <span>Full View</span>
-              </>
-            )}
-          </button>
-
           {/* Month Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-700 dark:text-slate-300 shadow-xs">
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 shadow-sm">
             <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <input
               type="month"
@@ -256,12 +208,10 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               className="bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer font-medium"
             />
           </div>
-
           <button
-            type="button"
             onClick={fetchStats}
             disabled={loading}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 hover:text-slate-900 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition cursor-pointer shadow-xs"
+            className="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition cursor-pointer shadow-sm"
             title="Refresh metrics"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -317,9 +267,9 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           )}
 
           {/* Primary Portfolio Cards */}
-          <div className={`grid grid-cols-2 lg:grid-cols-4 ${sidebarHidden ? 'gap-2.5 sm:gap-3.5' : 'gap-3 sm:gap-4'}`}>
+          <div className={`grid grid-cols-2 lg:grid-cols-4 ${isSidebarCollapsed ? 'gap-2.5 sm:gap-3' : 'gap-3 sm:gap-4'}`}>
             {/* Total Property Value */}
-            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden transition-all ${sidebarHidden ? 'p-3 sm:p-3.5' : 'p-4'}`}>
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden ${isSidebarCollapsed ? 'p-3 sm:p-3.5' : 'p-4'}`}>
               <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Portfolio Valuation</span>
                 <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
@@ -335,7 +285,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
 
             {/* Total Mortgage Liabilities */}
-            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden transition-all ${sidebarHidden ? 'p-3 sm:p-3.5' : 'p-4'}`}>
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden ${isSidebarCollapsed ? 'p-3 sm:p-3.5' : 'p-4'}`}>
               <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Mortgage Liabilities</span>
                 <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400">
@@ -352,7 +302,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
 
             {/* Net Equity */}
-            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden transition-all ${sidebarHidden ? 'p-3 sm:p-3.5' : 'p-4'}`}>
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden ${isSidebarCollapsed ? 'p-3 sm:p-3.5' : 'p-4'}`}>
               <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Net Portfolio Equity</span>
                 <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
@@ -368,7 +318,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
 
             {/* Total Bank Liquidity */}
-            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden transition-all ${sidebarHidden ? 'p-3 sm:p-3.5' : 'p-4'}`}>
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl relative overflow-hidden ${isSidebarCollapsed ? 'p-3 sm:p-3.5' : 'p-4'}`}>
               <div className="flex items-center justify-between text-slate-400 mb-1.5">
                 <span className="text-xs font-medium">Bank Cash Liquidity</span>
                 <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
@@ -385,7 +335,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
 
           {/* Monthly Performance Panel */}
-          <div className={`bg-slate-900/80 border border-slate-800 rounded-2xl ${sidebarHidden ? 'p-3.5 sm:p-4 space-y-3' : 'p-4 sm:p-5 space-y-4'}`}>
+          <div className={`bg-slate-900/80 border border-slate-800 rounded-2xl ${isSidebarCollapsed ? 'p-3 sm:p-4 space-y-3' : 'p-4 sm:p-5 space-y-4'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
               <div>
                 <h2 className="text-sm sm:text-base font-bold text-white">
@@ -403,9 +353,9 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
             </div>
 
-            <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 ${sidebarHidden ? 'gap-2 sm:gap-2.5' : 'gap-3'}`}>
+            <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 ${isSidebarCollapsed ? 'gap-2 sm:gap-2.5' : 'gap-3'}`}>
               {/* 1. Expected Rent Roll */}
-              <div className="metric-card-neutral min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:border-slate-500">
+              <div className={`metric-card-neutral min-w-0 ${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3 sm:p-3.5'} rounded-xl flex flex-col justify-between transition hover:border-slate-500`}>
                 <div className="flex items-center justify-between gap-1">
                   <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Expected Rent
@@ -419,7 +369,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
 
               {/* 2. Rent Collected */}
-              <div className="metric-card-rent-collected min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md">
+              <div className={`metric-card-rent-collected min-w-0 ${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3 sm:p-3.5'} rounded-xl flex flex-col justify-between transition hover:shadow-md`}>
                 <div className="flex items-center justify-between gap-1">
                   <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Rent Collected
@@ -433,7 +383,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
 
               {/* 3. Arrears / Uncollected */}
-              <div className="metric-card-arrears min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md">
+              <div className={`metric-card-arrears min-w-0 ${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3 sm:p-3.5'} rounded-xl flex flex-col justify-between transition hover:shadow-md`}>
                 <div className="flex items-center justify-between gap-1">
                   <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Arrears / Due
@@ -447,7 +397,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
 
               {/* 4. Operating Expenses */}
-              <div className="metric-card-neutral min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:border-slate-500">
+              <div className={`metric-card-neutral min-w-0 ${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3 sm:p-3.5'} rounded-xl flex flex-col justify-between transition hover:border-slate-500`}>
                 <div className="flex items-center justify-between gap-1">
                   <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Operating Exp
@@ -461,7 +411,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
 
               {/* 5. Mortgage Payments */}
-              <div className="metric-card-mortgage-payments min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md">
+              <div className={`metric-card-mortgage-payments min-w-0 ${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3 sm:p-3.5'} rounded-xl flex flex-col justify-between transition hover:shadow-md`}>
                 <div className="flex items-center justify-between gap-1">
                   <span className="metric-title text-[11px] font-semibold uppercase tracking-wider">
                     Mortgages
@@ -478,7 +428,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
               {/* 6. Net Cash Flow */}
               <div
-                className={`min-w-0 p-3 sm:p-3.5 rounded-xl flex flex-col justify-between transition hover:shadow-md ${
+                className={`min-w-0 ${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3 sm:p-3.5'} rounded-xl flex flex-col justify-between transition hover:shadow-md ${
                   (m.netCashFlow || 0) >= 0 ? 'metric-card-net-cash-flow' : 'metric-card-mortgage-payments'
                 }`}
               >
@@ -499,7 +449,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
 
           {/* Executive Profit & Loss Performance Widget */}
-          <div className="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+          <div className={`bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm ${isSidebarCollapsed ? 'p-3 sm:p-4 space-y-3' : 'p-4 sm:p-6 space-y-4'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-3">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -530,9 +480,9 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-1 md:grid-cols-3 ${isSidebarCollapsed ? 'gap-2.5 sm:gap-3' : 'gap-4'}`}>
               {/* Card 1: Current Month Net Profit / Loss */}
-              <div className={`p-4 rounded-xl border ${
+              <div className={`rounded-xl border ${isSidebarCollapsed ? 'p-3' : 'p-4'} ${
                 pnlSummary?.currentPeriod?.isProfit
                   ? 'bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-950/20'
                   : 'bg-rose-500/5 border-rose-500/30 dark:bg-rose-950/20'
@@ -563,7 +513,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
 
               {/* Card 2: MoM Comparison */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className={`rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 ${isSidebarCollapsed ? 'p-3' : 'p-4'}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                     Previous Month Comparison
@@ -595,7 +545,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
               </div>
 
               {/* Card 3: Year-to-Date (YTD) Profit */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className={`rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 ${isSidebarCollapsed ? 'p-3' : 'p-4'}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                     Year-to-Date (YTD) Result
@@ -619,8 +569,10 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
           </div>
 
-          {/* Portfolio Statutory Compliance & Expiry Register */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
+          {/* Statutory Compliance & Service Charges Row - Side by side when expanded to eliminate scroll */}
+          <div className={`grid grid-cols-1 ${isSidebarCollapsed ? 'xl:grid-cols-2 gap-3.5' : 'gap-6'}`}>
+            {/* Portfolio Statutory Compliance & Expiry Register */}
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col justify-between ${isSidebarCollapsed ? 'p-3.5 sm:p-4 space-y-3.5' : 'p-5 sm:p-6 space-y-5'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
@@ -817,77 +769,78 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             )}
           </div>
 
-          {/* Service Charges & Ground Rent Overview Card */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-                  <Building2 className="w-5 h-5" />
+            {/* Service Charges & Ground Rent Overview Card */}
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col justify-between ${isSidebarCollapsed ? 'p-3.5 sm:p-4 space-y-3.5' : 'p-5 space-y-4'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Service Charges & Ground Rent Ledger</span>
+                      {chargesOverview?.pendingCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          {chargesOverview.pendingCount} Pending Demands
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Managing company demands, partial payment reconciliation & banking audit trail
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>Service Charges & Ground Rent Ledger</span>
-                    {chargesOverview?.pendingCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        {chargesOverview.pendingCount} Pending Demands
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Managing company demands, partial payment reconciliation & banking audit trail
-                  </p>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigate && onNavigate('properties')}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition cursor-pointer self-start sm:self-auto"
+                >
+                  <span>Open Property Ledgers</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => onNavigate && onNavigate('properties')}
-                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition cursor-pointer self-start sm:self-auto"
-              >
-                <span>Open Property Ledgers</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Demanded Total</span>
-                <div className="text-lg font-extrabold text-white mt-1 tabular-nums">
-                  {formatGBP(chargesOverview?.totalDemanded || 0)}
+              <div className={`grid grid-cols-2 sm:grid-cols-4 ${isSidebarCollapsed ? 'gap-2' : 'gap-3'}`}>
+                <div className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-950/60 border border-slate-800/80`}>
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Demanded Total</span>
+                  <div className="text-base sm:text-lg font-extrabold text-white mt-1 tabular-nums">
+                    {formatGBP(chargesOverview?.totalDemanded || 0)}
+                  </div>
+                  <span className="text-[10px] text-slate-500">All raised notices</span>
                 </div>
-                <span className="text-[10px] text-slate-500">All raised notices</span>
-              </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-emerald-500/20">
-                <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">Reconciled Paid</span>
-                <div className="text-lg font-extrabold text-emerald-400 mt-1 tabular-nums">
-                  {formatGBP(chargesOverview?.totalPaid || 0)}
+                <div className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-950/60 border border-emerald-500/20`}>
+                  <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider block">Reconciled Paid</span>
+                  <div className="text-base sm:text-lg font-extrabold text-emerald-400 mt-1 tabular-nums">
+                    {formatGBP(chargesOverview?.totalPaid || 0)}
+                  </div>
+                  <span className="text-[10px] text-slate-500">Deducted from bank</span>
                 </div>
-                <span className="text-[10px] text-slate-500">Deducted from bank</span>
-              </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-amber-500/20">
-                <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider block">Balance Due</span>
-                <div className={`text-lg font-extrabold mt-1 tabular-nums ${(chargesOverview?.currentOutstanding || 0) > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
-                  {formatGBP(chargesOverview?.currentOutstanding || 0)}
+                <div className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-950/60 border border-amber-500/20`}>
+                  <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider block">Balance Due</span>
+                  <div className={`text-base sm:text-lg font-extrabold mt-1 tabular-nums ${(chargesOverview?.currentOutstanding || 0) > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+                    {formatGBP(chargesOverview?.currentOutstanding || 0)}
+                  </div>
+                  <span className="text-[10px] text-slate-500">Unsettled balance</span>
                 </div>
-                <span className="text-[10px] text-slate-500">Unsettled balance</span>
-              </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-rose-500/20">
-                <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider block">Overdue Demands</span>
-                <div className={`text-lg font-extrabold mt-1 tabular-nums ${(chargesOverview?.overdueAmount || 0) > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
-                  {formatGBP(chargesOverview?.overdueAmount || 0)}
+                <div className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-950/60 border border-rose-500/20`}>
+                  <span className="text-[11px] font-semibold text-rose-400 uppercase tracking-wider block">Overdue Demands</span>
+                  <div className={`text-base sm:text-lg font-extrabold mt-1 tabular-nums ${(chargesOverview?.overdueAmount || 0) > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                    {formatGBP(chargesOverview?.overdueAmount || 0)}
+                  </div>
+                  <span className="text-[10px] text-slate-500">Exceeded due date</span>
                 </div>
-                <span className="text-[10px] text-slate-500">Exceeded due date</span>
               </div>
             </div>
           </div>
 
           {/* Recent Activity & Monthly Comparison Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className={`grid grid-cols-1 lg:grid-cols-2 ${isSidebarCollapsed ? 'gap-3.5' : 'gap-5'}`}>
             {/* Recent Transactions in Active Company */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col justify-between ${isSidebarCollapsed ? 'p-3.5 sm:p-4 space-y-3' : 'p-5 space-y-4'}`}>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-indigo-400" />
@@ -956,7 +909,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
             </div>
 
             {/* 6-Month Income vs Expenses Visualizer */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div className={`bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col justify-between ${isSidebarCollapsed ? 'p-3.5 sm:p-4 space-y-3' : 'p-5 space-y-4'}`}>
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -972,7 +925,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
                   No historical cash flow data available.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className={`space-y-3 ${isSidebarCollapsed ? 'max-h-64 overflow-y-auto pr-1' : ''}`}>
                   {monthlyTrends.map((trend) => (
                     <div key={trend.month} className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/60 text-xs space-y-1.5">
                       <div className="flex items-center justify-between font-semibold">
@@ -999,10 +952,10 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
           </div>
 
           {/* Quick Actions Shortcuts */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-2 sm:grid-cols-4 ${isSidebarCollapsed ? 'gap-2.5' : 'gap-3'}`}>
             <button
               onClick={() => onNavigate('rent')}
-              className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer"
+              className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer`}
             >
               <div>
                 <div className="text-xs font-semibold text-white group-hover:text-indigo-400 transition">
@@ -1015,7 +968,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
             <button
               onClick={() => onNavigate('mortgages')}
-              className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer"
+              className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer`}
             >
               <div>
                 <div className="text-xs font-semibold text-white group-hover:text-indigo-400 transition">
@@ -1028,7 +981,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
             <button
               onClick={() => onNavigate('ledger')}
-              className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer"
+              className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer`}
             >
               <div>
                 <div className="text-xs font-semibold text-white group-hover:text-indigo-400 transition">
@@ -1041,7 +994,7 @@ export function DashboardPage({ onNavigate, selectedCompany }) {
 
             <button
               onClick={() => onNavigate('accounts')}
-              className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer"
+              className={`${isSidebarCollapsed ? 'p-2.5 sm:p-3' : 'p-3.5'} rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-left transition flex items-center justify-between group cursor-pointer`}
             >
               <div>
                 <div className="text-xs font-semibold text-white group-hover:text-indigo-400 transition">

@@ -21,7 +21,6 @@ import { StatementImportPage } from './pages/StatementImportPage.jsx';
 import { ProfitLossPage } from './pages/ProfitLossPage.jsx';
 import { authAPI, clearApiCache } from './services/api.js';
 import { ThemeProvider } from './context/ThemeContext.jsx';
-import { NavigationProvider } from './context/NavigationContext.jsx';
 import { PWAInstallBanner } from './components/PWAInstallBanner.jsx';
 import { COMPANIES, getCompanyBySlug } from './config/companies.js';
 
@@ -301,8 +300,7 @@ export function App() {
 
   return (
     <ThemeProvider>
-      <NavigationProvider>
-        {/* Splash screen displayed on cold initial loads */}
+      {/* Splash screen displayed on cold initial loads */}
       {showSplash && (
         <SplashScreen
           isFading={isFading}
@@ -411,9 +409,8 @@ export function App() {
         </MainLayout>
       )}
 
-        {/* Progressive Web App (PWA) Native Installation Prompt Banner */}
-        <PWAInstallBanner />
-      </NavigationProvider>
+      {/* Progressive Web App (PWA) Native Installation Prompt Banner */}
+      <PWAInstallBanner />
     </ThemeProvider>
   );
 }

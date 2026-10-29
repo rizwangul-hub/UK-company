@@ -7,11 +7,21 @@ export function PWAInstallBanner() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    // 0. If embedded in simulator or iframe, don't show native install prompt
+    try {
+      if (window.self !== window.top) return;
+    } catch {
+      return;
+    }
+
     // 1. Detect if the app is already running in standalone / installed PWA mode
-    const isAppStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true ||
-      document.referrer.includes('android-app://');
+    let isAppStandalone = false;
+    try {
+      isAppStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true ||
+        document.referrer.includes('android-app://');
+    } catch {}
 
     if (isAppStandalone) {
       setIsStandalone(true);
@@ -24,7 +34,11 @@ export function PWAInstallBanner() {
       setDeferredPrompt(e);
 
       // Check if user previously dismissed prompt in this session
-      const dismissed = sessionStorage.getItem('pwa_prompt_dismissed');
+      let dismissed = null;
+      try {
+        dismissed = sessionStorage.getItem('pwa_prompt_dismissed');
+      } catch {}
+
       if (!dismissed) {
         setShowBanner(true);
       }
@@ -67,7 +81,9 @@ export function PWAInstallBanner() {
 
   const handleDismiss = () => {
     setShowBanner(false);
-    sessionStorage.setItem('pwa_prompt_dismissed', 'true');
+    try {
+      sessionStorage.setItem('pwa_prompt_dismissed', 'true');
+    } catch {}
   };
 
   if (isStandalone || !showBanner || !deferredPrompt) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard,
   Building2,
@@ -22,14 +22,11 @@ import {
   Trash2,
   FileUp,
   TrendingUp,
-  Eye,
-  EyeOff,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import { BackToPortalButton } from '../components/BackToPortalButton.jsx';
-import { useNavigation } from '../context/NavigationContext.jsx';
 import pixxLogo from '../assets/logo.png';
 import { getPageAnimationClass } from '../utils/pageAnimations.js';
 
@@ -62,14 +59,29 @@ export function MainLayout({
   children,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const {
-    sidebarHidden,
-    navbarHidden,
-    isAllNavHidden,
-    toggleSidebar,
-    toggleNavbar,
-    toggleAllNav,
-  } = useNavigation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('pixx_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('pixx_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const handleCustomToggle = () => toggleSidebar();
+    window.addEventListener('pixx:toggle-sidebar', handleCustomToggle);
+    return () => window.removeEventListener('pixx:toggle-sidebar', handleCustomToggle);
+  }, []);
 
   const displayLogo = selectedCompany?.logo || pixxLogo;
   const displayName = selectedCompany?.name || 'PIXX TECHNOLOGIES';
@@ -78,33 +90,7 @@ export function MainLayout({
   const adminEmail = user?.email || 'fahad@gmail.com';
 
   return (
-    <div className="h-screen h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row relative">
-      {/* Floating Restore Controls when Navbar or Sidebar is Hidden */}
-      {(navbarHidden || sidebarHidden) && (
-        <div className="fixed top-3 right-4 z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
-          {navbarHidden && (
-            <button
-              onClick={toggleNavbar}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-600/95 hover:bg-indigo-600 text-white text-xs font-bold shadow-xl shadow-indigo-600/30 backdrop-blur-md transition-all border border-indigo-400/40 cursor-pointer hover:scale-105 active:scale-95"
-              title="Click to show Navbar"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Show Navbar</span>
-            </button>
-          )}
-          {sidebarHidden && (
-            <button
-              onClick={toggleSidebar}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white dark:bg-slate-800/90 dark:hover:bg-slate-700 text-xs font-bold shadow-xl shadow-black/30 backdrop-blur-md transition-all border border-slate-700/60 cursor-pointer hover:scale-105 active:scale-95"
-              title="Click to show Sidebar"
-            >
-              <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Show Sidebar</span>
-            </button>
-          )}
-        </div>
-      )}
-
+    <div className="h-screen h-[100dvh] max-h-[100dvh] w-full overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col md:flex-row">
       {/* Mobile Drawer Backdrop Overlay */}
       {mobileMenuOpen && (
         <div
@@ -115,7 +101,7 @@ export function MainLayout({
       )}
 
       {/* Mobile Top Header - Displays Company Brand & Admin Info on Top */}
-      <div className={`md:hidden ${navbarHidden ? 'hidden' : 'flex'} items-center justify-between px-3.5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shrink-0`}>
+      <div className="md:hidden flex items-center justify-between px-3.5 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="animated-logo-box w-12 h-12 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1 shadow-md shrink-0">
             <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
@@ -184,51 +170,62 @@ export function MainLayout({
 
       {/* Sidebar Navigation - Pure White in Light Mode, Dark Slate in Dark Mode */}
       <aside
-        className={`sidebar-layout fixed md:relative top-0 left-0 bottom-0 md:bottom-auto h-screen h-[100dvh] max-h-[100dvh] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-50 shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none ${
-          sidebarHidden
-            ? 'w-0 max-w-0 -translate-x-full md:w-0 md:max-w-0 md:-translate-x-full opacity-0 pointer-events-none p-0 m-0 border-0 overflow-hidden'
-            : `w-72 lg:w-80 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`
-        }`}
+        className={`sidebar-layout fixed md:relative top-0 left-0 bottom-0 md:bottom-auto h-screen h-[100dvh] max-h-[100dvh] bg-white dark:bg-slate-900 flex flex-col z-50 shrink-0 transition-all duration-300 ease-in-out shadow-2xl md:shadow-none overflow-hidden ${
+          sidebarCollapsed
+            ? 'w-72 md:w-0 md:min-w-0 md:border-r-0 md:opacity-0 md:pointer-events-none'
+            : 'w-72 lg:w-80 border-r border-slate-200 dark:border-slate-800'
+        } ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
-        {/* Mobile Drawer Header with Close Button */}
-        <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="animated-logo-box w-14 h-14 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1.5 shadow-md shrink-0">
-              <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white truncate">
-                {displayName}
+        <div className="w-72 lg:w-80 h-full flex flex-col shrink-0">
+          {/* Mobile Drawer Header with Close Button */}
+          <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="animated-logo-box w-14 h-14 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1.5 shadow-md shrink-0">
+                <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
               </div>
-              <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wider uppercase truncate">
-                {displayLegalName}
+              <div className="min-w-0">
+                <div className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white truncate">
+                  {displayName}
+                </div>
+                <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wider uppercase truncate">
+                  {displayLegalName}
+                </div>
               </div>
             </div>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer shrink-0"
+              title="Close Menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer shrink-0"
-            title="Close Menu"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Brand Area for Desktop */}
-        <div className="p-4 lg:p-5 border-b border-slate-200 dark:border-slate-800/80 hidden md:flex flex-col gap-2.5 shrink-0 bg-white dark:bg-slate-900">
-          <div className="flex items-center gap-3.5">
-            <div className="animated-logo-box w-16 h-16 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1.5 shadow-lg shrink-0">
-              <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-extrabold text-sm lg:text-base tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
-                <span>{displayName}</span>
+          {/* Brand Area for Desktop */}
+          <div className="p-4 lg:p-5 border-b border-slate-200 dark:border-slate-800/80 hidden md:flex flex-col gap-2.5 shrink-0 bg-white dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="animated-logo-box w-14 h-14 lg:w-16 lg:h-16 rounded-2xl bg-white border-2 border-indigo-500/40 flex items-center justify-center p-1.5 shadow-lg shrink-0">
+                  <img src={displayLogo} alt={displayName} className="w-full h-full object-contain" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-extrabold text-sm lg:text-base tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
+                    <span>{displayName}</span>
+                  </div>
+                  <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wider uppercase truncate">
+                    {displayLegalName}
+                  </div>
+                </div>
               </div>
-              <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold tracking-wider uppercase truncate">
-                {displayLegalName}
-              </div>
+              {/* Desktop Sidebar Collapse Toggle Button */}
+              <button
+                onClick={toggleSidebar}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition cursor-pointer shrink-0"
+                title="Hide Sidebar (Expand Dashboard View)"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
             </div>
-          </div>
 
           {/* Quick Actions: Master Group & Switch Company */}
           <div className="grid grid-cols-2 gap-1.5 mt-1">
@@ -352,31 +349,38 @@ export function MainLayout({
             </div>
           </div>
         </div>
-      </aside>
+      </div>
+    </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto overflow-x-hidden">
         {/* Top Header Bar for Desktop - Displays Company Brand, Admin Name & Email, Actions, Theme Toggle, Sign Out */}
-        <header className={`${navbarHidden ? 'hidden' : 'hidden md:flex'} items-center justify-between px-4 lg:px-6 py-2.5 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 transition-all duration-200`}>
-          <div className="flex items-center gap-3">
-            {/* Desktop Sidebar Toggle Button */}
+        <header className="hidden md:flex items-center justify-between px-4 lg:px-6 py-2.5 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
+          <div className="flex items-center gap-2.5">
+            {/* Desktop Sidebar Collapse / Expand Toggle Button */}
             <button
               onClick={toggleSidebar}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 transition border border-slate-200 dark:border-slate-700/80 cursor-pointer shadow-xs"
-              title={sidebarHidden ? "Show Sidebar Navigation" : "Hide Sidebar Navigation"}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer border ${
+                sidebarCollapsed
+                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 shadow-indigo-600/20'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700/80'
+              }`}
+              title={sidebarCollapsed ? 'Show Sidebar navigation' : 'Hide Sidebar (Full Width Dashboard)'}
             >
-              {sidebarHidden ? (
+              {sidebarCollapsed ? (
                 <>
-                  <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="hidden xl:inline">Show Sidebar</span>
+                  <PanelLeftOpen className="w-3.5 h-3.5" />
+                  <span>Show Sidebar</span>
                 </>
               ) : (
                 <>
-                  <PanelLeftClose className="w-3.5 h-3.5 text-slate-500" />
+                  <PanelLeftClose className="w-3.5 h-3.5" />
                   <span className="hidden xl:inline">Hide Sidebar</span>
                 </>
               )}
             </button>
+
+            <span className="text-slate-300 dark:text-slate-700">|</span>
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
@@ -397,19 +401,9 @@ export function MainLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {/* Back to Central Portal Button */}
             <BackToPortalButton />
-
-            {/* Hide Navbar Toggle Button */}
-            <button
-              onClick={toggleNavbar}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 dark:bg-slate-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-500/40 transition shadow-xs cursor-pointer"
-              title="Hide Top Navbar (Click floating button anytime to show again)"
-            >
-              <EyeOff className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-              <span className="hidden lg:inline">Hide Navbar</span>
-            </button>
 
             {/* Admin Profile Pill on Top Header */}
             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 shadow-xs">
@@ -462,7 +456,16 @@ export function MainLayout({
         {/* Dynamic Page Content with View-Specific 3D Animations */}
         <div className="flex-1 pb-page-safe flex flex-col justify-between book-page-perspective">
           <div key={currentView} className={`${getPageAnimationClass(currentView)} min-h-full flex flex-col justify-between flex-1`}>
-            <div>{children}</div>
+            <div>
+              {React.Children.map(children, (child) =>
+                React.isValidElement(child)
+                  ? React.cloneElement(child, {
+                      isSidebarCollapsed: sidebarCollapsed,
+                      onToggleSidebar: toggleSidebar,
+                    })
+                  : child
+              )}
+            </div>
 
             {/* Standard Footer for Mobile & Responsive Screens */}
             <footer className="mt-8 mb-2 py-3 px-4 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 flex-wrap text-center">
