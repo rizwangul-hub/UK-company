@@ -295,30 +295,35 @@ export function MainLayout({
                     onViewChange(item.id);
                     setMobileMenuOpen(false);
                   }}
-                  className={`group w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl min-h-[46px] text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                  className={`group w-full flex items-center justify-between px-3 py-2.5 rounded-2xl min-h-[46px] text-sm transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-600/25 border border-indigo-400/30'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent'
+                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/30 border border-emerald-400/40 ring-1 ring-emerald-400/30 font-bold'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent font-medium'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {isActive && (
+                      <span className="w-1.5 h-5 rounded-full bg-white shadow-xs shrink-0" />
+                    )}
                     <div
                       className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center transition-all shrink-0 ${
                         isActive
-                          ? 'bg-white/20 text-white shadow-sm'
-                          : 'bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 group-hover:text-indigo-700 dark:group-hover:text-indigo-300'
+                          ? 'bg-white/25 text-white shadow-sm ring-1 ring-white/30'
+                          : 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/20 group-hover:text-emerald-700 dark:group-hover:text-emerald-300'
                       }`}
                     >
                       <Icon className="w-4.5 h-4.5" />
                     </div>
-                    <span className="tracking-tight">{item.label}</span>
+                    <span className={`tracking-tight truncate ${isActive ? 'font-bold text-white' : 'font-semibold'}`}>
+                      {item.label}
+                    </span>
                   </div>
                   {item.badge && (
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                      className={`text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-extrabold ${
                         isActive
-                          ? 'bg-white/20 text-white border border-white/30'
-                          : 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30'
+                          ? 'bg-white/25 text-white border border-white/40 shadow-xs'
+                          : 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30'
                       }`}
                     >
                       {item.badge}
@@ -383,7 +388,7 @@ export function MainLayout({
             <span className="text-slate-300 dark:text-slate-700">|</span>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 {NAV_ITEMS.find((item) => item.id === currentView)?.label || 'System Portal'}
               </span>
               <span className="text-slate-400 dark:text-slate-600">/</span>
