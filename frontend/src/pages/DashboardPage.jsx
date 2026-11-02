@@ -35,7 +35,15 @@ export function DashboardPage({
   isSidebarCollapsed: propIsSidebarCollapsed,
   onToggleSidebar,
 }) {
-  const isSidebarCollapsed = Boolean(propIsSidebarCollapsed);
+  const [storedSidebarCollapsed, setStoredSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('pixx_sidebar_collapsed') === 'true'; } catch { return false; }
+  });
+  const isSidebarCollapsed = propIsSidebarCollapsed ?? storedSidebarCollapsed;
+  useEffect(() => {
+    const syncSidebar = event => setStoredSidebarCollapsed(Boolean(event.detail));
+    window.addEventListener('pixx:sidebar-changed', syncSidebar);
+    return () => window.removeEventListener('pixx:sidebar-changed', syncSidebar);
+  }, []);
 
   const handleToggleSidebar = () => {
     if (onToggleSidebar) {

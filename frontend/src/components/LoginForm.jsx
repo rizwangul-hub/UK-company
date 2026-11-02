@@ -155,12 +155,14 @@ export function LoginForm({ onLoginSuccess }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSetupMode && (
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label htmlFor="operator-name" className="block text-xs font-medium text-slate-300 mb-1.5">
                   Operator Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
+                    id="operator-name"
+                    autoComplete="name"
                     type="text"
                     required
                     value={name}
@@ -173,12 +175,14 @@ export function LoginForm({ onLoginSuccess }) {
             )}
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label htmlFor="login-email" className="block text-xs font-medium text-slate-300 mb-1.5">
                 Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
+                  id="login-email"
+                  autoComplete="username"
                   type="email"
                   required
                   value={email}
@@ -190,12 +194,14 @@ export function LoginForm({ onLoginSuccess }) {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label htmlFor="login-password" className="block text-xs font-medium text-slate-300 mb-1.5">
                 Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
+                  id="login-password"
+                  autoComplete={isSetupMode ? 'new-password' : 'current-password'}
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
@@ -208,7 +214,8 @@ export function LoginForm({ onLoginSuccess }) {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition cursor-pointer p-0.5 rounded focus:outline-none"
                   title={showPassword ? 'Hide password' : 'Show password'}
-                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -217,12 +224,14 @@ export function LoginForm({ onLoginSuccess }) {
 
             {isSetupMode && (
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label htmlFor="confirm-password" className="block text-xs font-medium text-slate-300 mb-1.5">
                   Confirm Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
+                    id="confirm-password"
+                    autoComplete="new-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     required
                     value={confirmPassword}
@@ -235,7 +244,8 @@ export function LoginForm({ onLoginSuccess }) {
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition cursor-pointer p-0.5 rounded focus:outline-none"
                     title={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    tabIndex={-1}
+                    aria-label={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'}
+                    aria-pressed={showConfirmPassword}
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>

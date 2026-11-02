@@ -1,12 +1,12 @@
-﻿/* Shared workspace design. Kept separate from the financial page logic. */
+/* Shared workspace design. Kept separate from the financial page logic. */
 :root { --workspace-accent: #087f73; --workspace-line: #e3e9ed; --workspace-muted: #64748b; }
 body { font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif; }
-button, input, select, textarea { font: inherit; }
+button, input, select, textarea { font-family: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 :focus-visible { outline: 3px solid #38b2a3; outline-offset: 3px; }
 .workspace-shell { display: flex; height: 100dvh; overflow: hidden; background: #f3f6f8; color: #182c3c; }
-.workspace-sidebar, html.light .workspace-sidebar { width: 264px; flex-shrink: 0; display: flex; flex-direction: column; background: #102b38 !important; color: #b9cbd4; border: 0 !important; }
+.workspace-sidebar { width: 264px; flex-shrink: 0; display: flex; flex-direction: column; background: #102b38 !important; color: #b9cbd4; border: 0 !important; }
 .workspace-brand { display: flex; align-items: center; gap: 11px; padding: 27px 22px 24px; }
 .workspace-brand-icon { display: grid; place-items: center; width: 39px; height: 42px; border-radius: 12px; background: #1b4652; color: #70d9c6; }
 .workspace-brand strong { display: block; color: #fff; font-size: 16px; letter-spacing: 1.5px; }
@@ -160,4 +160,44 @@ html.dark .login-screen { background: #0c1b26; }
 @media (max-width: 767px) {
   .workspace-sidebar, .workspace-shell.is-collapsed .workspace-sidebar { visibility: hidden; }
   .workspace-sidebar.is-open, .workspace-shell.is-collapsed .workspace-sidebar.is-open { visibility: visible; }
+}
+
+/* Override legacy global rules only within the redesigned surfaces. */
+html.light .workspace-sidebar { background: #102b38 !important; border: 0 !important; }
+html.light .workspace-nav-search input { color: #fff !important; }
+.workspace-nav-search:focus-within, .hub-search:focus-within { outline: 2px solid #38b2a3; outline-offset: 2px; }
+html.light .workspace-content button.bg-indigo-600.text-white,
+html.light .login-screen button[type="submit"],
+html.light .login-screen button.bg-gradient-to-br.text-white { color: #fff !important; }
+.workspace-page-intro h1 { font-size: clamp(23px, 2.5vw, 31px) !important; }
+.hub-intro h1 { font-size: clamp(28px, 4vw, 42px) !important; }
+.hub-group-banner h2 { font-size: 21px !important; }
+.hub-section-heading h2 { font-size: 17px !important; }
+.hub-company-card h3 { font-size: 15px !important; }
+.workspace-sidebar { min-height: 0; }
+.workspace-brand, .workspace-company, .workspace-nav-search, .workspace-sidebar-bottom { flex-shrink: 0; }
+.workspace-nav { min-height: 0; overscroll-behavior: contain; }
+.workspace-nav-group button { font-size: 12px; min-height: 40px; }
+.workspace-nav-group > p { font-size: 10px; }
+.workspace-company small { font-size: 9px; }
+.workspace-page-intro p, .hub-intro p { font-size: 12px; }
+.workspace-topbar { padding-top: env(safe-area-inset-top, 0px); }
+.workspace-breadcrumb { min-width: 0; }
+.workspace-breadcrumb strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-top-actions { flex-shrink: 0; }
+.workspace-sidebar-bottom { padding-bottom: max(13px, env(safe-area-inset-bottom, 0px)); }
+.workspace-main, .company-hub { overscroll-behavior-y: contain; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.hub-search { min-width: 0; }
+.hub-search input { min-width: 0; }
+@media (min-width: 1000px) {
+  .login-story h2 { font-size: clamp(34px, 4vw, 54px) !important; font-weight: 600 !important; }
+}
+@media (max-width: 767px) {
+  .hub-header { flex-wrap: wrap; }
+  .hub-company-card h3 { font-size: 13px !important; }
+  .workspace-nav-search input, .hub-search input,
+  .login-screen input, .workspace-content input,
+  .workspace-content select, .workspace-content textarea { font-size: 16px; }
+  .workspace-breadcrumb > svg { display: none; }
+  .workspace-breadcrumb button, .workspace-mobile-close, .workspace-profile button, .hub-signout { min-width: 40px; min-height: 40px; }
 }

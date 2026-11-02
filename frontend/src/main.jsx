@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import './workspace.css';
 import App from './App.jsx';
 
 // Register Service Worker for PWA (Progressive Web App)
@@ -46,5 +47,3 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>
 );
-
-import './workspace.css';
