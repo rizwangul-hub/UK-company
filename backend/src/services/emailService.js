@@ -107,6 +107,10 @@ export const sendDocumentExpiryAlertEmail = async ({
   toEmail,
   propertyName,
   propertyAddress = '',
+  unitName = '',
+  tenantName = '',
+  tenantPhone = '',
+  tenantEmail = '',
   documentTitle,
   documentCategory = 'Safety & Compliance',
   expiryDate,
@@ -136,10 +140,33 @@ export const sendDocumentExpiryAlertEmail = async ({
     urgencyColor = '#f59e0b';
     urgencyBadge = `URGENT: ${daysRemaining} DAYS REMAINING`;
     subjectPrefix = '⚠️ Urgent Notice (14 Days)';
+  } else if (daysRemaining <= 30) {
+    urgencyColor = '#f59e0b'; // amber
+    urgencyBadge = `EXPIRING IN 1 MONTH (${daysRemaining} DAYS)`;
+    subjectPrefix = '⚠️ 1 Month Notice (Expiring Soon)';
   }
 
   const formattedExpiry = formatUKDate(expiryDate);
-  const subject = `${subjectPrefix}: "${documentTitle}" for ${propertyName} expires on ${formattedExpiry}`;
+  const targetLabel = tenantName ? `tenant ${tenantName}${propertyName ? ` (${propertyName})` : ''}` : propertyName;
+  const subject = `${subjectPrefix}: "${documentTitle}" for ${targetLabel} will expire in ${daysRemaining} days (on ${formattedExpiry})`;
+
+  const textBody = `
+UK Property & Document Expiry Alert
+====================================
+Notice: ${urgencyBadge}
+
+Document: ${documentTitle}
+Category: ${documentCategory}
+${tenantName ? `Tenant: ${tenantName} (${tenantPhone || 'N/A'}${tenantEmail ? ` · ${tenantEmail}` : ''})\n` : ''}Property: ${propertyName}${unitName ? ` · ${unitName}` : ''}
+${propertyAddress ? `Address: ${propertyAddress}\n` : ''}Expiry Date: ${formattedExpiry}
+Days Remaining: ${isExpired ? `${Math.abs(daysRemaining)} days overdue` : isDueToday ? 'Expires today' : `${daysRemaining} days (approx. 1 month)`}
+
+Action Required:
+This document will expire after one month (on ${formattedExpiry}).
+Please arrange renewal, re-certification, or contractor inspection promptly to maintain compliance under UK landlord regulations.
+
+Once renewed, please upload the new document into the system to clear this alert.
+`.trim();
 
   const html = `
 <!DOCTYPE html>
@@ -150,8 +177,8 @@ export const sendDocumentExpiryAlertEmail = async ({
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 24px; color: #f8fafc; }
     .card { max-width: 600px; margin: 0 auto; background-color: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); }
-    .header { background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%); padding: 24px; border-bottom: 1px solid #334155; }
-    .brand { font-size: 13px; font-weight: 700; color: #818cf8; letter-spacing: 0.05em; text-transform: uppercase; }
+    .header { background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%); padding: 24px; border-bottom: 1px solid #334155; }
+    .brand { font-size: 13px; font-weight: 700; color: #34d399; letter-spacing: 0.05em; text-transform: uppercase; }
     .title { font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 8px; margin-bottom: 0; line-height: 1.3; }
     .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; background-color: ${urgencyColor}20; color: ${urgencyColor}; border: 1px solid ${urgencyColor}50; margin-top: 12px; }
     .body { padding: 24px; }
@@ -168,19 +195,28 @@ export const sendDocumentExpiryAlertEmail = async ({
 <body>
   <div class="card">
     <div class="header">
-      <div class="brand">UK Property Compliance &amp; Document Alert</div>
+      <div class="brand">UK Property Compliance &amp; Document Expiry Alert</div>
       <h1 class="title">${documentTitle}</h1>
       <div class="badge">${urgencyBadge}</div>
     </div>
     <div class="body">
       <p style="margin-top:0; font-size:14px; line-height:1.5; color:#cbd5e1;">
-        The following statutory or contractual property document requires your immediate attention and renewal action.
+        The following document will expire after one month (or is due for statutory renewal). Please review the details below:
       </p>
 
       <div class="detail-grid">
+        ${tenantName ? `
         <div class="row">
-          <span class="label">Property Name</span>
-          <span class="value">${propertyName}</span>
+          <span class="label">Tenant Name</span>
+          <span class="value">${tenantName}</span>
+        </div>
+        <div class="row">
+          <span class="label">Tenant Contact</span>
+          <span class="value">${tenantPhone || 'N/A'}${tenantEmail ? ` · ${tenantEmail}` : ''}</span>
+        </div>` : ''}
+        <div class="row">
+          <span class="label">Property / Unit</span>
+          <span class="value">${propertyName}${unitName ? ` · ${unitName}` : ''}</span>
         </div>
         ${propertyAddress ? `
         <div class="row">
@@ -188,7 +224,7 @@ export const sendDocumentExpiryAlertEmail = async ({
           <span class="value">${propertyAddress}</span>
         </div>` : ''}
         <div class="row">
-          <span class="label">Document Category</span>
+          <span class="label">Document Type</span>
           <span class="value">${documentCategory}</span>
         </div>
         <div class="row">
@@ -197,21 +233,21 @@ export const sendDocumentExpiryAlertEmail = async ({
         </div>
         <div class="row">
           <span class="label">Days Remaining</span>
-          <span class="value" style="color: ${urgencyColor};">${isExpired ? `${Math.abs(daysRemaining)} days overdue` : isDueToday ? 'Due today' : `${daysRemaining} days`}</span>
+          <span class="value" style="color: ${urgencyColor};">${isExpired ? `${Math.abs(daysRemaining)} days overdue` : isDueToday ? 'Due today' : `${daysRemaining} days (approx. 1 month)`}</span>
         </div>
       </div>
 
       <div class="alert-box">
-        <strong>Action Required:</strong>
-        Please arrange renewal, re-certification, or contractor inspection promptly to maintain full statutory compliance and avoid legal or insurance invalidation under UK landlord regulations.
+        <strong>1 Month Advance Notice:</strong>
+        This document will expire after one month. Please contact the tenant or arrange re-certification/renewal promptly to maintain statutory compliance under UK landlord regulations.
       </div>
 
       <p style="font-size:12px; color:#94a3b8; margin-bottom:0;">
-        Once renewed, please upload the new certificate / document into the system to automatically update the register and clear this alert.
+        Once renewed, please upload the new document or update the expiry date in the system to clear this alert.
       </p>
     </div>
     <div class="footer">
-      This is an automated compliance notification from your UK Expense Tracker &amp; Property Finance System.
+      Automated compliance notification · UK Property Management &amp; Expense Tracker
     </div>
   </div>
 </body>
@@ -222,6 +258,7 @@ export const sendDocumentExpiryAlertEmail = async ({
     to: toEmail,
     subject,
     html,
+    text: textBody,
     config,
   });
 };

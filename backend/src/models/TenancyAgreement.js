@@ -90,6 +90,14 @@ const tenancyAgreementSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    remindersTriggered: {
+      type: [String],
+      default: [],
+    },
+    lastReminderSentAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,

@@ -1,6 +1,9 @@
 import PropertyDocument from '../models/PropertyDocument.js';
 import Property from '../models/Property.js';
+import Unit from '../models/Unit.js';
+import Tenant from '../models/Tenant.js';
 import TenancyAgreement from '../models/TenancyAgreement.js';
+import TenantDocument from '../models/TenantDocument.js';
 import User from '../models/User.js';
 import EmailNotificationConfig from '../models/EmailNotificationConfig.js';
 import { sendDocumentExpiryAlertEmail } from './emailService.js';
@@ -205,6 +208,195 @@ export const evaluateAndSendExpiryEmails = async ({ targetCompanyId = null, forc
           results.failedCount++;
           results.errors.push(`Failed for "${check.title}" at ${prop.name}: ${emailRes.error}`);
         }
+      }
+    }
+
+    // 4. Process TenantDocument items (19 Standard & Custom UK Tenant documents)
+    const tenantDocQuery = {
+      isActive: true,
+      expiryDate: { $ne: null },
+    };
+    if (targetCompanyId) tenantDocQuery.companyId = targetCompanyId;
+
+    const tenantDocuments = await TenantDocument.find(tenantDocQuery).populate('tenantId', 'fullName email phone');
+    results.evaluatedCount += tenantDocuments.length;
+
+    for (const tDoc of tenantDocuments) {
+      if (!tDoc.expiryDate) continue;
+
+      const expiryMs = new Date(tDoc.expiryDate).getTime();
+      const diffDays = Math.ceil((expiryMs - todayMs) / (1000 * 60 * 60 * 24));
+
+      if (diffDays > maxThreshold) continue;
+
+      let milestone = null;
+      if (diffDays < 0) milestone = 'EXPIRED';
+      else if (diffDays === 0) milestone = '0_DAYS';
+      else if (diffDays <= 7 && thresholdDays.includes(7)) milestone = '7_DAYS';
+      else if (diffDays <= 14 && thresholdDays.includes(14)) milestone = '14_DAYS';
+      else if (diffDays <= 30 && thresholdDays.includes(30)) milestone = '30_DAYS';
+      else if (diffDays <= 45 && thresholdDays.includes(45)) milestone = '45_DAYS';
+      else if (diffDays <= 60 && thresholdDays.includes(60)) milestone = '60_DAYS';
+
+      if (!milestone) continue;
+
+      const emailMilestoneTag = `EMAIL_${milestone}`;
+      if (!forceSend && tDoc.remindersTriggered && tDoc.remindersTriggered.includes(emailMilestoneTag)) {
+        results.alreadyNotifiedCount++;
+        continue;
+      }
+
+      // Find any active tenancy for this tenant to provide property/unit context
+      let activeTenancy = null;
+      if (tDoc.tenantId?._id) {
+        activeTenancy = await TenancyAgreement.findOne({
+          tenantId: tDoc.tenantId._id,
+          status: 'ACTIVE',
+        })
+          .populate('propertyId', 'name addressLine1 postcode')
+          .populate('unitId', 'unitName')
+          .lean();
+      }
+
+      const tenantName = tDoc.tenantId?.fullName || 'Tenant';
+      const tenantPhone = tDoc.tenantId?.phone || '';
+      const tenantEmail = tDoc.tenantId?.email || '';
+      const propName = activeTenancy?.propertyId?.name || 'Assigned Property';
+      const propAddress = activeTenancy?.propertyId?.addressLine1 ? `${activeTenancy.propertyId.addressLine1}${activeTenancy.propertyId.postcode ? ` (${activeTenancy.propertyId.postcode})` : ''}` : '';
+      const unitName = activeTenancy?.unitId?.unitName || '';
+
+      const emailRes = await sendDocumentExpiryAlertEmail({
+        toEmail: recipientEmail,
+        propertyName: propName,
+        propertyAddress: propAddress,
+        unitName,
+        tenantName,
+        tenantPhone,
+        tenantEmail,
+        documentTitle: tDoc.documentName,
+        documentCategory: 'Tenant Document',
+        expiryDate: tDoc.expiryDate,
+        daysRemaining: diffDays,
+        config,
+      });
+
+      if (emailRes.success) {
+        if (!tDoc.remindersTriggered) tDoc.remindersTriggered = [];
+        tDoc.remindersTriggered.push(emailMilestoneTag);
+        tDoc.lastReminderSentAt = now;
+        await tDoc.save();
+
+        config.sentAlertsHistory.unshift({
+          propertyName: `${tenantName} · ${propName}`,
+          documentTitle: tDoc.documentName,
+          documentType: 'Tenant Document',
+          expiryDate: tDoc.expiryDate,
+          daysRemaining: diffDays,
+          sentTo: recipientEmail,
+          sentAt: now,
+          status: 'SENT',
+          milestone,
+        });
+
+        results.emailsSent++;
+      } else {
+        results.failedCount++;
+        results.errors.push(`Failed for tenant doc "${tDoc.documentName}": ${emailRes.error}`);
+
+        config.sentAlertsHistory.unshift({
+          propertyName: `${tenantName} · ${propName}`,
+          documentTitle: tDoc.documentName,
+          documentType: 'Tenant Document',
+          expiryDate: tDoc.expiryDate,
+          daysRemaining: diffDays,
+          sentTo: recipientEmail,
+          sentAt: now,
+          status: 'FAILED',
+          errorMessage: emailRes.error || 'Dispatch error',
+          milestone,
+        });
+      }
+    }
+
+    // 5. Process Tenancy Agreements (AST lease expiry 1 month before)
+    const tenancyQuery = {
+      status: 'ACTIVE',
+      endDate: { $ne: null },
+    };
+    if (targetCompanyId) tenancyQuery.companyId = targetCompanyId;
+
+    const tenancies = await TenancyAgreement.find(tenancyQuery)
+      .populate('tenantId', 'fullName email phone')
+      .populate('propertyId', 'name addressLine1 postcode')
+      .populate('unitId', 'unitName');
+
+    results.evaluatedCount += tenancies.length;
+
+    for (const ten of tenancies) {
+      if (!ten.endDate) continue;
+
+      const expMs = new Date(ten.endDate).getTime();
+      const diffD = Math.ceil((expMs - todayMs) / (1000 * 60 * 60 * 24));
+
+      if (diffD > maxThreshold) continue;
+
+      let m = null;
+      if (diffD < 0) m = 'EXPIRED';
+      else if (diffD === 0) m = '0_DAYS';
+      else if (diffD <= 7 && thresholdDays.includes(7)) m = '7_DAYS';
+      else if (diffD <= 14 && thresholdDays.includes(14)) m = '14_DAYS';
+      else if (diffD <= 30 && thresholdDays.includes(30)) m = '30_DAYS';
+      else if (diffD <= 60 && thresholdDays.includes(60)) m = '60_DAYS';
+
+      if (!m) continue;
+
+      const emailMilestoneTag = `EMAIL_${m}`;
+      if (!forceSend && ten.remindersTriggered && ten.remindersTriggered.includes(emailMilestoneTag)) {
+        results.alreadyNotifiedCount++;
+        continue;
+      }
+
+      const tenantName = ten.tenantId?.fullName || 'Tenant';
+      const propName = ten.propertyId?.name || 'Property';
+      const unitName = ten.unitId?.unitName || '';
+
+      const emailRes = await sendDocumentExpiryAlertEmail({
+        toEmail: recipientEmail,
+        propertyName: propName,
+        propertyAddress: ten.propertyId?.addressLine1 || '',
+        unitName,
+        tenantName,
+        tenantPhone: ten.tenantId?.phone || '',
+        tenantEmail: ten.tenantId?.email || '',
+        documentTitle: `Tenancy Agreement (${ten.agreementRef || ten.leaseType || 'AST'})`,
+        documentCategory: 'Tenancy Agreement',
+        expiryDate: ten.endDate,
+        daysRemaining: diffD,
+        config,
+      });
+
+      if (emailRes.success) {
+        if (!ten.remindersTriggered) ten.remindersTriggered = [];
+        ten.remindersTriggered.push(emailMilestoneTag);
+        ten.lastReminderSentAt = now;
+        await ten.save();
+
+        config.sentAlertsHistory.unshift({
+          propertyName: `${tenantName} · ${propName}`,
+          documentTitle: `Tenancy Agreement (${ten.agreementRef || ten.leaseType || 'AST'})`,
+          documentType: 'Tenancy Agreement',
+          expiryDate: ten.endDate,
+          daysRemaining: diffD,
+          sentTo: recipientEmail,
+          sentAt: now,
+          status: 'SENT',
+          milestone: m,
+        });
+
+        results.emailsSent++;
+      } else {
+        results.failedCount++;
+        results.errors.push(`Failed for tenancy agreement "${ten.agreementRef}": ${emailRes.error}`);
       }
     }
 
