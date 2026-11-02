@@ -435,58 +435,189 @@ export function TenantsPage({ selectedCompany }) {
       {/* Tab: Tenant Directory */}
       {activeTab === 'directory' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tenants.map((ten) => (
-            <div
-              key={ten._id}
-              onClick={() => setSelectedTenantDashboard(ten)}
-              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 space-y-3 cursor-pointer transition shadow-sm hover:shadow-lg group"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition flex items-center gap-1.5">
-                    <span>{ten.fullName}</span>
-                  </h3>
-                  <div className="text-[10px] text-slate-400">{ten.tenantType}</div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenEditTenant(ten);
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                    title="Edit tenant details"
-                  >
-                    <Edit3 className="w-3 h-3 text-amber-400" />
-                    <span>Edit</span>
-                  </button>
-                </div>
-              </div>
+          {tenants.map((ten) => {
+            const tenantAgreements = tenancies.filter(
+              (t) => (t.tenantId?._id || t.tenantId) === ten._id
+            );
+            const primaryAgreement = tenantAgreements[0];
 
-              <div className="space-y-1 text-xs text-slate-400">
-                <div className="flex items-center gap-2">
-                  <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span>{ten.phone}</span>
+            return (
+              <div
+                key={ten._id}
+                onClick={() => setSelectedTenantDashboard(ten)}
+                className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 space-y-3 cursor-pointer transition shadow-sm hover:shadow-lg group"
+              >
+                {/* Header: Name, Type & Edit */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition flex items-center gap-1.5 truncate">
+                      <span>{ten.fullName}</span>
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] font-semibold text-slate-400">{ten.tenantType}</span>
+                      {primaryAgreement ? (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          Active Lease
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          Unassigned
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditTenant(ten);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
+                      title="Edit tenant details"
+                    >
+                      <Edit3 className="w-3 h-3 text-amber-400" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
                 </div>
-                {ten.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>{ten.email}</span>
+
+                {/* Assigned Property & Lettable Unit */}
+                {primaryAgreement ? (
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                        <Building2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <span>Assigned Unit</span>
+                      </div>
+                      <div className="font-bold text-white truncate mt-0.5">
+                        {primaryAgreement.propertyId?.name || 'Property'}
+                        {primaryAgreement.unitId?.unitName && (
+                          <span className="text-indigo-400 font-medium"> · {primaryAgreement.unitId.unitName}</span>
+                        )}
+                      </div>
+                    </div>
+                    {primaryAgreement.rentAmount ? (
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-bold text-emerald-400 text-xs">
+                          {formatGBP(primaryAgreement.rentAmount)}
+                        </div>
+                        <div className="text-[9px] text-slate-500 uppercase font-semibold">per month</div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-xs">
+                      <Building2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>No Unit Assigned</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTenancyForm((prev) => ({
+                          ...prev,
+                          tenantId: ten._id,
+                          propertyId: '',
+                          unitId: '',
+                          rentAmount: '',
+                          depositAmount: '',
+                        }));
+                        setTenancyError('');
+                        setShowTenancyModal(true);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-[10px] shadow-sm transition cursor-pointer"
+                    >
+                      + Assign Unit
+                    </button>
                   </div>
                 )}
-                {ten.currentAddress && (
-                  <div className="text-[11px] text-slate-500 pt-1">
-                    {ten.currentAddress} {ten.postcode && `(${ten.postcode})`}
-                  </div>
-                )}
-              </div>
 
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-emerald-400 font-semibold">
-                <span>View Documents &amp; Dashboard</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+                {/* Contact Information (Phone, Email, Address) */}
+                <div className="space-y-1.5 text-xs text-slate-400">
+                  {/* Phone Row */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      {ten.phone ? (
+                        <span className="text-slate-200 truncate">{ten.phone}</span>
+                      ) : (
+                        <span className="text-slate-500 italic text-[11px]">No phone recorded</span>
+                      )}
+                    </div>
+                    {!ten.phone && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditTenant(ten);
+                        }}
+                        className="text-[10px] font-bold text-amber-400 hover:text-amber-300 transition cursor-pointer shrink-0"
+                      >
+                        + Add Phone
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Email Row */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      {ten.email ? (
+                        <span className="text-slate-200 truncate" title={ten.email}>
+                          {ten.email}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 italic text-[11px]">No email recorded</span>
+                      )}
+                    </div>
+                    {!ten.email && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditTenant(ten);
+                        }}
+                        className="text-[10px] font-bold text-amber-400 hover:text-amber-300 transition cursor-pointer shrink-0"
+                      >
+                        + Add Email
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Address Row */}
+                  <div className="flex items-start justify-between gap-2 pt-0.5">
+                    <div className="min-w-0 flex-1">
+                      {ten.currentAddress ? (
+                        <div className="text-[11px] text-slate-400 line-clamp-2">
+                          {ten.currentAddress} {ten.postcode && `(${ten.postcode})`}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-500 italic">No address recorded</div>
+                      )}
+                    </div>
+                    {!ten.currentAddress && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditTenant(ten);
+                        }}
+                        className="text-[10px] font-bold text-slate-400 hover:text-slate-300 transition cursor-pointer shrink-0"
+                      >
+                        + Add Address
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-emerald-400 font-semibold">
+                  <span>View Documents &amp; Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -706,25 +837,40 @@ export function TenantsPage({ selectedCompany }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Contact Card */}
                 <div className="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
-                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Contact Information</span>
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Contact Information</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditTenant(selectedTenantDashboard)}
+                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 transition cursor-pointer"
+                    >
+                      Edit Contact Info
+                    </button>
                   </div>
                   <div className="space-y-1.5 text-xs text-slate-300">
                     <div className="flex items-center gap-2">
                       <span className="text-slate-500 w-16">Phone:</span>
-                      <a href={`tel:${selectedTenantDashboard.phone}`} className="font-semibold text-slate-200 hover:text-indigo-400">
-                        {selectedTenantDashboard.phone || 'N/A'}
-                      </a>
+                      {selectedTenantDashboard.phone ? (
+                        <a href={`tel:${selectedTenantDashboard.phone}`} className="font-semibold text-slate-200 hover:text-indigo-400">
+                          {selectedTenantDashboard.phone}
+                        </a>
+                      ) : (
+                        <span className="text-slate-500 italic">No phone recorded</span>
+                      )}
                     </div>
-                    {selectedTenantDashboard.email && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-500 w-16">Email:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 w-16">Email:</span>
+                      {selectedTenantDashboard.email ? (
                         <a href={`mailto:${selectedTenantDashboard.email}`} className="font-semibold text-slate-200 hover:text-indigo-400">
                           {selectedTenantDashboard.email}
                         </a>
-                      </div>
-                    )}
+                      ) : (
+                        <span className="text-slate-500 italic">No email recorded</span>
+                      )}
+                    </div>
                     <div className="flex items-start gap-2">
                       <span className="text-slate-500 w-16 shrink-0">Address:</span>
                       <span className="text-slate-300">
@@ -749,8 +895,30 @@ export function TenantsPage({ selectedCompany }) {
 
                     if (tenantAgreements.length === 0) {
                       return (
-                        <div className="text-xs text-slate-500 italic py-2">
-                          No active lease agreement linked to this tenant yet.
+                        <div className="space-y-2 py-1">
+                          <div className="text-xs text-amber-400/90 font-medium">
+                            No active lease agreement linked to this tenant yet.
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTenancyForm((prev) => ({
+                                ...prev,
+                                tenantId: selectedTenantDashboard._id,
+                                propertyId: '',
+                                unitId: '',
+                                rentAmount: '',
+                                depositAmount: '',
+                              }));
+                              setSelectedTenantDashboard(null);
+                              setTenancyError('');
+                              setShowTenancyModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md transition cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Assign Lettable Unit Now</span>
+                          </button>
                         </div>
                       );
                     }
