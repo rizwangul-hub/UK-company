@@ -5,6 +5,7 @@ import {
   updateSchedule,
   recordPayment,
   getArrearsSummary,
+  sendRentNotice,
 } from '../controllers/rentController.js';
 import { protect } from '../middleware/auth.js';
 import { requireCompanyContext } from '../middleware/companyContext.js';
@@ -16,6 +17,7 @@ router.use(protect, requireCompanyContext);
 router.post('/generate-monthly', generateMonthlySchedules);
 router.get('/schedules', getSchedules);
 router.put('/schedules/:id', updateSchedule);
+router.post('/schedules/:id/send-notice', sendRentNotice);
 router.post('/payments', recordPayment);
 router.get('/arrears', getArrearsSummary);
 

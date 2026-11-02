@@ -9,6 +9,7 @@ import Account from '../models/Account.js';
 import Property from '../models/Property.js';
 import { postLedgerTransaction, generateVoucherNo, round2 } from '../services/ledgerService.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
+import { sendRentDueNoticeEmail } from '../services/emailService.js';
 
 export const generateMonthlySchedules = async (req, res) => {
   try {
@@ -414,5 +415,57 @@ export const updateSchedule = async (req, res) => {
     return apiSuccess(res, schedule, 'Rent billing schedule updated successfully');
   } catch (error) {
     return apiError(res, error.message || 'Failed to update rent schedule', 400, error);
+  }
+};
+
+/**
+ * Sends an on-demand Rent Due Email Notice to Tenant
+ */
+export const sendRentNotice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const schedule = await RentSchedule.findOne({ _id: id, companyId: req.companyId })
+      .populate('tenantId', 'fullName email phone')
+      .populate('propertyId', 'name addressLine1 postcode')
+      .populate('unitId', 'unitName');
+
+    if (!schedule) {
+      return apiError(res, 'Rent schedule not found', 404);
+    }
+
+    const tenantEmail = schedule.tenantId?.email;
+    if (!tenantEmail) {
+      return apiError(res, 'No email address registered for this tenant. Please update the tenant record first.', 400);
+    }
+
+    const tenantName = schedule.tenantId?.fullName || 'Valued Tenant';
+    const propertyName = schedule.propertyId?.name || 'Leased Property';
+    const unitName = schedule.unitId?.unitName || '';
+    const amountDue = schedule.outstandingAmount > 0 ? schedule.outstandingAmount : schedule.expectedAmount;
+    const dueDate = schedule.dueDate;
+    const paymentReference = `RENT-${(schedule.billingMonth || '').replace('-', '')}-${(schedule.tenantId?.fullName || '').slice(0, 4).toUpperCase()}`;
+
+    const sendRes = await sendRentDueNoticeEmail({
+      tenantName,
+      tenantEmail,
+      propertyName,
+      unitName,
+      amountDue,
+      dueDate,
+      paymentReference,
+      notes: schedule.notes || '',
+    });
+
+    if (!sendRes.success) {
+      return apiError(res, sendRes.error || 'Failed to dispatch rent notice email.', 500);
+    }
+
+    return apiSuccess(
+      res,
+      { scheduleId: schedule._id, tenantEmail, messageId: sendRes.messageId },
+      `Rent due notice successfully dispatched to ${tenantEmail} (from Kamran Ijaz & Fahad Rasheed, with replies routed to ftaccountants@hotmail.com).`
+    );
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to send rent notice email', 500, error);
   }
 };

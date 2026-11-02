@@ -248,6 +248,25 @@ export const tenantsAPI = {
     const res = await api.put(`/tenants/${id}`, data);
     return res.data;
   },
+  getDocuments: async (tenantId, config = {}) => {
+    return cachedGet(`/tenants/${tenantId}/documents`, config);
+  },
+  uploadDocument: async (tenantId, formData) => {
+    const res = await api.post(`/tenants/${tenantId}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  updateDocument: async (documentId, formData) => {
+    const res = await api.put(`/tenant-documents/${documentId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+  deleteDocument: async (documentId) => {
+    const res = await api.delete(`/tenant-documents/${documentId}`);
+    return res.data;
+  },
 };
 
 export const tenanciesAPI = {
@@ -356,6 +375,10 @@ export const rentAPI = {
   },
   getArrearsSummary: async (config = {}) => {
     return cachedGet('/rent/arrears', config);
+  },
+  sendRentNotice: async (id) => {
+    const res = await api.post(`/rent/schedules/${id}/send-notice`);
+    return res.data;
   },
 };
 

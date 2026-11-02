@@ -11,10 +11,16 @@ import {
   X,
   Loader2,
   Edit3,
+  Save,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { formatGBP, formatUKDate } from '../utils/formatters.js';
 import { tenantsAPI, tenanciesAPI, propertiesAPI, getApiCache } from '../services/api.js';
 import { ModalPortal } from '../components/ModalPortal.jsx';
+import { TenantDocumentSection } from '../components/TenantDocumentSection.jsx';
 
 export function TenantsPage({ selectedCompany }) {
   const [activeTab, setActiveTab] = useState('agreements'); // 'agreements' | 'directory'
@@ -29,10 +35,11 @@ export function TenantsPage({ selectedCompany }) {
   const [loading, setLoading] = useState(!cachedTenants?.data?.tenants?.length);
   const [search, setSearch] = useState('');
 
-  // Add Tenant Modal
+  // Add Tenant Modal & Pending Documents
   const [showTenantModal, setShowTenantModal] = useState(false);
   const [tenantSubmitting, setTenantSubmitting] = useState(false);
   const [tenantError, setTenantError] = useState('');
+  const [pendingDocuments, setPendingDocuments] = useState([]);
   const [tenantForm, setTenantForm] = useState({
     fullName: '',
     email: '',
@@ -42,6 +49,9 @@ export function TenantsPage({ selectedCompany }) {
     tenantType: 'INDIVIDUAL',
     companyName: '',
   });
+
+  // Tenant Dashboard / Details Modal
+  const [selectedTenantDashboard, setSelectedTenantDashboard] = useState(null);
 
   // Edit Tenant Modal
   const [editingTenant, setEditingTenant] = useState(null);
@@ -111,15 +121,54 @@ export function TenantsPage({ selectedCompany }) {
     loadData();
   }, [search]);
 
+  const handleOpenAddTenant = () => {
+    setTenantError('');
+    setPendingDocuments([]);
+    setTenantForm({
+      fullName: '',
+      email: '',
+      phone: '',
+      currentAddress: '',
+      postcode: '',
+      tenantType: 'INDIVIDUAL',
+      companyName: '',
+    });
+    setShowTenantModal(true);
+  };
+
   const handleTenantSubmit = async (e) => {
     e.preventDefault();
     setTenantSubmitting(true);
     setTenantError('');
 
     try {
-      await tenantsAPI.create(tenantForm);
+      const res = await tenantsAPI.create(tenantForm);
+      const createdTenant = res?.data?.data || res?.data?.tenant || res?.data || res;
+      const createdTenantId = createdTenant?._id;
+
+      // Upload any tenant documents collected in the creation form
+      if (createdTenantId && pendingDocuments.length > 0) {
+        for (const item of pendingDocuments) {
+          if (item.file) {
+            try {
+              const formData = new FormData();
+              formData.append('file', item.file);
+              formData.append('documentName', item.documentName);
+              formData.append('documentType', item.documentType || 'standard');
+              if (item.expiryDate) {
+                formData.append('expiryDate', item.expiryDate);
+              }
+              await tenantsAPI.uploadDocument(createdTenantId, formData);
+            } catch (upErr) {
+              console.warn(`Failed to upload ${item.documentName}:`, upErr);
+            }
+          }
+        }
+      }
+
+      setPendingDocuments([]);
       setShowTenantModal(false);
-      loadData();
+      await loadData(true);
     } catch (err) {
       setTenantError(err.response?.data?.message || 'Failed to create tenant.');
     } finally {
@@ -140,7 +189,7 @@ export function TenantsPage({ selectedCompany }) {
         rentDueDay: Number(tenancyForm.rentDueDay) || 1,
       });
       setShowTenancyModal(false);
-      loadData();
+      loadData(true);
     } catch (err) {
       setTenancyError(err.response?.data?.message || 'Failed to create tenancy lease.');
     } finally {
@@ -169,9 +218,16 @@ export function TenantsPage({ selectedCompany }) {
     setEditTenantError('');
 
     try {
-      await tenantsAPI.update(editingTenant._id, editTenantForm);
+      const res = await tenantsAPI.update(editingTenant._id, editTenantForm);
+      const updatedTenant = res?.data?.data || res?.data || { ...editingTenant, ...editTenantForm };
+      
+      // Keep dashboard in sync if open
+      if (selectedTenantDashboard && selectedTenantDashboard._id === editingTenant._id) {
+        setSelectedTenantDashboard(updatedTenant);
+      }
+
       setEditingTenant(null);
-      loadData();
+      await loadData(true);
     } catch (err) {
       setEditTenantError(err.response?.data?.message || 'Failed to update tenant details.');
     } finally {
@@ -239,13 +295,10 @@ export function TenantsPage({ selectedCompany }) {
 
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
-            onClick={() => {
-              setTenantError('');
-              setShowTenantModal(true);
-            }}
+            onClick={handleOpenAddTenant}
             className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/60 text-xs font-bold transition cursor-pointer shadow-sm"
           >
-            <Plus className="w-4 h-4 text-indigo-400" />
+            <Plus className="w-4 h-4 text-emerald-400" />
             <span>Add Tenant</span>
           </button>
 
@@ -304,7 +357,7 @@ export function TenantsPage({ selectedCompany }) {
                 <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
                   <tr>
                     <th className="py-3 px-4">Ref & Type</th>
-                    <th className="py-3 px-4">Tenant</th>
+                    <th className="py-3 px-4">Tenant (Click for Dashboard)</th>
                     <th className="py-3 px-4">Property & Unit</th>
                     <th className="py-3 px-4">Rent (£)</th>
                     <th className="py-3 px-4">Term Dates</th>
@@ -320,8 +373,20 @@ export function TenantsPage({ selectedCompany }) {
                         {t.agreementRef}
                         <span className="block text-[10px] font-sans font-normal text-indigo-400">{t.leaseType}</span>
                       </td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-200">
-                        {t.tenantId?.fullName}
+                      <td
+                        className="py-3.5 px-4 font-semibold text-slate-200 cursor-pointer hover:text-emerald-400 transition"
+                        onClick={() => {
+                          const fullTenant =
+                            tenants.find((tnt) => tnt._id === (t.tenantId?._id || t.tenantId)) ||
+                            t.tenantId;
+                          if (fullTenant) setSelectedTenantDashboard(fullTenant);
+                        }}
+                        title="Click to view tenant dashboard & documents"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>{t.tenantId?.fullName}</span>
+                          <ExternalLink className="w-3 h-3 text-slate-500" />
+                        </div>
                         <span className="block text-[10px] text-slate-500 font-normal">{t.tenantId?.phone}</span>
                       </td>
                       <td className="py-3.5 px-4">
@@ -371,20 +436,33 @@ export function TenantsPage({ selectedCompany }) {
       {activeTab === 'directory' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tenants.map((ten) => (
-            <div key={ten._id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div
+              key={ten._id}
+              onClick={() => setSelectedTenantDashboard(ten)}
+              className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl p-4 space-y-3 cursor-pointer transition shadow-sm hover:shadow-lg group"
+            >
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-white">{ten.fullName}</h3>
+                  <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition flex items-center gap-1.5">
+                    <span>{ten.fullName}</span>
+                  </h3>
                   <div className="text-[10px] text-slate-400">{ten.tenantType}</div>
                 </div>
-                <button
-                  onClick={() => handleOpenEditTenant(ten)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  <Edit3 className="w-3 h-3 text-amber-400" />
-                  <span>Edit</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEditTenant(ten);
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
+                    title="Edit tenant details"
+                  >
+                    <Edit3 className="w-3 h-3 text-amber-400" />
+                    <span>Edit</span>
+                  </button>
+                </div>
               </div>
+
               <div className="space-y-1 text-xs text-slate-400">
                 <div className="flex items-center gap-2">
                   <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -402,82 +480,333 @@ export function TenantsPage({ selectedCompany }) {
                   </div>
                 )}
               </div>
+
+              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-emerald-400 font-semibold">
+                <span>View Documents &amp; Dashboard</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Modal: New Tenant */}
+      {/* Modal: New Tenant (With Document Upload Option at Bottom) */}
       {showTenantModal && (
         <ModalPortal isOpen={showTenantModal} onClose={() => setShowTenantModal(false)}>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 sm:p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h2 className="text-base font-bold text-white">Add UK Tenant</h2>
-              <button onClick={() => setShowTenantModal(false)} className="p-1 rounded-lg text-slate-400 hover:text-white">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-800 shrink-0 bg-slate-950/60">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Add UK Tenant</h2>
+                  <p className="text-xs text-slate-400">Record tenant identity, contact details, and collect tenant documents</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTenantModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {tenantError && (
-              <div className="mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+              <div className="mx-5 sm:mx-6 mt-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
                 {tenantError}
               </div>
             )}
 
-            <form onSubmit={handleTenantSubmit} className="mt-4 space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={tenantForm.fullName}
-                  onChange={(e) => setTenantForm({ ...tenantForm, fullName: e.target.value })}
-                  placeholder="e.g. John Doe"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
+            <form onSubmit={handleTenantSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="overflow-y-auto p-5 sm:p-6 space-y-6 flex-1 text-xs">
+                {/* 1. Tenant Details Form */}
+                <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Tenant Information
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Full Legal Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={tenantForm.fullName}
+                        onChange={(e) => setTenantForm({ ...tenantForm, fullName: e.target.value })}
+                        placeholder="e.g. John Doe"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Tenant Type</label>
+                      <select
+                        value={tenantForm.tenantType}
+                        onChange={(e) => setTenantForm({ ...tenantForm, tenantType: e.target.value })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none cursor-pointer"
+                      >
+                        <option value="INDIVIDUAL">Individual Tenant</option>
+                        <option value="COMPANY">Company / Corporate Let</option>
+                        <option value="STUDENT">Student</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {tenantForm.tenantType === 'COMPANY' && (
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Company Legal Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={tenantForm.companyName}
+                        onChange={(e) => setTenantForm({ ...tenantForm, companyName: e.target.value })}
+                        placeholder="e.g. Acme Holdings Ltd"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Phone Number *</label>
+                      <input
+                        type="tel"
+                        required
+                        value={tenantForm.phone}
+                        onChange={(e) => setTenantForm({ ...tenantForm, phone: e.target.value })}
+                        placeholder="07123 456789"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        value={tenantForm.email}
+                        onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
+                        placeholder="tenant@gmail.com"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-slate-300 font-medium mb-1">Current Residential Address</label>
+                      <input
+                        type="text"
+                        value={tenantForm.currentAddress}
+                        onChange={(e) => setTenantForm({ ...tenantForm, currentAddress: e.target.value })}
+                        placeholder="e.g. Flat 4, 12 Kensington High Street"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Postcode</label>
+                      <input
+                        type="text"
+                        value={tenantForm.postcode}
+                        onChange={(e) => setTenantForm({ ...tenantForm, postcode: e.target.value })}
+                        placeholder="W8 4PT"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 uppercase focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Tenant Documents Section (Matching Screenshots) */}
+                <TenantDocumentSection
+                  pendingDocuments={pendingDocuments}
+                  onPendingDocumentsChange={setPendingDocuments}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Phone</label>
-                  <input
-                    type="text"
-                    required
-                    value={tenantForm.phone}
-                    onChange={(e) => setTenantForm({ ...tenantForm, phone: e.target.value })}
-                    placeholder="07123 456789"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={tenantForm.email}
-                    onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
-                    placeholder="tenant@gmail.com"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+              {/* Modal Footer with Cancel & Save Tenant buttons */}
+              <div className="p-4 sm:p-5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowTenantModal(false)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700/80 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={tenantSubmitting}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/25 transition cursor-pointer disabled:opacity-50"
                 >
-                  Create Tenant
+                  {tenantSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>{tenantSubmitting ? 'Saving Tenant & Uploading...' : 'Save Tenant'}</span>
                 </button>
               </div>
             </form>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Modal: Tenant Dashboard & Documents View */}
+      {selectedTenantDashboard && (
+        <ModalPortal isOpen={Boolean(selectedTenantDashboard)} onClose={() => setSelectedTenantDashboard(null)}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-800 bg-slate-950/60 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-black text-sm">
+                  {selectedTenantDashboard.fullName?.charAt(0)?.toUpperCase() || 'T'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-extrabold text-white">
+                      {selectedTenantDashboard.fullName}
+                    </h2>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      {selectedTenantDashboard.tenantType || 'INDIVIDUAL'}
+                    </span>
+                    {selectedTenantDashboard.companyName && (
+                      <span className="text-xs text-slate-400 font-medium">
+                        ({selectedTenantDashboard.companyName})
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Tenant Dashboard · Details, Active Leases &amp; 19 UK Compliance Documents
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenEditTenant(selectedTenantDashboard);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-xs font-bold border border-slate-700 transition cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Data</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTenantDashboard(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto p-4 sm:p-6 space-y-6 flex-1 text-xs">
+              {/* Top: Tenant Info Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Contact Card */}
+                <div className="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Contact Information</span>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 w-16">Phone:</span>
+                      <a href={`tel:${selectedTenantDashboard.phone}`} className="font-semibold text-slate-200 hover:text-indigo-400">
+                        {selectedTenantDashboard.phone || 'N/A'}
+                      </a>
+                    </div>
+                    {selectedTenantDashboard.email && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 w-16">Email:</span>
+                        <a href={`mailto:${selectedTenantDashboard.email}`} className="font-semibold text-slate-200 hover:text-indigo-400">
+                          {selectedTenantDashboard.email}
+                        </a>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-500 w-16 shrink-0">Address:</span>
+                      <span className="text-slate-300">
+                        {selectedTenantDashboard.currentAddress || 'No address specified'}
+                        {selectedTenantDashboard.postcode ? ` (${selectedTenantDashboard.postcode})` : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lease Agreements Card */}
+                <div className="bg-slate-950/50 border border-slate-800/80 rounded-2xl p-4 space-y-2.5">
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Active Leases &amp; Rentals</span>
+                  </div>
+                  {(() => {
+                    const tenantAgreements = tenancies.filter(
+                      (t) =>
+                        (t.tenantId?._id || t.tenantId) === selectedTenantDashboard._id
+                    );
+
+                    if (tenantAgreements.length === 0) {
+                      return (
+                        <div className="text-xs text-slate-500 italic py-2">
+                          No active lease agreement linked to this tenant yet.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-2">
+                        {tenantAgreements.map((agr) => (
+                          <div
+                            key={agr._id}
+                            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                          >
+                            <div>
+                              <div className="font-bold text-white flex items-center gap-1.5">
+                                <span>{agr.propertyId?.name || 'Property'}</span>
+                                {agr.unitId?.unitName && (
+                                  <span className="text-indigo-400 font-normal">
+                                    · {agr.unitId.unitName}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                {formatUKDate(agr.startDate)} – {formatUKDate(agr.endDate)} ({agr.leaseType})
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold font-mono text-emerald-400">
+                                {formatGBP(agr.rentAmount)} / mo
+                              </div>
+                              <div className="text-[10px] font-mono text-slate-400">
+                                Dep: {formatGBP(agr.depositAmount)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Bottom: Tenant Documents Section (Full 19 standard documents) */}
+              <div className="pt-2">
+                <TenantDocumentSection tenantId={selectedTenantDashboard._id} />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-950/80 flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedTenantDashboard(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 transition cursor-pointer"
+              >
+                Close Dashboard
+              </button>
+            </div>
           </div>
         </ModalPortal>
       )}

@@ -98,20 +98,25 @@ self.addEventListener('fetch', (event) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(request).then((networkResponse) => {
-        // Cache successful responses for same-origin static assets
-        if (
-          networkResponse &&
-          networkResponse.status === 200 &&
-          url.origin === self.location.origin
-        ) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
-        }
-        return networkResponse;
-      });
+      return fetch(request)
+        .then((networkResponse) => {
+          // Cache successful responses for same-origin static assets
+          if (
+            networkResponse &&
+            networkResponse.status === 200 &&
+            url.origin === self.location.origin
+          ) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Return empty response or fall back gracefully instead of unhandled rejection
+          return new Response('', { status: 408, statusText: 'Request timeout or offline' });
+        });
     })
   );
 });

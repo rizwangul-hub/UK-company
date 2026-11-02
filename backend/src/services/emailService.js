@@ -62,15 +62,29 @@ export const sendEmail = async ({ to, subject, html, text, config = {} }) => {
   }
 
   const fromEmail = config.fromEmail || process.env.SMTP_FROM || config.smtpUser || process.env.SMTP_USER;
-  const fromName = config.fromName || 'UK Property Management Alerts';
+  const fromName = config.fromName || 'Fahad Rasheed - FT Accountants';
+  const replyTo = config.replyTo || 'ftaccountants@hotmail.com';
+
+  // Generate clean plain-text body to ensure high inbox deliverability
+  const plainText = text || html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   try {
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to,
+      replyTo,
+      bcc: config.bcc || 'ftaccountants@hotmail.com',
       subject,
+      text: plainText,
       html,
-      text: text || html.replace(/<[^>]*>?/gm, ''),
+      headers: {
+        'X-Priority': '3',
+        'X-Mailer': 'FT Accountants Property Management Portal',
+      },
     });
 
     return {
@@ -252,9 +266,154 @@ export const sendTestEmail = async (toEmail, config = {}) => {
   });
 };
 
+/**
+ * Sends an official UK Rent Due Notice to Tenant
+ */
+export const sendRentDueNoticeEmail = async ({
+  tenantName,
+  tenantEmail,
+  propertyName,
+  unitName = '',
+  amountDue,
+  dueDate,
+  bankDetails = {},
+  paymentReference = '',
+  notes = '',
+  config = {},
+}) => {
+  const formattedDueDate = formatUKDate(dueDate);
+  const formattedAmount = Number(amountDue || 0).toLocaleString('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+  });
+
+  const subject = `Rent Payment Due: ${formattedAmount} for ${propertyName} (Due: ${formattedDueDate})`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }
+    .card { max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08); }
+    .header { background: linear-gradient(135deg, #065f46 0%, #047857 100%); padding: 24px; color: #ffffff; }
+    .brand { font-size: 11px; font-weight: 800; color: #a7f3d0; letter-spacing: 0.08em; text-transform: uppercase; }
+    .title { font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 6px; margin-bottom: 0; line-height: 1.3; }
+    .subtitle { font-size: 13px; color: #d1fae5; margin-top: 4px; margin-bottom: 0; }
+    .body { padding: 24px; }
+    .due-hero { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px; text-align: center; margin-bottom: 20px; }
+    .due-label { font-size: 12px; font-weight: 700; color: #065f46; text-transform: uppercase; letter-spacing: 0.05em; }
+    .due-amount { font-size: 32px; font-weight: 900; color: #047857; margin: 6px 0; }
+    .due-date { font-size: 13px; font-weight: 600; color: #166534; }
+    .detail-grid { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 20px 0; }
+    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+    .row:last-child { border-bottom: none; }
+    .label { color: #64748b; font-weight: 500; }
+    .value { color: #0f172a; font-weight: 700; text-align: right; }
+    .bank-box { background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; }
+    .bank-title { font-weight: 800; color: #1e40af; margin-bottom: 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .reply-alert { background-color: #ecfdf5; border-left: 4px solid #059669; padding: 12px 16px; border-radius: 6px; margin: 20px 0; font-size: 12.5px; color: #065f46; line-height: 1.5; }
+    .signature { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #475569; }
+    .footer { padding: 16px 24px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="brand">FT Accountants UK &amp; Property Finance</div>
+      <h1 class="title">Rent Due Payment Notice</h1>
+      <p class="subtitle">Official Tenancy Demand from Landlord Management</p>
+    </div>
+    <div class="body">
+      <p style="margin-top:0; font-size:14px; line-height:1.5; color:#334155;">
+        Dear <strong>${tenantName || 'Tenant'}</strong>,
+      </p>
+      <p style="font-size:13.5px; line-height:1.5; color:#334155;">
+        Please be reminded that the scheduled rent for your tenancy at <strong>${propertyName}${unitName ? ` (${unitName})` : ''}</strong> is now due for settlement.
+      </p>
+
+      <div class="due-hero">
+        <div class="due-label">Total Amount Due</div>
+        <div class="due-amount">${formattedAmount}</div>
+        <div class="due-date">Due on or before: ${formattedDueDate}</div>
+      </div>
+
+      <div class="detail-grid">
+        <div class="row">
+          <span class="label">Property</span>
+          <span class="value">${propertyName}</span>
+        </div>
+        ${unitName ? `
+        <div class="row">
+          <span class="label">Unit / Room</span>
+          <span class="value">${unitName}</span>
+        </div>` : ''}
+        <div class="row">
+          <span class="label">Tenant Name</span>
+          <span class="value">${tenantName}</span>
+        </div>
+        <div class="row">
+          <span class="label">Due Date</span>
+          <span class="value">${formattedDueDate}</span>
+        </div>
+        ${paymentReference ? `
+        <div class="row">
+          <span class="label">Payment Reference</span>
+          <span class="value" style="color: #047857; font-family: monospace;">${paymentReference}</span>
+        </div>` : ''}
+      </div>
+
+      ${(bankDetails.accountNumber || bankDetails.sortCode || bankDetails.accountName) ? `
+      <div class="bank-box">
+        <div class="bank-title">Official Bank Transfer Details</div>
+        ${bankDetails.accountName ? `<div style="margin-bottom:4px;"><strong>Account Name:</strong> ${bankDetails.accountName}</div>` : ''}
+        ${bankDetails.bankName ? `<div style="margin-bottom:4px;"><strong>Bank:</strong> ${bankDetails.bankName}</div>` : ''}
+        ${bankDetails.sortCode ? `<div style="margin-bottom:4px;"><strong>Sort Code:</strong> <span style="font-family: monospace; font-weight: bold;">${bankDetails.sortCode}</span></div>` : ''}
+        ${bankDetails.accountNumber ? `<div style="margin-bottom:4px;"><strong>Account Number:</strong> <span style="font-family: monospace; font-weight: bold;">${bankDetails.accountNumber}</span></div>` : ''}
+        ${paymentReference ? `<div style="margin-top:6px; color:#1e40af;"><strong>Reference to Quote:</strong> <span style="font-family: monospace; font-weight: bold;">${paymentReference}</span></div>` : ''}
+      </div>` : ''}
+
+      ${notes ? `<p style="font-size:12px; color:#64748b; font-style: italic;">Note: ${notes}</p>` : ''}
+
+      <div class="reply-alert">
+        <strong>Direct Manager Inquiries:</strong> If you have already made this payment, require a receipt, or need to query this demand, please reply directly to this email or write to <strong>ftaccountants@hotmail.com</strong>.
+      </div>
+
+      <div class="signature">
+        Kind regards,<br>
+        <strong style="color: #0f172a;">Kamran Ijaz</strong> (Director / Boss)<br>
+        <strong style="color: #0f172a;">Fahad Rasheed</strong> (Property Manager)<br>
+        <span>FT Accountants UK &middot; Management &amp; Accounts Division</span><br>
+        <span style="color: #059669; font-weight: 600;">ftaccountants@hotmail.com</span>
+      </div>
+    </div>
+    <div class="footer">
+      This is an automated rental accounting demand issued on behalf of FT Accountants UK &amp; Property Finance.
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  return sendEmail({
+    to: tenantEmail,
+    subject,
+    html,
+    config: {
+      ...config,
+      fromName: 'Kamran Ijaz & Fahad Rasheed (FT Accountants)',
+      replyTo: 'ftaccountants@hotmail.com',
+      bcc: 'ftaccountants@hotmail.com',
+    },
+  });
+};
+
 export default {
   createTransporter,
   sendEmail,
   sendDocumentExpiryAlertEmail,
+  sendRentDueNoticeEmail,
   sendTestEmail,
 };
