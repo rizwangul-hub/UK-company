@@ -79,6 +79,19 @@ const tenantDocumentSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+    remindersTriggered: {
+      type: [String],
+      default: [],
+    },
+    lastReminderSentAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
