@@ -104,13 +104,22 @@ export function LoginForm({ onLoginSuccess }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4 relative">
+    <div className="login-screen min-h-screen relative">
+      <section className="login-story" aria-label="About your workspace">
+        <Building2 size={38} />
+        <span className="story-kicker">PIXX PROPERTY · UNITED KINGDOM</span>
+        <h2>Your portfolio.<br />Every detail.<br /><span>One clear view.</span></h2>
+        <p>A simpler way to look after your properties, support your tenants and stay on top of the numbers.</p>
+        <div className="story-feature"><Building2 size={19} />Properties, units and tenants together</div>
+        <div className="story-feature"><Landmark size={19} />Rent, expenses and mortgage tracking</div>
+        <div className="story-feature"><ShieldCheck size={19} />Documents and compliance in one place</div>
+      </section>
       {/* Top Right Mood / Theme Change Button */}
       <div className="absolute top-4 right-4 z-20">
         <ThemeToggle />
       </div>
 
-      <div className="w-full max-w-md">
+      <div className="login-form-column w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-7">
           <div className="inline-flex items-center justify-center p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl shadow-indigo-600/10 mb-3.5">
@@ -127,7 +136,7 @@ export function LoginForm({ onLoginSuccess }) {
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-indigo-400" />
-              {isSetupMode ? 'Initial Operator Setup' : 'Authorized Sign In'}
+              {isSetupMode ? 'Create your account' : 'Welcome back'}
             </h2>
             <p className="text-xs text-slate-400 mt-1">
               {isSetupMode

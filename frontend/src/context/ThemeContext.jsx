@@ -16,7 +16,7 @@ export function ThemeProvider({ children }) {
     } catch {
       // ignore storage access errors
     }
-    return 'dark'; // Default to dark aesthetic
+    return 'light'; // A readable workspace for first-time visitors
   });
 
   useEffect(() => {

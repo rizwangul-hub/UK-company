@@ -158,7 +158,7 @@ export function DashboardPage({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                {selectedCompany ? `${selectedCompany.name} Financial Dashboard` : 'Portfolio Financial Dashboard'}
+                Monthly performance
               </h1>
               <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30">
                 {companyLegal}
