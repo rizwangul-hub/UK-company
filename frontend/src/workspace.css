@@ -57,7 +57,7 @@ html.dark .workspace-user-info small { color: #94a3b8; }
 html.dark .workspace-logout-btn:hover { color: #f87171; background: #7f1d1d40; }
 
 .workspace-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.workspace-topbar { height: 54px; flex-shrink: 0; background: white; border-bottom: 1px solid var(--workspace-line); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; gap: 12px; }
+.workspace-topbar { height: 68px; flex-shrink: 0; background: white; border-bottom: 1px solid var(--workspace-line); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; gap: 12px; }
 .workspace-breadcrumb, .workspace-top-actions { display: flex; align-items: center; gap: 14px; }
 .workspace-breadcrumb { font-size: 11px; color: #82909d; }
 .workspace-breadcrumb strong { color: #334b5c; font-weight: 600; }
@@ -65,9 +65,9 @@ html.dark .workspace-logout-btn:hover { color: #f87171; background: #7f1d1d40; }
 .workspace-mobile-toggle, .workspace-mobile-close { display: none; }
 .workspace-currency { font-size: 10px; color: #6b7e8d; }
 .workspace-main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.workspace-page-intro { max-width: 1500px; margin: 0 auto; padding: 14px 32px 10px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.workspace-page-intro { max-width: 1500px; margin: 0 auto; padding: 30px 32px 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .workspace-eyebrow { font-size: 9px; letter-spacing: 1.8px; font-weight: 700; color: #218177; }
-.workspace-page-intro h1 { margin: 3px 0 5px; font-size: clamp(23px, 2.5vw, 31px); font-weight: 700; letter-spacing: -1px; line-height: 1.25; }
+.workspace-page-intro h1 { margin: 5px 0 7px; font-size: clamp(23px, 2.5vw, 31px); font-weight: 700; letter-spacing: -1px; line-height: 1.25; }
 .workspace-page-intro p { margin: 0; font-size: 11px; line-height: 1.7; color: #70818e; }
 .workspace-primary-action { display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid #087f73; padding: 11px 16px; background: #087f73; color: #fff; font-size: 11px; border-radius: 8px; white-space: nowrap; box-shadow: 0 3px 6px #087f7315; }
 .workspace-primary-action:hover { background: #06685e; }
@@ -97,7 +97,7 @@ html.dark .workspace-breadcrumb strong { color: #d2e5ed; }
 html.dark .workspace-page-intro p { color: #9bb0bd; }
 html.dark .workspace-eyebrow { color: #6cd5bf; }
 html.dark .workspace-footer { border-color: #29404d; }
-@media (max-width: 900px) { .workspace-topbar { padding: 0 18px; } .workspace-page-intro { padding: 12px 24px 6px; } .workspace-currency { display: none; } .workspace-sidebar { width: 238px; } }
+@media (max-width: 900px) { .workspace-topbar { padding: 0 18px; } .workspace-page-intro { padding: 24px 24px 6px; } .workspace-currency { display: none; } .workspace-sidebar { width: 238px; } }
 @media (max-width: 767px) {
   .workspace-sidebar, .workspace-shell.is-collapsed .workspace-sidebar { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 60; width: 278px; transform: translateX(-100%); transition: transform .2s; }
   .workspace-sidebar.is-open, .workspace-shell.is-collapsed .workspace-sidebar.is-open { transform: translateX(0); }
@@ -105,12 +105,12 @@ html.dark .workspace-footer { border-color: #29404d; }
   .workspace-mobile-toggle { display: inline-flex; }
   .workspace-desktop-toggle { display: none; }
   .workspace-backdrop { display: block; position: fixed; inset: 0; z-index: 55; background: #071c2d99; backdrop-filter: blur(3px); border: 0; }
-  .workspace-topbar { height: 50px; padding: 0 12px; }
+  .workspace-topbar { height: 58px; padding: 0 12px; }
   .workspace-breadcrumb { gap: 8px; font-size: 10px; } .workspace-breadcrumb > span { display: none; }
   .workspace-top-actions { gap: 6px; }
   .workspace-user-info { display: none; }
   .workspace-user-profile-nav { padding: 3px 6px; gap: 4px; }
-  .workspace-page-intro { padding: 10px 16px 6px; align-items: flex-start; flex-direction: column; }
+  .workspace-page-intro { padding: 24px 16px 6px; align-items: flex-start; flex-direction: column; }
   .workspace-primary-action { padding: 9px 12px; font-size: 10px; }
   .workspace-footer { margin: 0 16px; flex-direction: column; gap: 5px; }
 }
