@@ -11,7 +11,8 @@ import User from '../models/User.js';
 import { sendTestEmail } from '../services/emailService.js';
 import { evaluateAndSendExpiryEmails } from '../services/documentExpiryEmailEngine.js';
 import ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
+import { configureReportSheet, renderReportPdf, styleReportBand, styleReportRows, styleStatusCell } from '../services/reportPresentation.js';
+import { formatGBP, formatUKDate, getCompanyLogoPath } from '../services/reportExportService.js';
 
 /**
  * 1. Get All Documents for a Property (Includes Appliance Equipment docs)
@@ -917,131 +918,123 @@ export const runRemindersCheck = async (req, res) => {
 /**
  * 14. Export Compliance Register & Expiry Report (Excel & PDF)
  */
+const statusLabel = status => status ? String(status).replaceAll('_', ' ').toLowerCase().replace(/^./, letter => letter.toUpperCase()) : '-';
+const statusTone = status => {
+  if (/expired|overdue|rejected/i.test(status)) return 'red';
+  if (/missing|expiring|pending|due soon/i.test(status)) return 'amber';
+  if (/valid|approved|complete/i.test(status)) return 'green';
+  return undefined;
+};
+
 export const exportComplianceReport = async (req, res) => {
   try {
-    const format = (req.query.format || 'excel').toLowerCase();
-    const documents = await PropertyDocument.find({
-      companyId: req.companyId,
-      isActive: true,
-    })
-      .populate('propertyId', 'name addressLine1 postcode')
-      .sort({ propertyId: 1, category: 1, expiryDate: 1 })
-      .lean();
-
-    const councilApps = await CouncilApplication.find({
-      companyId: req.companyId,
-      isActive: true,
-    })
-      .populate('propertyId', 'name')
-      .sort({ responseDeadline: 1 })
-      .lean();
-
-    const companyName = req.company?.name || 'UK Portfolio';
-
-    if (format === 'excel' || format === 'xlsx') {
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'PIXX Technologies UK Compliance Engine';
-
-      const sheet1 = workbook.addWorksheet('Compliance & Documents');
-      sheet1.columns = [
-        { header: 'Property', key: 'property', width: 25 },
-        { header: 'Category', key: 'category', width: 22 },
-        { header: 'Document Title', key: 'title', width: 32 },
-        { header: 'Status', key: 'status', width: 16 },
-        { header: 'Provider / Authority', key: 'provider', width: 24 },
-        { header: 'Reference No', key: 'ref', width: 20 },
-        { header: 'Issue Date', key: 'issueDate', width: 14 },
-        { header: 'Expiry Date', key: 'expiryDate', width: 14 },
-        { header: 'Version', key: 'version', width: 10 },
-        { header: 'Missing Document?', key: 'missing', width: 18 },
-        { header: 'Notes', key: 'notes', width: 30 },
-      ];
-
-      documents.forEach((d) => {
-        sheet1.addRow({
-          property: d.propertyId?.name || 'Property',
-          category: d.category,
-          title: d.title,
-          status: d.status,
-          provider: d.provider || '-',
-          ref: d.referenceNumber || '-',
-          issueDate: d.issueDate ? new Date(d.issueDate).toLocaleDateString('en-GB') : '-',
-          expiryDate: d.expiryDate ? new Date(d.expiryDate).toLocaleDateString('en-GB') : 'No Expiry',
-          version: `v${d.version}`,
-          missing: d.isMissing ? 'YES - ACTION REQUIRED' : 'No',
-          notes: d.notes || '',
-        });
-      });
-
-      const sheet2 = workbook.addWorksheet('Council & Licensing');
-      sheet2.columns = [
-        { header: 'Property', key: 'property', width: 25 },
-        { header: 'Application Type', key: 'type', width: 22 },
-        { header: 'Title / HMO Ref', key: 'title', width: 28 },
-        { header: 'Council Authority', key: 'council', width: 25 },
-        { header: 'Status', key: 'status', width: 18 },
-        { header: 'Submission Date', key: 'submitted', width: 15 },
-        { header: 'Response Deadline', key: 'deadline', width: 18 },
-        { header: 'Next Follow-up', key: 'followup', width: 16 },
-        { header: 'Fee Paid (£)', key: 'fee', width: 14 },
-      ];
-
-      councilApps.forEach((c) => {
-        sheet2.addRow({
-          property: c.propertyId?.name || 'Property',
-          type: c.applicationType,
-          title: c.title,
-          council: c.councilName,
-          status: c.status,
-          submitted: c.submissionDate ? new Date(c.submissionDate).toLocaleDateString('en-GB') : '-',
-          deadline: c.responseDeadline ? new Date(c.responseDeadline).toLocaleDateString('en-GB') : '-',
-          followup: c.nextFollowUpDate ? new Date(c.nextFollowUpDate).toLocaleDateString('en-GB') : '-',
-          fee: c.feePaid ? `£${c.feePaid.toFixed(2)}` : '£0.00',
-        });
-      });
-
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${req.companyId}_Compliance_Register_${new Date().toISOString().slice(0, 10)}.xlsx"`
-      );
-      await workbook.xlsx.write(res);
-      return res.end();
+    const format = String(req.query.format || 'excel').toLowerCase();
+    if (!['excel', 'xlsx', 'pdf'].includes(format)) {
+      return apiError(res, 'Choose PDF or Excel for the compliance report.', 400);
     }
+    const [documents, councilApps] = await Promise.all([
+      PropertyDocument.find({ companyId: req.companyId, isActive: true })
+        .populate('propertyId', 'name addressLine1 postcode')
+        .sort({ propertyId: 1, category: 1, expiryDate: 1 }).lean(),
+      CouncilApplication.find({ companyId: req.companyId, isActive: true })
+        .populate('propertyId', 'name').sort({ responseDeadline: 1 }).lean(),
+    ]);
 
-    // PDF Format
-    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${req.companyId}_Compliance_Audit_${new Date().toISOString().slice(0, 10)}.pdf"`
-    );
-
-    doc.pipe(res);
-
-    doc.fontSize(16).font('Helvetica-Bold').text(`${companyName} — Property Compliance & Expiry Register`);
-    doc.fontSize(9).font('Helvetica').text(`Generated: ${new Date().toLocaleDateString('en-GB')} | Scope: Six-Company Isolation Protected`);
-    doc.moveDown();
-
-    doc.fontSize(11).font('Helvetica-Bold').text('Statutory & Property Documents Summary', { underline: true });
-    doc.moveDown(0.5);
-
-    documents.slice(0, 40).forEach((d) => {
-      const expStr = d.expiryDate ? new Date(d.expiryDate).toLocaleDateString('en-GB') : 'No Expiry';
-      const statusColor = d.status === 'EXPIRED' ? 'red' : d.isMissing ? 'orange' : 'black';
-      doc
-        .fontSize(9)
-        .font('Helvetica-Bold')
-        .fillColor(statusColor)
-        .text(`[${d.category}] ${d.title} (${d.propertyId?.name || 'Property'}) — Status: ${d.status}`)
-        .font('Helvetica')
-        .fillColor('black')
-        .text(`  Provider: ${d.provider || 'N/A'} | Ref: ${d.referenceNumber || 'N/A'} | Expiry: ${expStr} | Version: v${d.version}`);
-      doc.moveDown(0.3);
-    });
-
-    doc.end();
+    const company = req.company?.legalName || req.company?.name || 'UK Portfolio';
+    const generatedAt = new Date();
+    const date = generatedAt.toISOString().slice(0, 10);
+    const documentRows = documents.map(d => [
+      d.propertyId?.name || 'Property', d.category, d.title, d.isMissing ? 'Missing document' : statusLabel(d.status),
+      d.provider || '-', d.referenceNumber || '-', formatUKDate(d.issueDate),
+      d.expiryDate ? formatUKDate(d.expiryDate) : 'No expiry', `v${d.version}`, d.notes || '',
+    ]);
+    const councilRows = councilApps.map(c => [
+      c.propertyId?.name || 'Property', c.applicationType, c.title, c.councilName,
+      statusLabel(c.status), formatUKDate(c.submissionDate), formatUKDate(c.responseDeadline),
+      formatUKDate(c.nextFollowUpDate), Number(c.feePaid) || 0,
+    ]);
+    const missing = documents.filter(d => d.isMissing).length;
+    const expired = documents.filter(d => !d.isMissing && d.status === 'EXPIRED').length;
+    const title = 'Property compliance register';
+    let buffer;
+    if (format === 'pdf') {
+      buffer = await renderReportPdf({
+        title,
+        sections: [{
+          title, company, logo: getCompanyLogoPath(req.companyId),
+          details: [`Generated: ${formatUKDate(generatedAt)}`],
+          metrics: [
+            { label: 'Property documents', value: documents.length, tone: 'blue' },
+            { label: 'Missing documents', value: missing, tone: 'amber' },
+            { label: 'Expired documents', value: expired, tone: 'red' },
+            { label: 'Council applications', value: councilApps.length, tone: 'teal' },
+          ],
+          tables: [
+            {
+              heading: 'Property documents',
+              columns: [
+                { label: 'Property', width: 135 }, { label: 'Document', width: 177 },
+                { label: 'Status', width: 89, tone: value => statusTone(value) || 'ink' },
+                { label: 'Provider / reference', width: 145 }, { label: 'Issued', width: 69 },
+                { label: 'Expires', width: 70 }, { label: 'Version', width: 53 },
+                { label: 'Notes', width: 125 },
+              ],
+              rows: documentRows.map(([property, category, name, status, provider, ref, issued, expiry, version, notes]) => [
+                property, [category, name].filter(Boolean).join(' / '), status,
+                [provider, ref].filter(value => value !== '-').join(' / '),
+                issued, expiry, version, notes,
+              ]),
+              empty: 'No active property documents are recorded.',
+            },
+            {
+              heading: 'Council applications and licensing',
+              columns: [
+                { label: 'Property', width: 130 }, { label: 'Application', width: 165 }, { label: 'Council', width: 107 },
+                { label: 'Status', width: 84, tone: value => statusTone(value) || 'ink' },
+                { label: 'Submitted', width: 75 }, { label: 'Deadline', width: 75 }, { label: 'Follow-up', width: 75 },
+                { label: 'Fee paid', width: 81, align: 'right' },
+              ],
+              rows: councilRows.map(([property, type, name, council, status, submitted, deadline, followup, fee]) => [
+                property, [type, name].filter(Boolean).join(' / '), council, status, submitted, deadline, followup, formatGBP(fee),
+              ]),
+              empty: 'No active council or licensing applications are recorded.',
+            },
+          ],
+        }],
+      });
+    } else {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'PIXX Property';
+      const addRegister = (name, headers, widths, rows, statusColumn, currencyColumns) => {
+        const sheet = workbook.addWorksheet(name);
+        sheet.columns = widths.map(width => ({ width }));
+        sheet.mergeCells(1, 1, 1, headers.length);
+        sheet.getCell('A1').value = `${company} | ${name}`;
+        sheet.mergeCells(2, 1, 2, headers.length);
+        sheet.getCell('A2').value = `Generated ${formatUKDate(generatedAt)} | ${rows.length} records`;
+        sheet.addRow(headers);
+        for (const values of rows) sheet.addRow(values);
+        styleReportBand(sheet, 1, 'title');
+        styleReportBand(sheet, 3, 'header');
+        styleReportRows(sheet, 4, 3 + rows.length, { currencyColumns });
+        rows.forEach((values, i) => styleStatusCell(sheet.getCell(i + 4, statusColumn), statusTone(values[statusColumn - 1])));
+        configureReportSheet(sheet, { freezeRows: 3, headerRow: 3, lastDataRow: 3 + rows.length });
+      };
+      addRegister('Compliance & Documents',
+        ['Property', 'Category', 'Document title', 'Status', 'Provider', 'Reference', 'Issued', 'Expires', 'Version', 'Notes'],
+        [27, 23, 33, 21, 26, 20, 15, 15, 10, 35], documentRows, 4, []);
+      addRegister('Council & Licensing',
+        ['Property', 'Application type', 'Title', 'Council', 'Status', 'Submitted', 'Deadline', 'Follow-up', 'Fee paid (£)'],
+        [28, 23, 31, 25, 18, 15, 15, 15, 16], councilRows, 5, [9]);
+      buffer = await workbook.xlsx.writeBuffer();
+    }
+    const pdf = format === 'pdf';
+    res.setHeader('Content-Type', pdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.companyId}_Compliance_Register_${date}.${pdf ? 'pdf' : 'xlsx'}"`);
+    res.setHeader('Content-Length', buffer.length);
+    return res.end(buffer);
   } catch (error) {
+    console.error('Compliance report export failed:', error);
     return apiError(res, 'Failed to export compliance report', 500, error);
   }
 };

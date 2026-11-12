@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { configureReportSheet, gbpNumberFormat, reportSum, styleReportBand, styleReportRows } from '../services/reportPresentation.js';
 import mongoose from 'mongoose';
 import '../config/env.js';
 import Property from '../models/Property.js';
@@ -155,11 +156,11 @@ export async function createOfficialLandlordWorkbook(
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
       if (c === 5) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4DE' } };
       } else if (c >= 7) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
       } else {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F8FA' } };
       }
     }
   }
@@ -188,12 +189,12 @@ export async function createOfficialLandlordWorkbook(
     row.getCell(4).value = p.mFee;
     row.getCell(4).numFmt = '£#,##0.00;[Red]-£#,##0.00;"-"';
     row.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
-    row.getCell(4).font = { name: 'Calibri', size: 10, color: { argb: 'FFDC2626' } };
+    row.getCell(4).font = { name: 'Calibri', size: 10, color: { argb: 'FFA1283D' } };
 
     row.getCell(5).value = p.dueDate;
     row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
     row.getCell(5).font = { name: 'Calibri', size: 10, bold: true };
-    row.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } };
+    row.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4DE' } };
 
     // Dynamic Excel formula: Rent + M. Fee
     row.getCell(6).value = { formula: `C${rNum}+D${rNum}` };
@@ -237,7 +238,7 @@ export async function createOfficialLandlordWorkbook(
         row.getCell(c).fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC' },
+          fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF4F8FA' },
         };
       }
       row.getCell(c).border = thinBorder;
@@ -256,28 +257,28 @@ export async function createOfficialLandlordWorkbook(
   totCell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF0F172A' } };
   totCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-  totRow.getCell(3).value = { formula: `SUM(C${startR}:C${endDataR})` };
+  totRow.getCell(3).value = reportSum('C', startR, endDataR);
   totRow.getCell(3).numFmt = '£#,##0.00';
 
-  totRow.getCell(4).value = { formula: `SUM(D${startR}:D${endDataR})` };
+  totRow.getCell(4).value = reportSum('D', startR, endDataR);
   totRow.getCell(4).numFmt = '£#,##0.00;[Red]-£#,##0.00;"-"';
-  totRow.getCell(4).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFDC2626' } };
+  totRow.getCell(4).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFA1283D' } };
 
   totRow.getCell(5).value = '';
 
-  totRow.getCell(6).value = { formula: `SUM(F${startR}:F${endDataR})` };
+  totRow.getCell(6).value = reportSum('F', startR, endDataR);
   totRow.getCell(6).numFmt = '£#,##0.00';
 
   totRow.getCell(7).value = '';
-  totRow.getCell(8).value = { formula: `SUM(H${startR}:H${endDataR})` };
+  totRow.getCell(8).value = reportSum('H', startR, endDataR);
   totRow.getCell(8).numFmt = '£#,##0.00';
 
   totRow.getCell(9).value = '';
-  totRow.getCell(10).value = { formula: `SUM(J${startR}:J${endDataR})` };
+  totRow.getCell(10).value = reportSum('J', startR, endDataR);
   totRow.getCell(10).numFmt = '£#,##0.00';
 
   totRow.getCell(11).value = '';
-  totRow.getCell(12).value = { formula: `SUM(L${startR}:L${endDataR})` };
+  totRow.getCell(12).value = reportSum('L', startR, endDataR);
   totRow.getCell(12).numFmt = '£#,##0.00';
 
   for (let c = 1; c <= 12; c++) {
@@ -374,7 +375,7 @@ export async function createOfficialLandlordWorkbook(
       name: 'Calibri',
       size: 10,
       bold: true,
-      color: { argb: isOccupied ? 'FF059669' : 'FF64748B' },
+      color: { argb: isOccupied ? 'FF16634C' : 'FF64748B' },
     };
 
     row.getCell(5).value = p.tenant;
@@ -409,7 +410,7 @@ export async function createOfficialLandlordWorkbook(
       name: 'Calibri',
       size: 10,
       bold: p.received > 0,
-      color: { argb: p.received > 0 ? 'FF059669' : 'FF64748B' },
+      color: { argb: p.received > 0 ? 'FF16634C' : 'FF64748B' },
     };
 
     // Arrears Formula: =MAX(0, H{row}-I{row})
@@ -420,14 +421,14 @@ export async function createOfficialLandlordWorkbook(
       name: 'Calibri',
       size: 10,
       bold: true,
-      color: { argb: 'FFDC2626' },
+      color: { argb: 'FFA1283D' },
     };
 
     for (let c = 1; c <= 10; c++) {
       row.getCell(c).fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC' },
+        fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF4F8FA' },
       };
       row.getCell(c).border = thinBorder;
     }
@@ -445,22 +446,22 @@ export async function createOfficialLandlordWorkbook(
   s2TotLabel.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF0F172A' } };
   s2TotLabel.alignment = { horizontal: 'center', vertical: 'middle' };
 
-  s2TotRow.getCell(6).value = { formula: `SUM(F${s2StartR}:F${s2EndDataR})` };
+  s2TotRow.getCell(6).value = reportSum('F', s2StartR, s2EndDataR);
   s2TotRow.getCell(6).numFmt = '£#,##0.00';
 
-  s2TotRow.getCell(7).value = { formula: `SUM(G${s2StartR}:G${s2EndDataR})` };
+  s2TotRow.getCell(7).value = reportSum('G', s2StartR, s2EndDataR);
   s2TotRow.getCell(7).numFmt = '£#,##0.00';
 
-  s2TotRow.getCell(8).value = { formula: `SUM(H${s2StartR}:H${s2EndDataR})` };
+  s2TotRow.getCell(8).value = reportSum('H', s2StartR, s2EndDataR);
   s2TotRow.getCell(8).numFmt = '£#,##0.00';
 
-  s2TotRow.getCell(9).value = { formula: `SUM(I${s2StartR}:I${s2EndDataR})` };
+  s2TotRow.getCell(9).value = reportSum('I', s2StartR, s2EndDataR);
   s2TotRow.getCell(9).numFmt = '£#,##0.00';
-  s2TotRow.getCell(9).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF059669' } };
+  s2TotRow.getCell(9).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF16634C' } };
 
-  s2TotRow.getCell(10).value = { formula: `SUM(J${s2StartR}:J${s2EndDataR})` };
+  s2TotRow.getCell(10).value = reportSum('J', s2StartR, s2EndDataR);
   s2TotRow.getCell(10).numFmt = '£#,##0.00';
-  s2TotRow.getCell(10).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFDC2626' } };
+  s2TotRow.getCell(10).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFA1283D' } };
 
   for (let c = 1; c <= 10; c++) {
     const cell = s2TotRow.getCell(c);
@@ -470,6 +471,19 @@ export async function createOfficialLandlordWorkbook(
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
   }
 
+  configureReportSheet(ws1, { freezeRows: 6 });
+  styleReportBand(ws1, 1, 'title');
+  styleReportBand(ws1, 5, 'header');
+  styleReportBand(ws1, 6, 'header');
+  styleReportRows(ws1, startR, endDataR, { currencyColumns: [3, 4, 6, 8, 10, 12] });
+  styleReportBand(ws1, totR, 'total');
+  for (const column of [3, 4, 6, 8, 10, 12]) totRow.getCell(column).numFmt = gbpNumberFormat;
+  configureReportSheet(ws2, { freezeRows: s2StartR - 1 });
+  styleReportBand(ws2, 1, 'title');
+  styleReportBand(ws2, s2StartR - 1, 'header');
+  styleReportRows(ws2, s2StartR, s2EndDataR, { currencyColumns: [6, 7, 8, 9, 10] });
+  styleReportBand(ws2, s2TotR, 'total');
+  for (const column of [6, 7, 8, 9, 10]) s2TotRow.getCell(column).numFmt = gbpNumberFormat;
   return wb;
 }
 

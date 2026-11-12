@@ -259,18 +259,20 @@ export function ReportsPage({ selectedCompany }) {
       {activeTab === 'tax' && (
         <div className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-slate-900 border border-slate-800 gap-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-indigo-400" />
-              <span className="text-xs font-medium text-slate-300">Select UK Tax Year:</span>
+            <label className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="flex shrink-0 items-center gap-2 text-xs font-medium text-slate-300">
+                <Calendar className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+                Select UK tax year
+              </span>
               <select
                 value={taxYear}
                 onChange={(e) => setTaxYear(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1 text-xs text-white focus:outline-none cursor-pointer"
+                className="w-full min-w-0 max-w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-1 text-xs text-white focus:outline-none cursor-pointer sm:w-auto"
               >
                 <option value="2026-2027">2026-2027 (6 Apr 2026 – 5 Apr 2027)</option>
                 <option value="2025-2026">2025-2026 (6 Apr 2025 – 5 Apr 2026)</option>
               </select>
-            </div>
+            </label>
 
             <div className="text-[11px] text-slate-400">
               Computed strictly from verified ledger entries in GBP (£)

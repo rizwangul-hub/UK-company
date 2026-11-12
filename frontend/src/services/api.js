@@ -566,9 +566,39 @@ export const triggerBlobDownload = (blob, filename) => {
   link.setAttribute('download', filename);
   document.body.appendChild(link);
   link.click();
-  link.parentNode.removeChild(link);
-  window.URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 30_000);
 };
+
+async function reportErrorMessage(blob) {
+  if (!(blob instanceof Blob) || blob.size > 65_536) return null;
+  try {
+    const data = JSON.parse(await blob.text());
+    return typeof data.message === 'string' ? data.message : null;
+  } catch {
+    return null;
+  }
+}
+
+async function downloadReportFile(request, filename, format) {
+  const label = format === 'pdf' ? 'PDF' : 'Excel';
+  let response;
+  try {
+    response = await request;
+  } catch (error) {
+    if (!error.response) throw error;
+    const message = await reportErrorMessage(error.response.data);
+    throw new Error(message || `${label} export failed (HTTP ${error.response.status}).`, { cause: error });
+  }
+  const blob = response.data;
+  const prefix = blob instanceof Blob ? new Uint8Array(await blob.slice(0, 5).arrayBuffer()) : [];
+  const signature = format === 'pdf' ? [37, 80, 68, 70, 45] : [80, 75, 3, 4];
+  if (!signature.every((byte, index) => byte === prefix[index])) {
+    throw new Error(await reportErrorMessage(blob) || `The server returned an invalid ${label} report. Please try again.`);
+  }
+  triggerBlobDownload(blob, filename);
+  return true;
+}
 
 // --------------------------------------------------------------------------
 // Reports & Dashboard API
@@ -588,63 +618,27 @@ export const reportsAPI = {
     return res.data;
   },
   downloadLedgerExcel: async (params, customFilename) => {
-    const res = await api.post('/reports/ledger/export/excel', params, {
-      responseType: 'blob',
-    });
-    if (res.data?.type === 'application/json') {
-      const text = await res.data.text();
-      const err = JSON.parse(text);
-      throw new Error(err.message || 'Excel export failed');
-    }
     const defaultFilename = `Pixx_UK_Ledger_${params?.scope || 'Report'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    triggerBlobDownload(res.data, customFilename || defaultFilename);
-    return true;
+    return downloadReportFile(api.post('/reports/ledger/export/excel', params, { responseType: 'blob' }), customFilename || defaultFilename, 'xlsx');
   },
   downloadLedgerPdf: async (params, customFilename) => {
-    const res = await api.post('/reports/ledger/export/pdf', params, {
-      responseType: 'blob',
-    });
-    if (res.data?.type === 'application/json') {
-      const text = await res.data.text();
-      const err = JSON.parse(text);
-      throw new Error(err.message || 'PDF export failed');
-    }
     const defaultFilename = `Pixx_UK_Ledger_${params?.scope || 'Report'}_${new Date().toISOString().slice(0, 10)}.pdf`;
-    triggerBlobDownload(res.data, customFilename || defaultFilename);
-    return true;
+    return downloadReportFile(api.post('/reports/ledger/export/pdf', params, { responseType: 'blob' }), customFilename || defaultFilename, 'pdf');
   },
   exportExcel: (type, params = {}) => {
     const query = new URLSearchParams(params).toString();
     return `/api/reports/export/excel?type=${type}&${query}`;
   },
   downloadLandlordStatementExcel: async (customFilename) => {
-    const res = await api.get('/reports/landlord-statement/excel', {
-      responseType: 'blob',
-    });
-    if (res.data?.type === 'application/json') {
-      const text = await res.data.text();
-      const err = JSON.parse(text);
-      throw new Error(err.message || 'Landlord statement export failed');
-    }
     const defaultFilename = `Landlord_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    triggerBlobDownload(res.data, customFilename || defaultFilename);
-    return true;
+    return downloadReportFile(api.get('/reports/landlord-statement/excel', { responseType: 'blob' }), customFilename || defaultFilename, 'xlsx');
   },
   getConsolidatedOverview: async (config = {}) => {
     return cachedGet('/reports/consolidated/overview', config);
   },
   downloadConsolidatedExcel: async (customFilename) => {
-    const res = await api.get('/reports/consolidated/excel', {
-      responseType: 'blob',
-    });
-    if (res.data?.type === 'application/json') {
-      const text = await res.data.text();
-      const err = JSON.parse(text);
-      throw new Error(err.message || 'Consolidated Excel export failed');
-    }
     const defaultFilename = `Consolidated_Rent_Details_All_Companies_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    triggerBlobDownload(res.data, customFilename || defaultFilename);
-    return true;
+    return downloadReportFile(api.get('/reports/consolidated/excel', { responseType: 'blob' }), customFilename || defaultFilename, 'xlsx');
   },
   downloadConsolidatedPdf: async (optionsOrFilename, customFilename) => {
     let companyId = null;
@@ -663,21 +657,12 @@ export const reportsAPI = {
       ? `/reports/consolidated/pdf?companyId=${encodeURIComponent(companyId)}`
       : '/reports/consolidated/pdf';
 
-    const res = await api.get(url, {
-      responseType: 'blob',
-    });
-    if (res.data?.type === 'application/json') {
-      const text = await res.data.text();
-      const err = JSON.parse(text);
-      throw new Error(err.message || 'Consolidated PDF export failed');
-    }
     const dateStr = new Date().toISOString().slice(0, 10);
     const defaultFilename = companyId && companyId !== 'all'
       ? `${companyId.toUpperCase()}_Single_Company_Report_${dateStr}.pdf`
       : `Consolidated_Group_Portfolio_Report_${dateStr}.pdf`;
 
-    triggerBlobDownload(res.data, finalFilename || defaultFilename);
-    return true;
+    return downloadReportFile(api.get(url, { responseType: 'blob' }), finalFilename || defaultFilename, 'pdf');
   },
 };
 
@@ -697,13 +682,8 @@ export const pnlAPI = {
     return res.data;
   },
   downloadExcel: async (params, customFilename) => {
-    const res = await api.get('/pnl/export/excel', {
-      params,
-      responseType: 'blob',
-    });
     const filename = customFilename || `UK_Property_Profit_and_Loss_${params?.datePreset || 'Statement'}.xlsx`;
-    triggerBlobDownload(res.data, filename);
-    return true;
+    return downloadReportFile(api.get('/pnl/export/excel', { params, responseType: 'blob' }), filename, 'xlsx');
   },
   downloadCsv: async (params, customFilename) => {
     const res = await api.get('/pnl/export/csv', {
@@ -807,12 +787,9 @@ export const complianceAPI = {
     return res.data;
   },
   downloadReport: async (format = 'excel', customFilename) => {
-    const res = await api.get(`/compliance/reports/export?format=${format}`, {
-      responseType: 'blob',
-    });
-    const defaultFilename = `Compliance_Register_${new Date().toISOString().slice(0, 10)}.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
-    triggerBlobDownload(res.data, customFilename || defaultFilename);
-    return true;
+    const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+    const defaultFilename = `Compliance_Register_${new Date().toISOString().slice(0, 10)}.${extension}`;
+    return downloadReportFile(api.get('/compliance/reports/export', { params: { format }, responseType: 'blob' }), customFilename || defaultFilename, extension);
   },
   getEmailSettings: async () => {
     const res = await api.get('/compliance/email-settings');

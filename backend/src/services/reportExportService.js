@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
+import { configureReportSheet, renderReportPdf, reportColors, styleReportBand, styleReportRows } from './reportPresentation.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -694,16 +694,16 @@ export const generateExcelReport = async (reportData) => {
   workbook.modified = new Date();
 
   // High-Contrast Executive Palette (NO BLACK BACKGROUNDS)
-  const brandRoyal = '1E40AF'; // Crisp Royal Blue
-  const brandHeaderFill = 'E2E8F0'; // Soft crisp slate for table headers
-  const brandSectionFill = 'EEF2FF'; // Soft indigo tint for section banners
-  const brandHeaderDarkText = '0F172A'; // Deep Navy text (ultra readable on light bg)
-  const brandIndigo = '4338CA';
-  const brandEmerald = '059669';
-  const brandRose = 'E11D48';
-  const brandLightGray = 'F8FAFC';
-  const borderLight = 'E2E8F0';
-  const borderMedium = 'CBD5E1';
+  const brandRoyal = reportColors.blue;
+  const brandHeaderFill = reportColors.tealLight;
+  const brandSectionFill = reportColors.blueLight;
+  const brandHeaderDarkText = reportColors.navy;
+  const brandIndigo = reportColors.teal;
+  const brandEmerald = reportColors.green;
+  const brandRose = reportColors.red;
+  const brandLightGray = reportColors.stripe;
+  const borderLight = reportColors.border;
+  const borderMedium = reportColors.border;
 
   // Embed Official Company Logo if available
   const logoPath = getCompanyLogoPath(reportData.companyId);
@@ -771,7 +771,7 @@ export const generateExcelReport = async (reportData) => {
 
   summarySheet.mergeCells('C2:F2');
   const h2 = summarySheet.getCell('C2');
-  h2.value = `UK Reg: ${reportData.companyRegNo || 'N/A'} • 14 Belgrave Square, London SW1X 8PZ • United Kingdom • HMRC Compliant Accounting`;
+  h2.value = `UK registration: ${reportData.companyRegNo || 'N/A'} | GBP (£)`;
   h2.font = { name: 'Segoe UI', size: 8.5, color: { argb: 'FF64748B' } };
   h2.alignment = { vertical: 'middle', horizontal: 'left' };
 
@@ -1316,7 +1316,7 @@ export const generateExcelReport = async (reportData) => {
 
   txSheet.mergeCells('K2:O2');
   const tM2 = txSheet.getCell('K2');
-  tM2.value = `HMRC COMPLIANT • STERLING GBP (£)`;
+  tM2.value = 'Currency: GBP (£)';
   tM2.font = { name: 'Segoe UI', size: 8.5, bold: true, color: { argb: 'FF' + brandEmerald } };
   tM2.alignment = { vertical: 'middle', horizontal: 'right' };
 
@@ -1465,7 +1465,7 @@ export const generateExcelReport = async (reportData) => {
     txSheet.getCell(`N${currentTxRow}`).value = reportData.summary.closingBalance;
     txSheet.getCell(`N${currentTxRow}`).numFmt = '"£"#,##0.00;[Red]-"£"#,##0.00;"£"0.00';
 
-    txSheet.getCell(`O${currentTxRow}`).value = 'RECONCILED';
+    txSheet.getCell(`O${currentTxRow}`).value = null;
     txSheet.getCell(`O${currentTxRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
 
     txSheet.getRow(currentTxRow).height = 26;
@@ -1488,385 +1488,66 @@ export const generateExcelReport = async (reportData) => {
   }
 
   // Generate buffer
-  return await workbook.xlsx.writeBuffer();
+  configureReportSheet(summarySheet);
+  configureReportSheet(txSheet, { freezeRows: 5, headerRow: 5, lastDataRow: 5 + reportData.entries.length });
+  styleReportBand(txSheet, 5, 'header');
+  if (reportData.entries.length) {
+    styleReportRows(txSheet, 6, 5 + reportData.entries.length, { currencyColumns: [12, 13, 14] });
+    styleReportBand(txSheet, 6 + reportData.entries.length, 'total');
+  }
+  return workbook.xlsx.writeBuffer();
 };
 
-/**
- * Generate Real, High-Quality Corporate PDF Report using PDFKit
- * Completely eliminates black backgrounds and text overlapping.
- * Uses dynamic company logos, legal company metadata, robust dynamic row heights,
- * and elegant light-contrast executive styling.
- */
-export const generatePdfReport = async (reportData) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        size: 'A4',
-        layout: 'landscape',
-        margin: 28,
-        bufferPages: true,
-      });
+/** Generate a print-ready PDF for any ledger scope. */
+export const generatePdfReport = (reportData) => {
+  const summary = reportData.summary;
+  const title = reportData.reportTitle || 'Transaction ledger';
+  const balanceLabel = reportData.isLiquidity ? 'Closing balance' : 'Net cash movement';
+  const balance = reportData.isLiquidity ? summary.closingBalance : summary.netCashMovement;
+  const moneyIn = { label: 'Money in', width: 86, align: 'right', tone: () => 'green' };
+  const moneyOut = { label: 'Money out', width: 86, align: 'right', tone: () => 'red' };
+  const columns = [
+    { label: 'Date', width: 78 },
+    { label: 'Voucher', width: 96 },
+    { label: 'Description', width: 176 },
+    { label: 'Category', width: 100 },
+    { label: 'Account', width: 91 },
+    { label: 'Property / unit', width: 116 },
+    moneyIn,
+    moneyOut,
+    { label: 'Balance', width: 88, align: 'right' },
+  ];
 
-      const chunks = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => {
-        const result = Buffer.concat(chunks);
-        resolve(result);
-      });
-      doc.on('error', (err) => reject(err));
-
-      const pageWidth = doc.page.width;
-      const pageHeight = doc.page.height;
-      const margin = 28;
-      const contentWidth = pageWidth - margin * 2;
-
-      // ---------------------------------------------------------------------
-      // 1. Header (Dynamic Logo & Company Details)
-      // ---------------------------------------------------------------------
-      const logoPath = getCompanyLogoPath(reportData.companyId);
-      const logoWidth = 46;
-      const logoHeight = 46;
-      if (fs.existsSync(logoPath)) {
-        try {
-          doc.image(logoPath, margin, margin, { width: logoWidth, height: logoHeight, fit: [logoWidth, logoHeight] });
-        } catch {
-          // fallback gracefully if image format fails
-        }
-      }
-
-      const textStartX = fs.existsSync(logoPath) ? margin + logoWidth + 12 : margin;
-      const activeLegalName = reportData.companyLegalName || reportData.companyName || 'PIXX TECHNOLOGIES UK PROPERTY FINANCE LTD';
-
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(13)
-        .fillColor('#0F172A')
-        .text(activeLegalName, textStartX, margin);
-
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .fillColor('#64748B')
-        .text(
-          `UK Reg: ${reportData.companyRegNo || 'N/A'} • 14 Belgrave Square, London SW1X 8PZ • United Kingdom • HMRC Compliant Accounting`,
-          textStartX,
-          margin + 17
-        );
-
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(10)
-        .fillColor('#1E40AF')
-        .text(reportData.reportTitle.toUpperCase(), textStartX, margin + 30);
-
-      // Top Right Reference Box
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(8.5)
-        .fillColor('#0F172A')
-        .text(`AUDIT REF: ${reportData.reportRef}`, contentWidth - 100, margin, { align: 'right' });
-
-      doc
-        .font('Helvetica')
-        .fontSize(8)
-        .fillColor('#475569')
-        .text(`Period: ${reportData.periodLabel}`, contentWidth - 100, margin + 14, { align: 'right' });
-
-      doc
-        .text(
-          `Date: ${formatUKDate(reportData.generatedAt)} ${new Date(reportData.generatedAt).toLocaleTimeString('en-GB')} (GBP £)`,
-          contentWidth - 100,
-          margin + 26,
-          { align: 'right' }
-        );
-
-      // Horizontal Divider
-      const headerBottomY = margin + 50;
-      doc
-        .strokeColor('#CBD5E1')
-        .lineWidth(1)
-        .moveTo(margin, headerBottomY)
-        .lineTo(pageWidth - margin, headerBottomY)
-        .stroke();
-
-      // ---------------------------------------------------------------------
-      // 2. Executive KPI Cards Strip (NO BLACK BACKGROUNDS)
-      // ---------------------------------------------------------------------
-      const kpiY = headerBottomY + 8;
-      const kpiCount = 4;
-      const gap = 8;
-      const kpiWidth = (contentWidth - gap * (kpiCount - 1)) / kpiCount;
-      const kpiHeight = 36;
-
-      const kpis = [
-        { label: 'OPENING BALANCE (B/F)', val: formatGBP(reportData.summary.openingBalance), color: '#334155', bg: '#F8FAFC', border: '#CBD5E1' },
-        { label: 'TOTAL RECEIPTS (IN)', val: formatGBP(reportData.summary.totalMoneyIn), color: '#15803D', bg: '#F0FDF4', border: '#BBF7D0' },
-        { label: 'TOTAL PAYMENTS (OUT)', val: formatGBP(reportData.summary.totalMoneyOut), color: '#B91C1C', bg: '#FEF2F2', border: '#FECACA' },
-        {
-          label: reportData.isLiquidity ? 'CLOSING BALANCE' : 'NET CASH MOVEMENT',
-          val: formatGBP(reportData.isLiquidity ? reportData.summary.closingBalance : reportData.summary.netCashMovement),
-          color: '#4338CA',
-          bg: '#EEF2FF',
-          border: '#C7D2FE',
-        },
-      ];
-
-      kpis.forEach((kpi, idx) => {
-        const kX = margin + idx * (kpiWidth + gap);
-        doc
-          .roundedRect(kX, kpiY, kpiWidth, kpiHeight, 4)
-          .fillAndStroke(kpi.bg, kpi.border);
-
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(6.5)
-          .fillColor('#64748B')
-          .text(kpi.label, kX + 6, kpiY + 5, { width: kpiWidth - 12 });
-
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(10)
-          .fillColor(kpi.color)
-          .text(kpi.val, kX + 6, kpiY + 18, { width: kpiWidth - 12 });
-      });
-
-      // ---------------------------------------------------------------------
-      // 3. Transactions Table Setup (NO BLACK BACKGROUND & NO OVERLAPPING)
-      // ---------------------------------------------------------------------
-      let startTableY = kpiY + kpiHeight + 10;
-
-      // Table Columns definition (total = 786 pt, matching landscape printable width)
-      const colWidths = {
-        date: 54,
-        voucher: 90, // Generous width so UK-EXP-202610-0065 NEVER wraps to line 2
-        detail: 168, // Narration
-        head: 96,    // Nominal Head
-        account: 74, // Account
-        property: 106, // Property & Unit
-        in: 64,      // Money In
-        out: 64,     // Money Out
-        balance: 70, // Running Balance
-      };
-
-      const drawTableHeader = (yPos) => {
-        // Soft Light Slate Header (NO BLACK BACKGROUND)
-        doc
-          .rect(margin, yPos, contentWidth, 19)
-          .fill('#F1F5F9');
-
-        doc
-          .strokeColor('#94A3B8')
-          .lineWidth(1)
-          .moveTo(margin, yPos)
-          .lineTo(pageWidth - margin, yPos)
-          .moveTo(margin, yPos + 19)
-          .lineTo(pageWidth - margin, yPos + 19)
-          .stroke();
-
-        doc.font('Helvetica-Bold').fontSize(7).fillColor('#0F172A');
-        let currentX = margin + 4;
-
-        doc.text('DATE', currentX, yPos + 6, { width: colWidths.date, align: 'center' });
-        currentX += colWidths.date;
-
-        doc.text('VOUCHER NO', currentX, yPos + 6, { width: colWidths.voucher, align: 'center' });
-        currentX += colWidths.voucher;
-
-        doc.text('PARTICULARS / DESCRIPTION', currentX, yPos + 6, { width: colWidths.detail });
-        currentX += colWidths.detail;
-
-        doc.text('NOMINAL HEAD', currentX, yPos + 6, { width: colWidths.head });
-        currentX += colWidths.head;
-
-        doc.text('ACCOUNT', currentX, yPos + 6, { width: colWidths.account });
-        currentX += colWidths.account;
-
-        doc.text('PROPERTY / ASSET', currentX, yPos + 6, { width: colWidths.property });
-        currentX += colWidths.property;
-
-        doc.text('MONEY IN (£)', currentX, yPos + 6, { width: colWidths.in, align: 'right' });
-        currentX += colWidths.in;
-
-        doc.text('MONEY OUT (£)', currentX, yPos + 6, { width: colWidths.out, align: 'right' });
-        currentX += colWidths.out;
-
-        doc.text('BALANCE (£)', currentX, yPos + 6, { width: colWidths.balance - 8, align: 'right' });
-
-        return yPos + 19;
-      };
-
-      let currentY = drawTableHeader(startTableY);
-      const maxY = pageHeight - margin - 26;
-
-      if (reportData.entries.length === 0) {
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(9)
-          .fillColor('#64748B')
-          .text('No financial transactions found matching the selected report criteria.', margin, currentY + 20, { align: 'center', width: contentWidth });
-      } else {
-        reportData.entries.forEach((tx, idx) => {
-          const cleanDetail = (tx.narration || '-').replace(/\r?\n/g, ' ').trim();
-          const cleanHead = (tx.categoryName || '-').replace(/\r?\n/g, ' ').trim();
-          const hasProp = Boolean(tx.propertyName && tx.propertyName !== '-');
-          const hasUnit = Boolean(tx.unitName && tx.unitName !== '-');
-          const cleanPropUnit = (hasProp && hasUnit ? `${tx.propertyName} · ${tx.unitName}` : hasProp ? tx.propertyName : hasUnit ? tx.unitName : '-').replace(/\r?\n/g, ' ').trim();
-
-          // Calculate height needed to prevent text collision
-          doc.fontSize(6.5).font('Helvetica');
-          const hDetail = doc.heightOfString(cleanDetail, { width: colWidths.detail - 6 });
-          const hHead = doc.heightOfString(cleanHead, { width: colWidths.head - 4 });
-          const hProp = doc.heightOfString(cleanPropUnit, { width: colWidths.property - 4 });
-          const maxTextH = Math.max(hDetail, hHead, hProp);
-
-          // Dynamic row height with safe bounding (min 18pt, max 32pt)
-          const rowHeight = Math.min(32, Math.max(18, maxTextH + 6));
-
-          // Page break check
-          if (currentY + rowHeight > maxY) {
-            doc.addPage({ size: 'A4', layout: 'landscape', margin });
-            currentY = drawTableHeader(margin);
-          }
-
-          const isEven = idx % 2 === 0;
-          doc.rect(margin, currentY, contentWidth, rowHeight).fill(isEven ? '#FFFFFF' : '#F8FAFC');
-
-          const textY = currentY + 4;
-          const textH = rowHeight - 6;
-          let rX = margin + 4;
-
-          // 1. Date
-          doc.font('Helvetica').fontSize(6.5).fillColor('#334155');
-          doc.text(formatUKDate(tx.date), rX, textY, { width: colWidths.date - 4, height: textH, align: 'center', ellipsis: true });
-          rX += colWidths.date;
-
-          // 2. Voucher (Single line, bold indigo)
-          doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#3730A3');
-          doc.text(tx.voucherNo || '-', rX, textY, { width: colWidths.voucher - 4, height: textH, align: 'center', ellipsis: true });
-          rX += colWidths.voucher;
-
-          // 3. Particulars / Narration
-          doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A');
-          doc.text(cleanDetail, rX, textY, { width: colWidths.detail - 6, height: textH, ellipsis: true });
-          rX += colWidths.detail;
-
-          // 4. Nominal Head
-          doc.font('Helvetica').fontSize(6.5).fillColor('#334155');
-          doc.text(cleanHead, rX, textY, { width: colWidths.head - 4, height: textH, ellipsis: true });
-          rX += colWidths.head;
-
-          // 5. Account
-          doc.font('Helvetica').fontSize(6.5).fillColor('#475569');
-          doc.text(tx.accountName || '-', rX, textY, { width: colWidths.account - 4, height: textH, ellipsis: true });
-          rX += colWidths.account;
-
-          // 6. Property / Asset
-          doc.font('Helvetica').fontSize(6.5).fillColor('#0F172A');
-          doc.text(cleanPropUnit, rX, textY, { width: colWidths.property - 4, height: textH, ellipsis: true });
-          rX += colWidths.property;
-
-          // 7. Money In
-          doc.font('Helvetica-Bold').fontSize(6.5);
-          if (tx.moneyIn > 0) {
-            doc.fillColor('#15803D').text(formatGBP(tx.moneyIn), rX, textY, { width: colWidths.in - 4, height: textH, align: 'right', ellipsis: true });
-          } else {
-            doc.fillColor('#94A3B8').text('-', rX, textY, { width: colWidths.in - 4, height: textH, align: 'right' });
-          }
-          rX += colWidths.in;
-
-          // 8. Money Out
-          if (tx.moneyOut > 0) {
-            doc.fillColor('#B91C1C').text(formatGBP(tx.moneyOut), rX, textY, { width: colWidths.out - 4, height: textH, align: 'right', ellipsis: true });
-          } else {
-            doc.fillColor('#94A3B8').text('-', rX, textY, { width: colWidths.out - 4, height: textH, align: 'right' });
-          }
-          rX += colWidths.out;
-
-          // 9. Running Balance
-          doc.fillColor('#0F172A').text(formatGBP(tx.runningBalance), rX, textY, { width: colWidths.balance - 8, height: textH, align: 'right', ellipsis: true });
-
-          // Light row bottom border
-          doc
-            .strokeColor('#E2E8F0')
-            .lineWidth(0.5)
-            .moveTo(margin, currentY + rowHeight)
-            .lineTo(pageWidth - margin, currentY + rowHeight)
-            .stroke();
-
-          currentY += rowHeight;
-        });
-
-        // Bottom Grand Total Row (NO BLACK BACKGROUND)
-        if (currentY + 22 > maxY) {
-          doc.addPage({ size: 'A4', layout: 'landscape', margin });
-          currentY = drawTableHeader(margin);
-        }
-
-        doc.rect(margin, currentY, contentWidth, 22).fill('#EEF2FF');
-        doc
-          .strokeColor('#94A3B8')
-          .lineWidth(1)
-          .moveTo(margin, currentY)
-          .lineTo(pageWidth - margin, currentY)
-          .moveTo(margin, currentY + 22)
-          .lineTo(pageWidth - margin, currentY + 22)
-          .stroke();
-
-        doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#0F172A');
-
-        let totX = margin + 4;
-        doc.text(`TOTALS (${reportData.entries.length} POSTED RECORDS)`, totX, currentY + 7, {
-          width: colWidths.date + colWidths.voucher + colWidths.detail + colWidths.head + colWidths.account + colWidths.property,
-        });
-
-        totX += colWidths.date + colWidths.voucher + colWidths.detail + colWidths.head + colWidths.account + colWidths.property;
-        doc.fillColor('#15803D').text(formatGBP(reportData.summary.totalMoneyIn), totX, currentY + 7, { width: colWidths.in - 4, align: 'right' });
-        totX += colWidths.in;
-
-        doc.fillColor('#B91C1C').text(formatGBP(reportData.summary.totalMoneyOut), totX, currentY + 7, { width: colWidths.out - 4, align: 'right' });
-        totX += colWidths.out;
-
-        doc.fillColor('#0F172A').text(formatGBP(reportData.summary.closingBalance), totX, currentY + 7, { width: colWidths.balance - 8, align: 'right' });
-      }
-
-      // ---------------------------------------------------------------------
-      // 4. Two-Pass Dynamic Footers (Page X of Y)
-      // ---------------------------------------------------------------------
-      const range = doc.bufferedPageRange();
-      for (let i = range.start; i < range.start + range.count; i++) {
-        doc.switchToPage(i);
-        const footerY = pageHeight - margin + 4;
-
-        doc
-          .strokeColor('#CBD5E1')
-          .lineWidth(0.5)
-          .moveTo(margin, footerY - 4)
-          .lineTo(pageWidth - margin, footerY - 4)
-          .stroke();
-
-        doc
-          .font('Helvetica')
-          .fontSize(6.5)
-          .fillColor('#64748B')
-          .text(
-            `${reportData.companyLegalName || reportData.companyName || 'PIXX TECHNOLOGIES UK'} • OFFICIAL AUDIT REGISTER • CONFIDENTIAL`,
-            margin,
-            footerY,
-            { align: 'left', width: contentWidth / 2 }
-          );
-
-        doc.text(
-          `Page ${i + 1} of ${range.count} • Ref: ${reportData.reportRef}`,
-          pageWidth - margin - contentWidth / 2,
-          footerY,
-          { align: 'right', width: contentWidth / 2 }
-        );
-      }
-
-      doc.end();
-    } catch (err) {
-      reject(err);
-    }
+  return renderReportPdf({
+    title,
+    sections: [{
+      title,
+      company: reportData.companyLegalName || reportData.companyName || 'PIXX Property',
+      logo: getCompanyLogoPath(reportData.companyId),
+      details: [
+        reportData.periodLabel,
+        reportData.reportRef && `Reference: ${reportData.reportRef}`,
+        `Generated: ${formatUKDate(reportData.generatedAt)} | GBP`,
+      ].filter(Boolean),
+      metrics: [
+        { label: 'Opening balance', value: formatGBP(summary.openingBalance), tone: 'blue' },
+        { label: 'Money in', value: formatGBP(summary.totalMoneyIn), tone: 'green' },
+        { label: 'Money out', value: formatGBP(summary.totalMoneyOut), tone: 'red' },
+        { label: balanceLabel, value: formatGBP(balance), tone: 'teal' },
+      ],
+      tables: [{
+        heading: `Transactions (${reportData.entries.length})`,
+        columns,
+        rows: reportData.entries.map(tx => [
+          formatUKDate(tx.date), tx.voucherNo, tx.narration, tx.categoryName, tx.accountName,
+          [tx.propertyName, tx.unitName].filter(name => name && name !== '-').join(' / '),
+          tx.moneyIn ? formatGBP(tx.moneyIn) : '-', tx.moneyOut ? formatGBP(tx.moneyOut) : '-',
+          formatGBP(tx.runningBalance),
+        ]),
+        total: ['Total', '', '', '', '', '', formatGBP(summary.totalMoneyIn), formatGBP(summary.totalMoneyOut), formatGBP(summary.closingBalance)],
+        empty: 'No transactions match the selected period and filters.',
+      }],
+    }],
   });
 };
 
@@ -1900,6 +1581,6 @@ export const generateLandlordRentStatementExcel = async (companyId) => {
     received: 0,
   }));
 
-  const wb = await createOfficialLandlordWorkbook(companyName, propertyList.length > 0 ? propertyList : undefined);
+  const wb = await createOfficialLandlordWorkbook(companyName, propertyList);
   return await wb.xlsx.writeBuffer();
 };

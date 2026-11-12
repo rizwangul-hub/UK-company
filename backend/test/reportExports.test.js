@@ -9,6 +9,7 @@ import {
   generatePdfReport,
 } from '../src/services/reportExportService.js';
 import { round2 } from '../src/services/ledgerService.js';
+import { renderReportPdf } from '../src/services/reportPresentation.js';
 
 test('REPORT SERVICE: Sanitize against CSV & Excel formula injection', () => {
   assert.equal(sanitizeCell('=SUM(A1:A10)'), "'=SUM(A1:A10)");
@@ -221,4 +222,26 @@ test('REPORT SERVICE: Generate vector PDF report with corporate headers and two-
   // Verify standard PDF header magic bytes: %PDF- (0x25 0x50 0x44 0x46 0x2D)
   const pdfHeader = pdfBuffer.slice(0, 5).toString('utf-8');
   assert.equal(pdfHeader, '%PDF-', 'PDF must start with %PDF- signature');
+});
+
+test('REPORT PRESENTATION: Handles empty and multi-page tables', async () => {
+  const section = {
+    title: 'Transaction register',
+    company: 'Test Property Company',
+    tables: [{
+      heading: 'Transactions',
+      columns: [{ label: 'Description', width: 1 }],
+      rows: [],
+    }],
+  };
+  const emptyPdf = await renderReportPdf({ title: section.title, sections: [section] });
+  assert.equal(emptyPdf.subarray(0, 5).toString('ascii'), '%PDF-');
+
+  const rows = Array.from({ length: 60 }, (_, index) => [`Transaction ${index + 1} - Monthly rent payment`]);
+  const multiPagePdf = await renderReportPdf({
+    title: section.title,
+    sections: [{ ...section, tables: [{ ...section.tables[0], rows }] }],
+  });
+  const pageCount = (multiPagePdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length;
+  assert.ok(pageCount > 1, 'Long registers should paginate instead of clipping off the page');
 });

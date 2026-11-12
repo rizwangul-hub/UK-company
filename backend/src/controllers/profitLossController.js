@@ -4,6 +4,12 @@ import { calculateProfitAndLoss, classifyTransaction } from '../services/profitL
 import Transaction from '../models/Transaction.js';
 import { getCompanyById } from '../config/companies.js';
 import { round2 } from '../services/ledgerService.js';
+import { configureReportSheet, gbpNumberFormat, styleReportBand, styleReportRows, styleStatusCell } from '../services/reportPresentation.js';
+
+const reportNumber = (value, digits = 2) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(digits) : (0).toFixed(digits);
+};
 
 /**
  * GET /api/pnl
@@ -202,38 +208,38 @@ export const exportProfitLossCsv = async (req, res) => {
       ['Generated On', new Date().toISOString().slice(0, 10)],
       [],
       ['EXECUTIVE SUMMARY'],
-      ['Total Operating Revenue (£)', reportData.summary.totalIncome.toFixed(2)],
-      ['Operating Expenses (£)', reportData.summary.operatingExpenses.toFixed(2)],
-      ['Finance Costs (Mortgage Interest) (£)', reportData.summary.financeCosts.toFixed(2)],
-      ['Total Expenses (£)', reportData.summary.totalExpenses.toFixed(2)],
-      ['Net Profit / Loss (£)', reportData.summary.netResult.toFixed(2)],
-      ['Net Profit Margin (%)', `${reportData.summary.netProfitMargin.toFixed(2)}%`],
+      ['Total Operating Revenue (£)', reportNumber(reportData.summary.totalIncome)],
+      ['Operating Expenses (£)', reportNumber(reportData.summary.operatingExpenses)],
+      ['Finance Costs (Mortgage Interest) (£)', reportNumber(reportData.summary.financeCosts)],
+      ['Total Expenses (£)', reportNumber(reportData.summary.totalExpenses)],
+      ['Net Profit / Loss (£)', reportNumber(reportData.summary.netResult)],
+      ['Net Profit Margin (%)', `${reportNumber(reportData.summary.netProfitMargin)}%`],
       [],
       ['SECTION 1: OPERATING REVENUE (INCOME)'],
       ['Category Head', 'Transaction Count', 'Total (£)'],
-      ...reportData.breakdown.income.map((c) => [`"${c.category}"`, c.count, c.total.toFixed(2)]),
-      ['TOTAL INCOME', '', reportData.summary.totalIncome.toFixed(2)],
+      ...reportData.breakdown.income.map((c) => [`"${c.category}"`, c.count, reportNumber(c.total)]),
+      ['TOTAL INCOME', '', reportNumber(reportData.summary.totalIncome)],
       [],
       ['SECTION 2: OPERATING EXPENSES'],
       ['Category Head', 'Transaction Count', 'Total (£)'],
-      ...reportData.breakdown.operatingExpenses.map((c) => [`"${c.category}"`, c.count, c.total.toFixed(2)]),
-      ['TOTAL OPERATING EXPENSES', '', reportData.summary.operatingExpenses.toFixed(2)],
+      ...reportData.breakdown.operatingExpenses.map((c) => [`"${c.category}"`, c.count, reportNumber(c.total)]),
+      ['TOTAL OPERATING EXPENSES', '', reportNumber(reportData.summary.operatingExpenses)],
       [],
       ['SECTION 3: FINANCE COSTS'],
       ['Category / Property Head', 'Transaction Count', 'Total (£)'],
-      ...reportData.breakdown.financeCosts.map((c) => [`"${c.category}"`, c.count, c.total.toFixed(2)]),
-      ['TOTAL FINANCE COSTS', '', reportData.summary.financeCosts.toFixed(2)],
+      ...reportData.breakdown.financeCosts.map((c) => [`"${c.category}"`, c.count, reportNumber(c.total)]),
+      ['TOTAL FINANCE COSTS', '', reportNumber(reportData.summary.financeCosts)],
       [],
       ['SECTION 4: PROPERTY PROFITABILITY BREAKDOWN'],
       ['Property Name', 'Rental Income (£)', 'Other Income (£)', 'Operating Expenses (£)', 'Mortgage Interest (£)', 'Net Profit / Loss (£)', 'Margin (%)'],
       ...reportData.propertyProfitability.map((p) => [
         `"${p.name}"`,
-        p.rentalIncome.toFixed(2),
-        p.otherIncome.toFixed(2),
-        p.operatingExpenses.toFixed(2),
-        p.financeCosts.toFixed(2),
-        p.netProfit.toFixed(2),
-        `${p.profitMargin.toFixed(2)}%`,
+        reportNumber(p.rentalIncome),
+        reportNumber(p.otherIncome),
+        reportNumber(p.operatingExpenses),
+        reportNumber(p.financeCosts),
+        reportNumber(p.netProfit),
+        `${reportNumber(p.profitMargin)}%`,
       ]),
     ];
 
@@ -241,12 +247,12 @@ export const exportProfitLossCsv = async (req, res) => {
       const u = reportData.companyUnallocated;
       rows.push([
         `"${u.name}"`,
-        u.rentalIncome.toFixed(2),
-        u.otherIncome.toFixed(2),
-        u.operatingExpenses.toFixed(2),
-        u.financeCosts.toFixed(2),
-        u.netProfit.toFixed(2),
-        `${u.profitMargin.toFixed(2)}%`,
+        reportNumber(u.rentalIncome),
+        reportNumber(u.otherIncome),
+        reportNumber(u.operatingExpenses),
+        reportNumber(u.financeCosts),
+        reportNumber(u.netProfit),
+        `${reportNumber(u.profitMargin)}%`,
       ]);
     }
 
@@ -295,7 +301,7 @@ export const exportProfitLossExcel = async (req, res) => {
     });
 
     sheet1.columns = [
-      { width: 36 },
+      { width: 47 },
       { width: 14 },
       { width: 18 },
       { width: 18 },
@@ -303,8 +309,10 @@ export const exportProfitLossExcel = async (req, res) => {
 
     // Header Title
     sheet1.addRow([`${compName} - PROFIT & LOSS STATEMENT`]);
-    sheet1.getRow(1).font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1E293B' } };
+    sheet1.mergeCells('A1:D1');
+    sheet1.getRow(1).font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
     sheet1.addRow([`Reporting Period: ${reportData.periodLabel} | Accounting Basis: ${reportData.basisLabel} | Currency: GBP (£)`]);
+    sheet1.mergeCells('A2:D2');
     sheet1.getRow(2).font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } };
     sheet1.addRow([]);
 
@@ -323,7 +331,7 @@ export const exportProfitLossExcel = async (req, res) => {
       reportData.summary.netResult,
     ]);
     netRow.font = { bold: true, color: { argb: reportData.summary.isProfit ? 'FF059669' : 'FFE11D48' } };
-    sheet1.addRow(['Net Profit Margin', '', `${reportData.summary.netProfitMargin.toFixed(2)}%`]);
+    sheet1.addRow(['Net Profit Margin', '', `${reportNumber(reportData.summary.netProfitMargin)}%`]);
     sheet1.addRow([]);
 
     // Format numbers
@@ -410,7 +418,7 @@ export const exportProfitLossExcel = async (req, res) => {
         p.financeCosts,
         p.totalExpenses,
         p.netProfit,
-        `${p.profitMargin.toFixed(1)}%`,
+        `${reportNumber(p.profitMargin, 1)}%`,
       ]);
       [3, 4, 5, 6, 7, 8, 9].forEach((idx) => {
         r.getCell(idx).numFmt = '£#,##0.00;[Red]-£#,##0.00;"£0.00"';
@@ -429,7 +437,7 @@ export const exportProfitLossExcel = async (req, res) => {
         u.financeCosts,
         u.totalExpenses,
         u.netProfit,
-        `${u.profitMargin.toFixed(1)}%`,
+        `${reportNumber(u.profitMargin, 1)}%`,
       ]);
       [3, 4, 5, 6, 7, 8, 9].forEach((idx) => {
         r.getCell(idx).numFmt = '£#,##0.00;[Red]-£#,##0.00;"£0.00"';
@@ -473,14 +481,36 @@ export const exportProfitLossExcel = async (req, res) => {
       r.getCell(7).font = { bold: true, color: { argb: m.isProfit ? 'FF059669' : 'FFE11D48' } };
     });
 
+    sheet1.getRow(2).height = 28;
+    sheet1.getCell('A2').alignment = { vertical: 'middle', wrapText: true };
+    styleReportBand(sheet1, 1, 'title');
+    styleReportBand(sheet1, 4, 'header');
+    styleReportRows(sheet1, 5, 9, { currencyColumns: [3] });
+    styleReportRows(sheet1, 10, 10);
+    styleStatusCell(netRow.getCell(3), reportData.summary.isProfit ? 'green' : 'red');
+    for (const [header, subtotal] of [[rInc, subTotInc], [rExp, subTotExp], [rFin, subTotFin]]) {
+      styleReportBand(sheet1, header.number, 'header');
+      styleReportRows(sheet1, header.number + 1, subtotal.number - 1, { currencyColumns: [3] });
+      styleReportBand(sheet1, subtotal.number, 'total');
+      subtotal.getCell(3).numFmt = gbpNumberFormat;
+    }
+    configureReportSheet(sheet1, { freezeRows: 4 });
+    styleReportBand(sheet2, 1, 'header');
+    styleReportRows(sheet2, 2, sheet2.rowCount, { currencyColumns: [3, 4, 5, 6, 7, 8, 9] });
+    configureReportSheet(sheet2, { freezeRows: 1, headerRow: 1, lastDataRow: sheet2.rowCount });
+    styleReportBand(sheet3, 1, 'header');
+    styleReportRows(sheet3, 2, sheet3.rowCount, { currencyColumns: [2, 3, 4, 5, 6, 8] });
+    reportData.monthlyTrend.forEach((month, index) => styleStatusCell(sheet3.getCell(index + 2, 7), month.isProfit ? 'green' : 'red'));
+    configureReportSheet(sheet3, { freezeRows: 1, headerRow: 1, lastDataRow: sheet3.rowCount });
+    const buffer = await workbook.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${req.companyId}_Profit_and_Loss_${datePreset || 'Period'}.xlsx"`
     );
 
-    await workbook.xlsx.write(res);
-    res.end();
+    res.setHeader('Content-Length', buffer.length);
+    return res.end(buffer);
   } catch (error) {
     console.error('Error exporting P&L Excel:', error);
     return apiError(res, 'Failed to export Excel report', 500, error);

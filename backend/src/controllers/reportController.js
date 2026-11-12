@@ -7,6 +7,7 @@ import RentSchedule from '../models/RentSchedule.js';
 import MortgagePayment from '../models/MortgagePayment.js';
 import { round2 } from '../services/ledgerService.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
+import { getCompanyById } from '../config/companies.js';
 import {
   buildLedgerReportData,
   generateExcelReport,
@@ -488,10 +489,15 @@ export const exportConsolidatedExcel = async (req, res) => {
  */
 export const exportConsolidatedPdf = async (req, res) => {
   try {
-    const companyId = req.query.companyId || req.headers['x-company-id'];
+    const requestedCompany = req.query.companyId || req.headers['x-company-id'];
+    const company = requestedCompany && requestedCompany !== 'all' ? getCompanyById(requestedCompany) : null;
+    if (requestedCompany && requestedCompany !== 'all' && !company) {
+      return apiError(res, 'Select a valid company for the portfolio report.', 400);
+    }
+    const companyId = company?.id;
     const buffer = await generateConsolidatedGroupPdfReport({ companyId });
     const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = companyId && companyId !== 'all'
+    const filename = companyId
       ? `${companyId.toUpperCase()}_Single_Company_Report_${dateStr}.pdf`
       : `Consolidated_Group_Portfolio_Report_${dateStr}.pdf`;
 
