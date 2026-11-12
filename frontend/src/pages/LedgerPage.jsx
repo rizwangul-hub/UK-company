@@ -340,13 +340,14 @@ export function LedgerPage({ selectedCompany }) {
     if (!headSummaryData || !headSummaryData.heads) return;
     const headers = ['Head Category', 'Sub Head', 'Transactions Count', 'Payments (£)', 'Receipts (£)', 'Net Total (£)'];
     const rows = [];
+    const formatAmount = (value) => Number(value || 0).toFixed(2);
     headSummaryData.heads.forEach((h) => {
-      rows.push([`"${h.head}"`, 'TOTAL (HEAD)', h.count, h.totalPayments.toFixed(2), h.totalReceipts.toFixed(2), h.net.toFixed(2)]);
+      rows.push([`"${h.head}"`, 'TOTAL (HEAD)', h.count, formatAmount(h.totalPayments), formatAmount(h.totalReceipts), formatAmount(h.net)]);
       (h.subHeads || []).forEach((sh) => {
-        rows.push([`"${h.head}"`, `"${sh.subHead}"`, sh.count, sh.payments.toFixed(2), sh.receipts.toFixed(2), sh.net.toFixed(2)]);
+        rows.push([`"${h.head}"`, `"${sh.subHead}"`, sh.count, formatAmount(sh.payments), formatAmount(sh.receipts), formatAmount(sh.net)]);
       });
     });
-    rows.push(['GRAND TOTAL', '', headSummaryData.grandTotalCount, headSummaryData.grandTotalPayments.toFixed(2), headSummaryData.grandTotalReceipts.toFixed(2), headSummaryData.netLiquidity.toFixed(2)]);
+    rows.push(['GRAND TOTAL', '', headSummaryData.grandTotalCount, formatAmount(headSummaryData.grandTotalPayments), formatAmount(headSummaryData.grandTotalReceipts), formatAmount(headSummaryData.netLiquidity)]);
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');

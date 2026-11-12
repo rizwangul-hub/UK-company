@@ -500,7 +500,7 @@ export const buildLedgerReportData = async (filters = {}) => {
     }
 
     // Track Category / Nominal Head summary
-    const headName = tx.head || tx.headId?.name || (isTransfer ? 'Internal Transfer' : tx.categoryId?.name || tx.transactionType);
+    const headName = tx.head || tx.headId?.name || (isTransfer ? 'Internal Transfer' : tx.categoryId?.name || tx.transactionType || 'Unclassified');
     const subHeadName = tx.subHead || tx.subHeadId?.name || '';
     const fullCatName = headName && subHeadName ? `${headName} · ${subHeadName}` : headName;
     const catType = tx.categoryId?.type || (isTransfer ? 'TRANSFER' : tx.transactionType);
@@ -608,7 +608,7 @@ export const buildLedgerReportData = async (filters = {}) => {
       transactionType: tx.transactionType,
       head: tx.head || tx.headId?.name || '',
       subHead: tx.subHead || tx.subHeadId?.name || '',
-      categoryName: tx.head && tx.subHead ? `${tx.head} · ${tx.subHead}` : (tx.subHead || tx.head || catName),
+      categoryName: fullCatName || tx.categoryId?.name || tx.transactionType || 'Unclassified',
       categoryCode: tx.categoryId?.code || '-',
       categoryType: catType,
       propertyName: tx.propertyId?.name || '-',
@@ -1903,4 +1903,3 @@ export const generateLandlordRentStatementExcel = async (companyId) => {
   const wb = await createOfficialLandlordWorkbook(companyName, propertyList.length > 0 ? propertyList : undefined);
   return await wb.xlsx.writeBuffer();
 };
-

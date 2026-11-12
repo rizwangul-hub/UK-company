@@ -361,6 +361,7 @@ export const getLedgerReportPreview = async (req, res) => {
       hasMore: reportData.entries.length > previewLimit,
     });
   } catch (error) {
+    console.error('Error generating ledger report preview:', error);
     return apiError(res, 'Failed to generate ledger report preview', 500, error);
   }
 };
@@ -389,6 +390,7 @@ export const exportLedgerExcel = async (req, res) => {
     res.setHeader('Content-Length', buffer.length);
     return res.end(buffer);
   } catch (error) {
+    console.error('Error exporting Excel ledger report:', error);
     return apiError(res, 'Failed to export Excel ledger report', 500, error);
   }
 };
@@ -414,6 +416,7 @@ export const exportLedgerPdf = async (req, res) => {
     res.setHeader('Content-Length', buffer.length);
     return res.end(buffer);
   } catch (error) {
+    console.error('Error exporting PDF ledger report:', error);
     return apiError(res, 'Failed to export PDF ledger report', 500, error);
   }
 };
@@ -503,6 +506,5 @@ export const exportConsolidatedPdf = async (req, res) => {
     return apiError(res, 'Failed to export consolidated PDF report', 500, error);
   }
 };
-
 
 

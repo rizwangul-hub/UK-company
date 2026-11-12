@@ -564,7 +564,7 @@ export function ProfitLossPage({ selectedCompany }) {
           <div className={`font-display text-xl sm:text-2xl font-black tracking-tight tabular-nums ${
             summary.isProfit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
           }`}>
-            {summary.netProfitMargin.toFixed(2)}%
+            {Number(summary.netProfitMargin || 0).toFixed(2)}%
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-semibold">
             {summary.totalIncome > 0 ? 'Margin on revenue' : 'No revenue recorded'}
@@ -838,7 +838,7 @@ export function ProfitLossPage({ selectedCompany }) {
                       {summary.isProfit ? formatGBP(summary.netProfit) : `(${formatGBP(summary.netLoss)})`}
                     </td>
                     <td className="p-4 text-center text-xs font-black">
-                      Margin: {summary.netProfitMargin.toFixed(1)}%
+                      Margin: {Number(summary.netProfitMargin || 0).toFixed(1)}%
                     </td>
                   </tr>
                 </tfoot>
@@ -913,7 +913,7 @@ export function ProfitLossPage({ selectedCompany }) {
                           ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
                           : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
                       }`}>
-                        {p.profitMargin.toFixed(1)}%
+                        {Number(p.profitMargin || 0).toFixed(1)}%
                       </span>
                     </td>
                   </tr>
@@ -963,7 +963,7 @@ export function ProfitLossPage({ selectedCompany }) {
                   }`}>
                     {summary.isProfit ? formatGBP(summary.netProfit) : `(${formatGBP(summary.netLoss)})`}
                   </td>
-                  <td className="p-3.5 text-center text-xs">{summary.netProfitMargin.toFixed(1)}%</td>
+                  <td className="p-3.5 text-center text-xs">{Number(summary.netProfitMargin || 0).toFixed(1)}%</td>
                 </tr>
               </tfoot>
             </table>
