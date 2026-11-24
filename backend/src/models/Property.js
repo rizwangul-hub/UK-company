@@ -110,6 +110,121 @@ const propertySchema = new mongoose.Schema(
       groundRentAnnual: { type: Number, default: 0 },
       serviceChargeAnnual: { type: Number, default: 0 },
     },
+    leaseholdRecord: {
+      // 1. Property & Purchase Details
+      propertyAddress: { type: String, trim: true, default: '' },
+      titleNumber: { type: String, trim: true, default: '' },
+      completionDate: { type: Date, default: null },
+      purchasePrice: { type: Number, default: null },
+      conveyancingSolicitor: { type: String, trim: true, default: '' },
+      solicitorReferenceAndContact: { type: String, trim: true, default: '' },
+
+      // 2. Lease Term & Key Dates
+      originalLeaseDate: { type: Date, default: null },
+      originalLeaseTermYears: { type: Number, default: null },
+      leaseStartDate: { type: Date, default: null },
+      leaseExpiryDate: { type: Date, default: null },
+      remainingYearsAtPurchase: { type: Number, default: null },
+      eightyYearThresholdDate: { type: Date, default: null },
+
+      // 3. Freeholder (Landlord) Details
+      freeholderName: { type: String, trim: true, default: '' },
+      freeholderTitleNumber: { type: String, trim: true, default: '' },
+      freeholderRegisteredAddress: { type: String, trim: true, default: '' },
+      freeholderContactName: { type: String, trim: true, default: '' },
+      freeholderTelephone: { type: String, trim: true, default: '' },
+      freeholderEmail: { type: String, trim: true, default: '' },
+      shareOfFreeholdIncluded: { type: String, enum: ['YES', 'NO', ''], default: '' },
+      managementCompanyNameAndNo: { type: String, trim: true, default: '' },
+
+      // 4. Managing Agent Details
+      managingAgentName: { type: String, trim: true, default: '' },
+      managingAgentAddress: { type: String, trim: true, default: '' },
+      propertyManagerName: { type: String, trim: true, default: '' },
+      managingAgentTelephone: { type: String, trim: true, default: '' },
+      managingAgentEmail: { type: String, trim: true, default: '' },
+      onlinePortalUrlAndRef: { type: String, trim: true, default: '' },
+
+      // 5. Ground Rent
+      currentAnnualGroundRent: { type: Number, default: null },
+      groundRentFrequency: {
+        type: String,
+        enum: ['ANNUALLY', 'HALF_YEARLY', 'QUARTERLY', ''],
+        default: '',
+      },
+      groundRentDueDates: { type: String, trim: true, default: '' },
+      groundRentPayableTo: {
+        type: String,
+        enum: ['FREEHOLDER', 'MANAGING_AGENT', ''],
+        default: '',
+      },
+      groundRentPaymentMethodRef: { type: String, trim: true, default: '' },
+      groundRentReviewClause: { type: String, trim: true, default: '' },
+      groundRentNextReviewDate: { type: Date, default: null },
+
+      // 6. Service Charge & Reserve Fund
+      currentAnnualServiceCharge: { type: Number, default: null },
+      serviceChargeFinancialYear: { type: String, trim: true, default: '' },
+      serviceChargeFrequency: {
+        type: String,
+        enum: ['ANNUALLY', 'HALF_YEARLY', 'QUARTERLY', 'MONTHLY', ''],
+        default: '',
+      },
+      serviceChargeDueDates: { type: String, trim: true, default: '' },
+      apportionmentSharePercent: { type: Number, default: null },
+      serviceChargePayableTo: { type: String, trim: true, default: '' },
+      serviceChargePaymentMethodRef: { type: String, trim: true, default: '' },
+      sinkingFundIncluded: { type: String, enum: ['YES', 'NO', ''], default: '' },
+      currentReserveFundBalance: { type: Number, default: null },
+      plannedMajorWorksDisclosed: { type: String, trim: true, default: '' },
+
+      // 7. Buildings Insurance
+      insuranceArrangedBy: {
+        type: String,
+        enum: ['FREEHOLDER_MANAGING_AGENT', 'LEASEHOLDER', ''],
+        default: '',
+      },
+      insurerName: { type: String, trim: true, default: '' },
+      policyNumber: { type: String, trim: true, default: '' },
+      insuranceRenewalDate: { type: Date, default: null },
+      annualInsurancePremium: { type: Number, default: null },
+      claimsContactNumber: { type: String, trim: true, default: '' },
+
+      // 8. Lease Covenants, Restrictions & Consents
+      sublettingPermitted: {
+        type: String,
+        enum: ['YES', 'WITH_CONSENT', 'NO', ''],
+        default: '',
+      },
+      petsPermitted: {
+        type: String,
+        enum: ['YES', 'WITH_CONSENT', 'NO', ''],
+        default: '',
+      },
+      alterationsPermitted: {
+        type: String,
+        enum: ['YES', 'WITH_CONSENT', 'NO', ''],
+        default: '',
+      },
+      deedOfCovenantFeePaid: { type: Number, default: null },
+      shareCertificateReceived: {
+        type: String,
+        enum: ['YES', 'NO', 'N/A', ''],
+        default: '',
+      },
+
+      // 9. Key Documents Checklist & Storage Location
+      keyDocumentsChecklist: [
+        new mongoose.Schema(
+          {
+            documentName: { type: String, trim: true, required: true },
+            received: { type: Boolean, default: false },
+            storedLocation: { type: String, trim: true, default: '' },
+          },
+          { _id: false }
+        ),
+      ],
+    },
     ownershipEntity: {
       type: String,
       trim: true,

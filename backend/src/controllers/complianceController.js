@@ -1069,6 +1069,11 @@ export const getEmailSettings = async (req, res) => {
       lastCheckedAt: config.lastCheckedAt,
       lastEmailSentAt: config.lastEmailSentAt,
       sentAlertsHistory: config.sentAlertsHistory || [],
+      rentDueEmailEnabled: Boolean(config.rentDueEmailEnabled),
+      rentDueEnvKillSwitch: String(process.env.AUTO_RENT_DUE_EMAIL_ENABLED || '').trim().toLowerCase() === 'false',
+      rentDueReplyTo: config.rentDueReplyTo || process.env.RENT_DUE_REPLY_TO || 'ftaccountants@hotmail.com',
+      rentDueLastCheckedAt: config.rentDueLastCheckedAt,
+      rentDueSentHistory: config.rentDueSentHistory || [],
     });
   } catch (error) {
     return apiError(res, 'Failed to fetch email notification settings', 500, error);
@@ -1091,6 +1096,8 @@ export const updateEmailSettings = async (req, res) => {
       smtpPass,
       fromEmail,
       fromName,
+      rentDueEmailEnabled,
+      rentDueReplyTo,
     } = req.body;
 
     let config = await EmailNotificationConfig.findOne({ companyId: 'GLOBAL' });
@@ -1108,6 +1115,8 @@ export const updateEmailSettings = async (req, res) => {
     if (smtpPass !== undefined && smtpPass !== '') config.smtpPass = smtpPass;
     if (fromEmail !== undefined) config.fromEmail = fromEmail.trim();
     if (fromName !== undefined) config.fromName = fromName.trim();
+    if (rentDueEmailEnabled !== undefined) config.rentDueEmailEnabled = Boolean(rentDueEmailEnabled);
+    if (rentDueReplyTo !== undefined) config.rentDueReplyTo = rentDueReplyTo.trim();
 
     await config.save();
 
@@ -1125,6 +1134,11 @@ export const updateEmailSettings = async (req, res) => {
       lastCheckedAt: config.lastCheckedAt,
       lastEmailSentAt: config.lastEmailSentAt,
       sentAlertsHistory: config.sentAlertsHistory || [],
+      rentDueEmailEnabled: Boolean(config.rentDueEmailEnabled),
+      rentDueEnvKillSwitch: String(process.env.AUTO_RENT_DUE_EMAIL_ENABLED || '').trim().toLowerCase() === 'false',
+      rentDueReplyTo: config.rentDueReplyTo || process.env.RENT_DUE_REPLY_TO || 'ftaccountants@hotmail.com',
+      rentDueLastCheckedAt: config.rentDueLastCheckedAt,
+      rentDueSentHistory: config.rentDueSentHistory || [],
     }, 'Email settings updated successfully');
   } catch (error) {
     return apiError(res, 'Failed to update email notification settings', 500, error);

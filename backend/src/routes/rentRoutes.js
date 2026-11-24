@@ -6,6 +6,8 @@ import {
   recordPayment,
   getArrearsSummary,
   sendRentNotice,
+  runAutoRentDueNotices,
+  sendTestRentDueNotice,
 } from '../controllers/rentController.js';
 import { protect } from '../middleware/auth.js';
 import { requireCompanyContext } from '../middleware/companyContext.js';
@@ -18,6 +20,8 @@ router.post('/generate-monthly', generateMonthlySchedules);
 router.get('/schedules', getSchedules);
 router.put('/schedules/:id', updateSchedule);
 router.post('/schedules/:id/send-notice', sendRentNotice);
+router.post('/due-notices/check-now', runAutoRentDueNotices);
+router.post('/due-notices/test', sendTestRentDueNotice);
 router.post('/payments', recordPayment);
 router.get('/arrears', getArrearsSummary);
 

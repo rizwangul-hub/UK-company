@@ -83,6 +83,41 @@ const emailNotificationConfigSchema = new mongoose.Schema(
       type: [sentAlertSchema],
       default: [],
     },
+    // Automatic Tenant Rent Due Emailing (OFF by default until explicitly enabled)
+    rentDueEmailEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    rentDueReplyTo: {
+      type: String,
+      trim: true,
+      default: 'ftaccountants@hotmail.com',
+    },
+    rentDueLastCheckedAt: {
+      type: Date,
+      default: null,
+    },
+    rentDueSentHistory: {
+      type: [
+        new mongoose.Schema(
+          {
+            scheduleId: { type: mongoose.Schema.Types.ObjectId, ref: 'RentSchedule' },
+            tenantName: { type: String, default: '' },
+            propertyName: { type: String, default: '' },
+            billingMonth: { type: String, default: '' },
+            dueDate: { type: Date },
+            amountDue: { type: Number, default: 0 },
+            sentTo: { type: String, required: true },
+            replyTo: { type: String, default: 'ftaccountants@hotmail.com' },
+            sentAt: { type: Date, default: Date.now },
+            status: { type: String, enum: ['SENT', 'FAILED'], default: 'SENT' },
+            errorMessage: { type: String, default: '' },
+          },
+          { _id: true }
+        ),
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

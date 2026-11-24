@@ -84,6 +84,11 @@ export function SettingsPage({ user }) {
     lastCheckedAt: null,
     lastEmailSentAt: null,
     sentAlertsHistory: [],
+    rentDueEmailEnabled: false,
+    rentDueEnvKillSwitch: true,
+    rentDueReplyTo: 'ftaccountants@hotmail.com',
+    rentDueLastCheckedAt: null,
+    rentDueSentHistory: [],
   });
   const [emailLoading, setEmailLoading] = useState(true);
   const [emailSaving, setEmailSaving] = useState(false);
@@ -498,6 +503,48 @@ export function SettingsPage({ user }) {
                   className="w-4 h-4 rounded text-indigo-600 bg-slate-900 border-slate-700 cursor-pointer"
                 />
               </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-200">Automatic Tenant Rent Due Emails</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      emailSettings.rentDueEmailEnabled && !emailSettings.rentDueEnvKillSwitch
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {emailSettings.rentDueEmailEnabled && !emailSettings.rentDueEnvKillSwitch ? 'ACTIVE' : 'OFF (Paused)'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    Sends rent due notice on tenant&apos;s due date via pixxtechinfo; replies go to {emailSettings.rentDueReplyTo || 'ftaccountants@hotmail.com'}
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  id="rentDueEmailToggle"
+                  checked={Boolean(emailSettings.rentDueEmailEnabled)}
+                  onChange={(e) => setEmailSettings({ ...emailSettings, rentDueEmailEnabled: e.target.checked })}
+                  className="w-4 h-4 rounded text-emerald-600 bg-slate-900 border-slate-700 cursor-pointer"
+                />
+              </div>
+              <div className="pt-1">
+                <label className="block text-[11px] text-slate-400 mb-1">Tenant Reply-To Email</label>
+                <input
+                  type="email"
+                  value={emailSettings.rentDueReplyTo || ''}
+                  onChange={(e) => setEmailSettings({ ...emailSettings, rentDueReplyTo: e.target.value })}
+                  placeholder="ftaccountants@hotmail.com"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              {emailSettings.rentDueEnvKillSwitch && (
+                <p className="text-[10px] text-amber-400">
+                  Server safety switch (AUTO_RENT_DUE_EMAIL_ENABLED=false) is keeping automatic tenant emails paused until you are ready to activate.
+                </p>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">

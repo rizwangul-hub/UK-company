@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import ExcelJS from 'exceljs';
+import Property from '../src/models/Property.js';
 import {
   formatUKDate,
   formatGBP,
@@ -7,6 +9,7 @@ import {
   parseReportingDateRange,
   generateExcelReport,
   generatePdfReport,
+  generateLandlordRentStatementExcel,
 } from '../src/services/reportExportService.js';
 import { round2 } from '../src/services/ledgerService.js';
 import { renderReportPdf } from '../src/services/reportPresentation.js';
@@ -222,6 +225,36 @@ test('REPORT SERVICE: Generate vector PDF report with corporate headers and two-
   // Verify standard PDF header magic bytes: %PDF- (0x25 0x50 0x44 0x46 0x2D)
   const pdfHeader = pdfBuffer.slice(0, 5).toString('utf-8');
   assert.equal(pdfHeader, '%PDF-', 'PDF must start with %PDF- signature');
+});
+
+test('REPORT SERVICE: Empty ledger PDF keeps its footer on the report page', async () => {
+  const pdf = await generatePdfReport({
+    reportTitle: 'Transaction ledger',
+    companyId: 'old-street',
+    companyName: 'Old Street',
+    generatedAt: new Date('2026-11-12'),
+    periodLabel: 'November 2026',
+    summary: {},
+    entries: [],
+  });
+
+  // PDFKit writes page dictionaries outside compressed page content.
+  assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1);
+});
+
+test('REPORT SERVICE: Empty landlord export stays scoped and has zero totals', async (t) => {
+  const find = t.mock.method(Property, 'find', () => ({ lean: async () => [] }));
+  const buffer = await generateLandlordRentStatementExcel('homewards');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+
+  assert.deepEqual(find.mock.calls[0].arguments, [{ companyId: 'homewards', isActive: true }]);
+  const rent = workbook.getWorksheet('Rent Income Report');
+  const portfolio = workbook.getWorksheet('Portfolio Summary');
+  assert.match(rent.getCell('A1').value, /Homewards/);
+  assert.equal(rent.lastRow.getCell(3).value, 0);
+  assert.equal(portfolio.lastRow.getCell(6).value, 0);
+  assert.equal(portfolio.lastRow.getCell(10).value, 0);
 });
 
 test('REPORT PRESENTATION: Handles empty and multi-page tables', async () => {

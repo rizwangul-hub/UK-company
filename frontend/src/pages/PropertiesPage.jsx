@@ -42,6 +42,12 @@ import PropertyAppliancesSection from '../components/PropertyAppliancesSection.j
 import PropertyComplianceSection from '../components/PropertyComplianceSection.jsx';
 import PropertyChargesSection from '../components/PropertyChargesSection.jsx';
 import { ModalPortal } from '../components/ModalPortal.jsx';
+import {
+  LeaseholdRecordForm,
+  createEmptyLeaseholdRecord,
+  normalizeLeaseholdRecord,
+  buildLeaseholdPayload,
+} from '../components/LeaseholdRecordForm.jsx';
 
 function formatUnitTypeLabel(type, name = '') {
   if (type === 'RETAIL_SHOP' || name?.toLowerCase().includes('shop')) return 'Shop';
@@ -295,6 +301,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
     gasSafetyExpiryDate: '',
     eicrExpiryDate: '',
     notes: '',
+    leaseholdRecord: createEmptyLeaseholdRecord(),
   });
 
   const loadProperties = async (forceRefresh = false) => {
@@ -391,6 +398,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
       gasSafetyExpiryDate: '',
       eicrExpiryDate: '',
       notes: '',
+      leaseholdRecord: createEmptyLeaseholdRecord(),
     });
     setFormError('');
     setShowModal(true);
@@ -418,6 +426,7 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
       gasSafetyExpiryDate: prop.compliance?.gasSafetyExpiryDate ? prop.compliance.gasSafetyExpiryDate.slice(0, 10) : '',
       eicrExpiryDate: prop.compliance?.eicrExpiryDate ? prop.compliance.eicrExpiryDate.slice(0, 10) : '',
       notes: prop.notes || '',
+      leaseholdRecord: normalizeLeaseholdRecord(prop.leaseholdRecord),
     });
     setFormError('');
     setShowModal(true);
@@ -451,6 +460,18 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
         },
         notes: formData.notes.trim(),
       };
+
+      const isLeaseProperty =
+        formData.tenure === 'LEASEHOLD' || formData.tenure === 'SHARE_OF_FREEHOLD';
+      if (isLeaseProperty) {
+        const leasePayload = buildLeaseholdPayload(formData.leaseholdRecord);
+        payload.leaseholdRecord = leasePayload;
+        payload.leaseDetails = {
+          leaseYearsRemaining: leasePayload.remainingYearsAtPurchase ?? null,
+          groundRentAnnual: leasePayload.currentAnnualGroundRent ?? 0,
+          serviceChargeAnnual: leasePayload.currentAnnualServiceCharge ?? 0,
+        };
+      }
 
       if (editingProperty) {
         await propertiesAPI.update(editingProperty._id, payload);
@@ -1944,9 +1965,16 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
 
   // Helper function to render modal in both views
   function renderEditModal() {
+    const isLeaseProperty =
+      formData.tenure === 'LEASEHOLD' || formData.tenure === 'SHARE_OF_FREEHOLD';
+
     return (
       <ModalPortal isOpen={showModal} onClose={() => setShowModal(false)}>
-        <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+        <div
+          className={`bg-slate-900 border border-slate-700/80 rounded-2xl w-full ${
+            isLeaseProperty ? 'max-w-4xl' : 'max-w-2xl'
+          } max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 transition-all`}
+        >
           {/* Sticky Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-900 shrink-0">
             <div className="flex items-center gap-2.5">
@@ -1979,6 +2007,54 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                   {formError}
                 </div>
               )}
+
+              {/* Property Category Selector: Simple Property vs Lease Property */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, tenure: 'FREEHOLD' })}
+                  className={`p-3.5 rounded-xl border text-left transition cursor-pointer ${
+                    !isLeaseProperty
+                      ? 'bg-indigo-600/15 border-indigo-500 text-white shadow-sm'
+                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs">Simple Property</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold">
+                      Freehold
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Standard property setup with rent, address, valuation &amp; compliance.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      tenure: isLeaseProperty ? formData.tenure : 'LEASEHOLD',
+                    })
+                  }
+                  className={`p-3.5 rounded-xl border text-left transition cursor-pointer ${
+                    isLeaseProperty
+                      ? 'bg-indigo-600/15 border-indigo-500 text-white shadow-sm'
+                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs">Lease Property</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                      Leasehold Form
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Opens the full 9-section Leasehold Property Information Record Form.
+                  </p>
+                </button>
+              </div>
 
               {/* Section 1: Property Identity & Type */}
               <div className="space-y-3">
@@ -2244,6 +2320,16 @@ export function PropertiesPage({ onSelectProperty, selectedCompany }) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
                 />
               </div>
+
+              {/* Section 6: Full Leasehold Property Information Record Form (when Lease Property is selected) */}
+              {isLeaseProperty && (
+                <LeaseholdRecordForm
+                  value={formData.leaseholdRecord}
+                  onChange={(nextLeasehold) =>
+                    setFormData({ ...formData, leaseholdRecord: nextLeasehold })
+                  }
+                />
+              )}
             </div>
 
             {/* Sticky Footer */}

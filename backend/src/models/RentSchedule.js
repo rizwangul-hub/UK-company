@@ -73,6 +73,21 @@ const rentScheduleSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    dueNoticeSentAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    dueNoticeSentTo: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    dueNoticeMessageId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,

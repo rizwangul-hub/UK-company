@@ -10,6 +10,8 @@ import Property from '../models/Property.js';
 import { postLedgerTransaction, generateVoucherNo, round2 } from '../services/ledgerService.js';
 import { apiSuccess, apiError } from '../utils/apiResponse.js';
 import { sendRentDueNoticeEmail } from '../services/emailService.js';
+import EmailNotificationConfig from '../models/EmailNotificationConfig.js';
+import { evaluateAndSendRentDueEmails } from '../services/rentDueEmailEngine.js';
 
 export const generateMonthlySchedules = async (req, res) => {
   try {
@@ -445,6 +447,10 @@ export const sendRentNotice = async (req, res) => {
     const dueDate = schedule.dueDate;
     const paymentReference = `RENT-${(schedule.billingMonth || '').replace('-', '')}-${(schedule.tenantId?.fullName || '').slice(0, 4).toUpperCase()}`;
 
+    const config = (await EmailNotificationConfig.findOne({ companyId: 'GLOBAL' }).lean()) || {};
+    const replyToEmail =
+      config.rentDueReplyTo || process.env.RENT_DUE_REPLY_TO || 'ftaccountants@hotmail.com';
+
     const sendRes = await sendRentDueNoticeEmail({
       tenantName,
       tenantEmail,
@@ -454,18 +460,102 @@ export const sendRentNotice = async (req, res) => {
       dueDate,
       paymentReference,
       notes: schedule.notes || '',
+      config: {
+        smtpHost: config.smtpHost,
+        smtpPort: config.smtpPort,
+        smtpSecure: config.smtpSecure,
+        smtpUser: config.smtpUser,
+        smtpPass: config.smtpPass,
+        fromEmail: config.fromEmail,
+        fromName: 'Kamran Ijaz & Fahad Rasheed (FT Accountants)',
+        replyTo: replyToEmail,
+        bcc: replyToEmail,
+      },
     });
 
     if (!sendRes.success) {
       return apiError(res, sendRes.error || 'Failed to dispatch rent notice email.', 500);
     }
 
+    schedule.dueNoticeSentAt = new Date();
+    schedule.dueNoticeSentTo = tenantEmail;
+    schedule.dueNoticeMessageId = sendRes.messageId || '';
+    await schedule.save();
+
     return apiSuccess(
       res,
-      { scheduleId: schedule._id, tenantEmail, messageId: sendRes.messageId },
-      `Rent due notice successfully dispatched to ${tenantEmail} (from Kamran Ijaz & Fahad Rasheed, with replies routed to ftaccountants@hotmail.com).`
+      { scheduleId: schedule._id, tenantEmail, replyTo: replyToEmail, messageId: sendRes.messageId },
+      `Rent due notice successfully dispatched to ${tenantEmail} (with replies routed to ${replyToEmail}).`
     );
   } catch (error) {
     return apiError(res, error.message || 'Failed to send rent notice email', 500, error);
+  }
+};
+
+/**
+ * Triggers automatic rent due-date email evaluation for the active company.
+ * Respects the disabled-by-default guard unless forceSend is explicitly passed.
+ */
+export const runAutoRentDueNotices = async (req, res) => {
+  try {
+    const result = await evaluateAndSendRentDueEmails({
+      targetCompanyId: req.companyId,
+      forceSend: false,
+    });
+    return apiSuccess(res, result, result.message);
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to run automatic rent due email check', 500, error);
+  }
+};
+
+/**
+ * Sends a test Rent Due Notice email to a specified test address (e.g. rizwangul535@gmail.com)
+ * using pixxtechinfo SMTP credentials and Reply-To ftaccountants@hotmail.com.
+ */
+export const sendTestRentDueNotice = async (req, res) => {
+  try {
+    const { toEmail } = req.body;
+    const targetEmail = (toEmail || '').trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      return apiError(res, 'A valid test recipient email address is required.', 400);
+    }
+
+    const config = (await EmailNotificationConfig.findOne({ companyId: 'GLOBAL' }).lean()) || {};
+    const replyToEmail =
+      config.rentDueReplyTo || process.env.RENT_DUE_REPLY_TO || 'ftaccountants@hotmail.com';
+
+    const sendRes = await sendRentDueNoticeEmail({
+      tenantName: 'Test Tenant (Rizwan)',
+      tenantEmail: targetEmail,
+      propertyName: 'Sample UK Property',
+      unitName: 'Unit 1',
+      amountDue: 1250,
+      dueDate: new Date(),
+      paymentReference: 'RENT-TEST-DEMO',
+      notes: 'This is a test rent due notice email. Replying to this email will route to ' + replyToEmail,
+      config: {
+        smtpHost: config.smtpHost,
+        smtpPort: config.smtpPort,
+        smtpSecure: config.smtpSecure,
+        smtpUser: config.smtpUser,
+        smtpPass: config.smtpPass,
+        fromEmail: config.fromEmail,
+        fromName: 'Kamran Ijaz & Fahad Rasheed (FT Accountants)',
+        replyTo: replyToEmail,
+        bcc: '', // Do not BCC ftaccountants during test dispatch
+      },
+    });
+
+    if (!sendRes.success) {
+      return apiError(res, sendRes.error || 'Failed to dispatch test rent due email.', 400);
+    }
+
+    return apiSuccess(
+      res,
+      { sentTo: targetEmail, replyTo: replyToEmail, messageId: sendRes.messageId },
+      `Test rent due email sent to ${targetEmail} (Reply-To: ${replyToEmail}).`
+    );
+  } catch (error) {
+    return apiError(res, error.message || 'Failed to send test rent due email', 500, error);
   }
 };

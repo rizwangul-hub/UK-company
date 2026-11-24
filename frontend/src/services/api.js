@@ -380,6 +380,14 @@ export const rentAPI = {
     const res = await api.post(`/rent/schedules/${id}/send-notice`);
     return res.data;
   },
+  checkRentDueNoticesNow: async () => {
+    const res = await api.post('/rent/due-notices/check-now');
+    return res.data;
+  },
+  sendTestRentDueNotice: async (toEmail) => {
+    const res = await api.post('/rent/due-notices/test', { toEmail });
+    return res.data;
+  },
 };
 
 // --------------------------------------------------------------------------

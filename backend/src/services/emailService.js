@@ -63,7 +63,8 @@ export const sendEmail = async ({ to, subject, html, text, config = {} }) => {
 
   const fromEmail = config.fromEmail || process.env.SMTP_FROM || config.smtpUser || process.env.SMTP_USER;
   const fromName = config.fromName || 'Fahad Rasheed - FT Accountants';
-  const replyTo = config.replyTo || 'ftaccountants@hotmail.com';
+  const replyTo = config.replyTo || process.env.RENT_DUE_REPLY_TO || 'ftaccountants@hotmail.com';
+  const bcc = config.bcc !== undefined ? config.bcc : 'ftaccountants@hotmail.com';
 
   // Generate clean plain-text body to ensure high inbox deliverability
   const plainText = text || html
@@ -73,11 +74,10 @@ export const sendEmail = async ({ to, subject, html, text, config = {} }) => {
     .trim();
 
   try {
-    const info = await transporter.sendMail({
+    const mailOptions = {
       from: `"${fromName}" <${fromEmail}>`,
       to,
       replyTo,
-      bcc: config.bcc || 'ftaccountants@hotmail.com',
       subject,
       text: plainText,
       html,
@@ -85,7 +85,11 @@ export const sendEmail = async ({ to, subject, html, text, config = {} }) => {
         'X-Priority': '3',
         'X-Mailer': 'FT Accountants Property Management Portal',
       },
-    });
+    };
+    if (bcc) {
+      mailOptions.bcc = bcc;
+    }
+    const info = await transporter.sendMail(mailOptions);
 
     return {
       success: true,
@@ -323,6 +327,7 @@ export const sendRentDueNoticeEmail = async ({
     style: 'currency',
     currency: 'GBP',
   });
+  const replyToEmail = config.replyTo || process.env.RENT_DUE_REPLY_TO || 'ftaccountants@hotmail.com';
 
   const subject = `Rent Payment Due: ${formattedAmount} for ${propertyName} (Due: ${formattedDueDate})`;
 
@@ -415,7 +420,7 @@ export const sendRentDueNoticeEmail = async ({
       ${notes ? `<p style="font-size:12px; color:#64748b; font-style: italic;">Note: ${notes}</p>` : ''}
 
       <div class="reply-alert">
-        <strong>Direct Manager Inquiries:</strong> If you have already made this payment, require a receipt, or need to query this demand, please reply directly to this email or write to <strong>ftaccountants@hotmail.com</strong>.
+        <strong>Direct Manager Inquiries:</strong> If you have already made this payment, require a receipt, or need to query this demand, please reply directly to this email or write to <strong>${replyToEmail}</strong>.
       </div>
 
       <div class="signature">
@@ -423,7 +428,7 @@ export const sendRentDueNoticeEmail = async ({
         <strong style="color: #0f172a;">Kamran Ijaz</strong> (Director / Boss)<br>
         <strong style="color: #0f172a;">Fahad Rasheed</strong> (Property Manager)<br>
         <span>FT Accountants UK &middot; Management &amp; Accounts Division</span><br>
-        <span style="color: #059669; font-weight: 600;">ftaccountants@hotmail.com</span>
+        <span style="color: #059669; font-weight: 600;">${replyToEmail}</span>
       </div>
     </div>
     <div class="footer">
@@ -440,9 +445,9 @@ export const sendRentDueNoticeEmail = async ({
     html,
     config: {
       ...config,
-      fromName: 'Kamran Ijaz & Fahad Rasheed (FT Accountants)',
-      replyTo: 'ftaccountants@hotmail.com',
-      bcc: 'ftaccountants@hotmail.com',
+      fromName: config.fromName || 'Kamran Ijaz & Fahad Rasheed (FT Accountants)',
+      replyTo: replyToEmail,
+      bcc: config.bcc !== undefined ? config.bcc : replyToEmail,
     },
   });
 };
