@@ -19,6 +19,7 @@ import { GroupPortfolioDashboard } from './pages/GroupPortfolioDashboard.jsx';
 import { RecycleBinPage } from './pages/RecycleBinPage.jsx';
 import { StatementImportPage } from './pages/StatementImportPage.jsx';
 import { ProfitLossPage } from './pages/ProfitLossPage.jsx';
+import { PixxAIAssistantPage } from './pages/PixxAIAssistantPage.jsx';
 import { authAPI, clearApiCache } from './services/api.js';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { PWAInstallBanner } from './components/PWAInstallBanner.jsx';
@@ -384,9 +385,11 @@ export function App() {
           {currentView === 'reports' && <ReportsPage selectedCompany={selectedCompany} />}
           {currentView === 'recycle-bin' && <RecycleBinPage selectedCompany={selectedCompany} />}
           {currentView === 'settings' && <SettingsPage user={user} selectedCompany={selectedCompany} />}
+          {currentView === 'ai-assistant' && <PixxAIAssistantPage selectedCompany={selectedCompany} />}
           {![
             'dashboard',
             'profit-loss',
+            'ai-assistant',
             'data-entry',
             'properties',
             'appliances',

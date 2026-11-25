@@ -23,13 +23,14 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Bot,
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle.jsx';
 import { BackToPortalButton } from '../components/BackToPortalButton.jsx';
 import pixxLogo from '../assets/logo.png';
 
 const GROUPS = [
-  { label: 'Overview', items: [['dashboard', 'Dashboard', LayoutDashboard], ['profit-loss', 'Profit & loss', TrendingUp]] },
+  { label: 'Overview', items: [['dashboard', 'Dashboard', LayoutDashboard], ['profit-loss', 'Profit & loss', TrendingUp], ['ai-assistant', 'PIXX AI ASSISTANT', Bot]] },
   { label: 'Property management', items: [['properties', 'Properties & units', Building2], ['tenants', 'Tenants & leases', Users], ['rent', 'Rent collection', Receipt], ['appliances', 'Appliances & care', Sparkles]] },
   { label: 'Finance & accounting', items: [['data-entry', 'Record a transaction', FileEdit], ['accounts', 'Bank accounts', CreditCard], ['statement-import', 'Statement imports', FileUp], ['mortgages', 'Mortgages', Landmark], ['ledger', 'Transaction ledger', Layers], ['chart-of-accounts', 'Chart of accounts', ListTree], ['reports', 'Reports & exports', FileSpreadsheet]] },
   { label: 'Workspace', items: [['recycle-bin', 'Recycle bin', Trash2], ['settings', 'Settings', Settings]] },
@@ -38,6 +39,7 @@ const GROUPS = [
 const HELP = {
   dashboard: 'Your properties, cash flow and priorities in one place.',
   'profit-loss': 'Understand income, expenses and portfolio performance.',
+  'ai-assistant': 'Ask Gemini 3.5 Flash about your companies, ledgers, reconciliation & emails.',
   properties: 'Manage buildings, lettable units and property compliance.',
   tenants: 'Manage people, leases and essential documents.',
   rent: 'Keep payments, due dates and arrears in view.',

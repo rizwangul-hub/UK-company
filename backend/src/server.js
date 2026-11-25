@@ -21,6 +21,7 @@ import complianceRoutes from './routes/complianceRoutes.js';
 import propertyChargeRoutes from './routes/propertyChargeRoutes.js';
 import statementImportRoutes from './routes/statementImportRoutes.js';
 import profitLossRoutes from './routes/profitLossRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 
 // Configure UK Cloudinary if credentials are present in UK .env
 configureCloudinary();
@@ -191,6 +192,7 @@ app.use('/api/compliance', complianceRoutes);
 app.use('/api/property-charges', propertyChargeRoutes);
 app.use('/api/statement-import', statementImportRoutes);
 app.use('/api/pnl', profitLossRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api', tenancyRoutes); // exposes /api/tenants and /api/tenancies
 
 // 404 Handler

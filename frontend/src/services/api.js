@@ -927,4 +927,50 @@ export const statementImportAPI = {
   },
 };
 
+// --------------------------------------------------------------------------
+// Pixx AI Assistant API (Gemini 3.5 Flash)
+// --------------------------------------------------------------------------
+export const aiAPI = {
+  getConversations: async () => {
+    const res = await api.get('/ai/conversations');
+    return res.data;
+  },
+  createConversation: async (data) => {
+    const res = await api.post('/ai/conversations', data);
+    return res.data;
+  },
+  getConversation: async (id) => {
+    const res = await api.get(`/ai/conversations/${id}`);
+    return res.data;
+  },
+  deleteConversation: async (id) => {
+    const res = await api.delete(`/ai/conversations/${id}`);
+    return res.data;
+  },
+  chat: async (data) => {
+    const res = await api.post('/ai/chat', data);
+    return res.data;
+  },
+  getPendingApprovals: async () => {
+    const res = await api.get('/ai/approvals');
+    return res.data;
+  },
+  approveAction: async (id, approvalToken) => {
+    const res = await api.post(`/ai/approvals/${id}/approve`, { approvalToken });
+    return res.data;
+  },
+  rejectAction: async (id, approvalToken) => {
+    const res = await api.post(`/ai/approvals/${id}/reject`, { approvalToken });
+    return res.data;
+  },
+  getUsage: async () => {
+    const res = await api.get('/ai/usage');
+    return res.data;
+  },
+  getAudit: async () => {
+    const res = await api.get('/ai/audit');
+    return res.data;
+  },
+};
+
 export default api;
