@@ -21,6 +21,7 @@ import { StatementImportPage } from './pages/StatementImportPage.jsx';
 import { ProfitLossPage } from './pages/ProfitLossPage.jsx';
 import { PixxAIAssistantPage } from './pages/PixxAIAssistantPage.jsx';
 import { authAPI, clearApiCache } from './services/api.js';
+import { isRequestCanceled } from './utils/requestErrors.js';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { PWAInstallBanner } from './components/PWAInstallBanner.jsx';
 import { COMPANIES, getCompanyBySlug } from './config/companies.js';
@@ -182,7 +183,7 @@ export function App() {
             localStorage.setItem('user', JSON.stringify(authenticatedUser));
           }
         } catch (authErr) {
-          console.warn('Session verification notice:', authErr);
+          if (!isRequestCanceled(authErr)) console.warn('Session verification notice:', authErr);
           if (authErr?.response?.status === 401) {
             clearApiCache();
             localStorage.removeItem('token');

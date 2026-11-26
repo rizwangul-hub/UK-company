@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { getUsageLimitsConfig } from './AIUsageService.js';
 import { getAuthorizedCompanies } from './CompanyAuthorizationService.js';
+import { requestGeminiContent } from './GeminiRequestService.js';
 
 let cachedClient = null;
 let cachedApiKey = null;
@@ -8,8 +9,10 @@ let cachedApiKey = null;
 export const getGeminiClient = () => {
   const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) {
-    const err = new Error('GEMINI_API_KEY is not configured in backend environment.');
-    err.status = 500;
+    const err = new Error('The AI service is not configured. Please contact your administrator.');
+    err.status = 503;
+    err.code = 'AI_NOT_CONFIGURED';
+    err.retryable = false;
     throw err;
   }
   if (!cachedClient || cachedApiKey !== apiKey) {
@@ -64,10 +67,13 @@ export const runGeminiTurn = async ({
   userMessage,
   toolDeclarations = [],
   executeTool,
+  client,
 }) => {
-  const ai = getGeminiClient();
-  const { model, maxOutputTokens } = getUsageLimitsConfig();
+  const ai = client || getGeminiClient();
+  const deadline = Date.now() + 65_000;
+  const { model: primaryModel, fallbackModel, maxOutputTokens } = getUsageLimitsConfig();
   const systemInstruction = buildSystemInstruction({ user, activeCompanyId });
+  let activeModel = primaryModel;
 
   const contents = [];
   for (const msg of history) {
@@ -95,34 +101,18 @@ export const runGeminiTurn = async ({
   const MAX_TOOL_ROUNDS = 6;
   let finalText = '';
 
-  const callWithRetry = async (fn, retries = 2) => {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        return await fn();
-      } catch (err) {
-        const isTransient = err?.status === 503 || err?.status === 429;
-        if (isTransient && attempt < retries) {
-          await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
-          continue;
-        }
-        throw err;
-      }
-    }
-  };
-
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await callWithRetry(() =>
-      ai.models.generateContent({
-        model,
-        contents,
-        config: {
-          systemInstruction,
-          maxOutputTokens,
-          temperature: 0.2,
-          tools: toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined,
-        },
-      })
-    );
+    const { response, activeModel: usedModel } = await requestGeminiContent(ai, {
+      model: activeModel,
+      contents,
+      config: {
+        systemInstruction,
+        maxOutputTokens,
+        temperature: 0.2,
+        tools: toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined,
+      },
+    }, { deadline, fallbackModel });
+    activeModel = usedModel;
 
     const meta = response.usageMetadata || {};
     totalInputTokens += Number(meta.promptTokenCount || 0);
@@ -196,7 +186,7 @@ export const runGeminiTurn = async ({
 
   return {
     reply: finalText,
-    model,
+    model: activeModel,
     toolCalls: executedToolCalls,
     reportPreview,
     emailPreview,

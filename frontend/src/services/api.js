@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { retryInterruptedRead } from '../utils/requestErrors.js';
 
 const resolveBaseURL = () => {
   const envUrl = import.meta.env.VITE_API_URL;
@@ -185,7 +186,7 @@ export const authAPI = {
     return res.data;
   },
   getMe: async (config = {}) => {
-    return cachedGet('/auth/me', config, 30000);
+    return retryInterruptedRead(() => cachedGet('/auth/me', config, 30000), { signal: config.signal });
   },
   updatePassword: async (passwords) => {
     const res = await api.put('/auth/password', passwords);
@@ -931,8 +932,8 @@ export const statementImportAPI = {
 // Pixx AI Assistant API (Gemini 3.5 Flash)
 // --------------------------------------------------------------------------
 export const aiAPI = {
-  getConversations: async () => {
-    const res = await api.get('/ai/conversations');
+  getConversations: async (config = {}) => {
+    const res = await retryInterruptedRead(() => api.get('/ai/conversations', config), { signal: config.signal });
     return res.data;
   },
   createConversation: async (data) => {
@@ -948,11 +949,11 @@ export const aiAPI = {
     return res.data;
   },
   chat: async (data) => {
-    const res = await api.post('/ai/chat', data);
+    const res = await api.post('/ai/chat', data, { timeout: 70000 });
     return res.data;
   },
-  getPendingApprovals: async () => {
-    const res = await api.get('/ai/approvals');
+  getPendingApprovals: async (config = {}) => {
+    const res = await api.get('/ai/approvals', config);
     return res.data;
   },
   approveAction: async (id, approvalToken) => {

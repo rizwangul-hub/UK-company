@@ -83,12 +83,17 @@ export const removeConversation = async (req, res) => {
 export const chatWithAssistant = async (req, res) => {
   const started = Date.now();
   let activeCompanyId = null;
+  let convId = null;
+  let savedUserMessage = null;
 
   try {
-    const { conversationId, companyContext, message } = req.body || {};
+    const { conversationId, companyContext, message, retryMessageId } = req.body || {};
     const cleanMessage = String(message || '').trim();
     if (!cleanMessage) {
       return apiError(res, 'Message is required.', 400);
+    }
+    if (retryMessageId && !conversationId) {
+      return apiError(res, 'A conversation is required to retry a message.', 400);
     }
 
     await checkUserRateLimit(req.user._id);
@@ -99,7 +104,7 @@ export const chatWithAssistant = async (req, res) => {
       activeCompanyId = 'ALL';
     }
 
-    let convId = conversationId;
+    convId = conversationId;
     let isFirstMessage = false;
     if (!convId) {
       const conv = await createConversation({
@@ -118,21 +123,33 @@ export const chatWithAssistant = async (req, res) => {
         activeCompanyId = existing.conversation.companyContext;
       }
       isFirstMessage = existing.messages.length === 0;
+      if (retryMessageId) {
+        const latest = existing.messages.at(-1);
+        if (!latest || String(latest._id) !== String(retryMessageId) || latest.role !== 'user'
+          || latest.content !== cleanMessage || (latest.companyContext || null) !== activeCompanyId) {
+          return apiError(res, 'This conversation has changed. Reload it before retrying.', 409);
+        }
+        savedUserMessage = latest;
+      }
     }
 
-    const history = await getSlidingWindowHistory({
+    let history = await getSlidingWindowHistory({
       conversationId: convId,
       userId: req.user._id,
     });
 
-    await appendMessage({
-      conversationId: convId,
-      userId: req.user._id,
-      role: 'user',
-      content: cleanMessage,
-      companyContext: activeCompanyId,
-      autoTitle: isFirstMessage ? cleanMessage.slice(0, 60) : null,
-    });
+    if (savedUserMessage) {
+      history = history.filter((msg) => String(msg._id) !== String(savedUserMessage._id));
+    } else {
+      savedUserMessage = await appendMessage({
+        conversationId: convId,
+        userId: req.user._id,
+        role: 'user',
+        content: cleanMessage,
+        companyContext: activeCompanyId,
+        autoTitle: isFirstMessage ? cleanMessage.slice(0, 60) : null,
+      });
+    }
 
     const executeTool = createToolExecutor({
       user: req.user,
@@ -191,13 +208,26 @@ export const chatWithAssistant = async (req, res) => {
     await recordUsage({
       userId: req.user._id,
       companyContext: activeCompanyId || 'GENERAL',
+      conversationId: convId,
       model: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
       durationMs: Date.now() - started,
       status: error.status === 429 ? 'RATE_LIMITED' : 'ERROR',
       errorMessage: error.message || 'AI chat failed',
     }).catch(() => {});
 
-    return apiError(res, error.message || 'AI request failed', error.status || 500, error);
+    const status = Number(error.status);
+    return res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500).json({
+      success: false,
+      message: error.message || 'AI request failed',
+      ...(typeof error.code === 'string' && error.code.startsWith('AI_') ? {
+        code: error.code,
+        retryable: error.retryable,
+        retryAfterSeconds: error.retryAfterSeconds || null,
+      } : {}),
+      ...(savedUserMessage ? {
+        data: { conversationId: convId, userMessage: savedUserMessage },
+      } : {}),
+    });
   }
 };
 

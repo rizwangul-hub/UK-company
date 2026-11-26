@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { aiAPI } from '../services/api.js';
+import { getAIErrorMessage, isRequestCanceled } from '../utils/requestErrors.js';
 import { MarkdownRenderer } from '../components/ai/MarkdownRenderer.jsx';
 import { ApprovalDialog } from '../components/ai/ApprovalDialog.jsx';
 import { AIUsagePanel } from '../components/ai/AIUsagePanel.jsx';
@@ -37,6 +38,8 @@ export function PixxAIAssistantPage({ selectedCompany }) {
   const [sending, setSending] = useState(false);
   const [loadingConv, setLoadingConv] = useState(false);
   const [error, setError] = useState('');
+  const [failedRequest, setFailedRequest] = useState(null);
+  const [conversationError, setConversationError] = useState('');
   const [pendingApprovals, setPendingApprovals] = useState({});
   const [showUsageTab, setShowUsageTab] = useState(false);
   const [usageStats, setUsageStats] = useState(null);
@@ -44,21 +47,25 @@ export function PixxAIAssistantPage({ selectedCompany }) {
 
   const messagesEndRef = useRef(null);
 
-  const loadConversations = async () => {
+  const loadConversations = async (config = {}) => {
     try {
-      const res = await aiAPI.getConversations();
+      const res = await aiAPI.getConversations(config);
+      if (config.signal?.aborted) return;
       if (res?.success) {
         setConversations(res.data.conversations || []);
         setCompanies(res.data.companies || []);
+        setConversationError('');
       }
     } catch (err) {
-      console.error('Failed to load AI conversations:', err);
+      if (isRequestCanceled(err) || config.signal?.aborted) return;
+      setConversationError('Could not load saved conversations. Check your connection and try again.');
     }
   };
 
-  const loadApprovals = async () => {
+  const loadApprovals = async (config = {}) => {
     try {
-      const res = await aiAPI.getPendingApprovals();
+      const res = await aiAPI.getPendingApprovals(config);
+      if (config.signal?.aborted) return;
       if (res?.success && Array.isArray(res.data.approvals)) {
         const map = {};
         for (const a of res.data.approvals) {
@@ -72,8 +79,10 @@ export function PixxAIAssistantPage({ selectedCompany }) {
   };
 
   useEffect(() => {
-    loadConversations();
-    loadApprovals();
+    const controller = new AbortController();
+    loadConversations({ signal: controller.signal });
+    loadApprovals({ signal: controller.signal });
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -81,10 +90,12 @@ export function PixxAIAssistantPage({ selectedCompany }) {
   }, [messages, sending]);
 
   const handleSelectConversation = async (convId) => {
+    if (sending) return;
     setShowUsageTab(false);
     setActiveConvId(convId);
     setLoadingConv(true);
     setError('');
+    setFailedRequest(null);
     try {
       const res = await aiAPI.getConversation(convId);
       if (res?.success) {
@@ -101,14 +112,17 @@ export function PixxAIAssistantPage({ selectedCompany }) {
   };
 
   const handleNewConversation = () => {
+    if (sending) return;
     setShowUsageTab(false);
     setActiveConvId(null);
     setMessages([]);
     setError('');
+    setFailedRequest(null);
   };
 
   const handleDeleteConversation = async (convId, e) => {
     e.stopPropagation();
+    if (sending) return;
     try {
       await aiAPI.deleteConversation(convId);
       setConversations((prev) => prev.filter((c) => c._id !== convId));
@@ -136,10 +150,13 @@ export function PixxAIAssistantPage({ selectedCompany }) {
   const handleSend = async (promptText) => {
     const text = String(promptText ?? input).trim();
     if (!text || sending) return;
+    const retry = failedRequest?.message === text && failedRequest?.conversationId === activeConvId
+      && failedRequest?.companyContext === companyContext ? failedRequest : null;
+    if (!retry) setFailedRequest(null);
 
     setShowUsageTab(false);
     setError('');
-    if (promptText === undefined) setInput('');
+    if (promptText === undefined || text === input.trim()) setInput('');
 
     const optimisticUserMsg = {
       _id: `tmp-${Date.now()}`,
@@ -147,7 +164,7 @@ export function PixxAIAssistantPage({ selectedCompany }) {
       content: text,
       createdAt: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimisticUserMsg]);
+    if (!retry) setMessages((prev) => [...prev, optimisticUserMsg]);
     setSending(true);
 
     try {
@@ -155,6 +172,7 @@ export function PixxAIAssistantPage({ selectedCompany }) {
         conversationId: activeConvId,
         companyContext,
         message: text,
+        ...(retry ? { retryMessageId: retry.userMessageId } : {}),
       });
 
       if (res?.success && res.data) {
@@ -166,10 +184,28 @@ export function PixxAIAssistantPage({ selectedCompany }) {
           setPendingApprovals((prev) => ({ ...prev, [approvalRequest._id]: approvalRequest }));
         }
         setMessages((prev) => [...prev, assistantMsg]);
+        setFailedRequest(null);
         loadConversations();
       }
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || 'AI request failed.');
+      const saved = err?.response?.data?.data;
+      setError(getAIErrorMessage(err));
+      setInput((draft) => draft || text);
+      if (saved?.conversationId && saved?.userMessage?._id) {
+        setActiveConvId(saved.conversationId);
+        setMessages((prev) => prev.map((msg) => msg._id === optimisticUserMsg._id ? saved.userMessage : msg));
+        setFailedRequest({
+          conversationId: saved.conversationId,
+          userMessageId: saved.userMessage._id,
+          message: text,
+          companyContext,
+        });
+        loadConversations();
+      } else {
+        // An interrupted response has no confirmed message ID; let the user recover the draft.
+        if (!retry) setMessages((prev) => prev.filter((msg) => msg._id !== optimisticUserMsg._id));
+        if (err?.response?.status === 409) setFailedRequest(null);
+      }
     } finally {
       setSending(false);
     }
@@ -218,6 +254,7 @@ export function PixxAIAssistantPage({ selectedCompany }) {
           <button
             type="button"
             onClick={handleNewConversation}
+            disabled={sending}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -302,6 +339,7 @@ export function PixxAIAssistantPage({ selectedCompany }) {
               <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
               <select
                 value={companyContext}
+                disabled={sending}
                 onChange={(e) => setCompanyContext(e.target.value)}
                 className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
               >
@@ -328,6 +366,13 @@ export function PixxAIAssistantPage({ selectedCompany }) {
           <AIUsagePanel stats={usageStats} loading={loadingUsage} />
         ) : (
           <>
+            {conversationError && (
+              <div role="alert" className="m-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-wrap items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span className="flex-1">{conversationError}</span>
+                <button type="button" onClick={() => loadConversations()} className="font-semibold underline cursor-pointer">Try again</button>
+              </div>
+            )}
             {/* Message List */}
             <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-5 bg-white">
               {loadingConv ? (
@@ -480,9 +525,12 @@ export function PixxAIAssistantPage({ selectedCompany }) {
               )}
 
               {error && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex flex-wrap items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
+                  <span className="flex-1">{error}</span>
+                  {failedRequest && (
+                    <button type="button" disabled={sending} onClick={() => handleSend(failedRequest.message)} className="font-semibold underline cursor-pointer disabled:opacity-50">Try again</button>
+                  )}
                 </div>
               )}
 

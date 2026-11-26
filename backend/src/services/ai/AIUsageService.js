@@ -9,6 +9,8 @@ export const getUsageLimitsConfig = () => {
   const normalizedModel = rawModel.toLowerCase() === 'gemini 3.5 flash' ? 'gemini-3.5-flash' : rawModel;
   return {
     model: normalizedModel,
+    // Only use an alternative model when the deployment explicitly configures one.
+    fallbackModel: (process.env.GEMINI_FALLBACK_MODEL || '').trim() || null,
   maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS) || 4096,
   maxHistoryMessages: Number(process.env.AI_MAX_HISTORY_MESSAGES) || 20,
   userRpmLimit: Number(process.env.AI_USER_RPM_LIMIT) || 30,
