@@ -5,10 +5,11 @@ import AIUsageLog from '../../models/AIUsageLog.js';
  * Pricing is read from environment variables rather than hardcoded.
  */
 export const getUsageLimitsConfig = () => {
-  const rawModel = (process.env.GEMINI_MODEL || 'gemini-3.5-flash').trim();
+  const rawModel = (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
   const normalizedModel = rawModel.toLowerCase() === 'gemini 3.5 flash' ? 'gemini-3.5-flash' : rawModel;
-  // Default fallback to gemini-3.5-flash-lite during Google 3.5-flash high demand spikes
-  const fallbackModel = (process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash-lite').trim() || null;
+  // Fallback: if primary is the standard flash, fall back to flash-lite; otherwise use 3.1-flash-lite
+  const defaultFallback = normalizedModel === 'gemini-3.5-flash' ? 'gemini-3.5-flash-lite' : 'gemini-3.1-flash-lite';
+  const fallbackModel = (process.env.GEMINI_FALLBACK_MODEL || defaultFallback).trim() || null;
   return {
     model: normalizedModel,
     fallbackModel: fallbackModel !== normalizedModel ? fallbackModel : null,

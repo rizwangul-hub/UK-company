@@ -74,9 +74,10 @@ export async function requestGeminiContent(client, params, {
         const isLastModel = currentModel === modelsToTry[modelsToTry.length - 1];
         const delay = 800 * (2 ** attempt) + Math.floor(random() * 400);
 
-        // If this model is experiencing high demand (503/429) and we have a fallback model available,
-        // switch immediately to the fallback model on the next iteration
-        if (error.retryable && !isLastModel && attempt === 0) {
+        // If this model is rate-limited (429/503) and we have a fallback available, switch immediately.
+        // 429 = daily/minute quota exhausted (no point retrying same model); 503 = high demand.
+        const shouldFailover = (error.retryable || error.status === 429) && !isLastModel && attempt === 0;
+        if (shouldFailover) {
           console.warn(`[GeminiRequestService] Model ${currentModel} returned ${error.status}. Failing over to fallback ${fallbackModel}...`);
           break;
         }

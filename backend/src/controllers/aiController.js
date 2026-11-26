@@ -12,12 +12,13 @@ import {
   recordUsage,
   getUsageDashboard,
   calculateEstimatedCostUsd,
+  getUsageLimitsConfig,
 } from '../services/ai/AIUsageService.js';
 import {
   assertCompanyAuthorized,
   getAuthorizedCompanies,
 } from '../services/ai/CompanyAuthorizationService.js';
-import { runGeminiTurn } from '../services/ai/GeminiService.js';
+import { runGeminiTurn, getGeminiClient } from '../services/ai/GeminiService.js';
 import { toolDeclarations, createToolExecutor } from '../services/ai/AIToolRegistry.js';
 import {
   listPendingApprovals,
@@ -216,6 +217,18 @@ export const chatWithAssistant = async (req, res) => {
     }).catch(() => {});
 
     const status = Number(error.status);
+    // Log the full underlying error to server console for Vercel log inspection
+    console.error('[AI Chat Error]', {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+      causeStatus: error.cause?.status,
+      causeMessage: (error.cause?.message || '').slice(0, 500),
+      userId: req.user?._id,
+      model: process.env.GEMINI_MODEL,
+      fallback: process.env.GEMINI_FALLBACK_MODEL,
+      apiKeyPresent: !!(process.env.GEMINI_API_KEY || '').trim(),
+    });
     return res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500).json({
       success: false,
       message: error.message || 'AI request failed',
@@ -290,4 +303,57 @@ export const getAuditHistory = async (req, res) => {
   } catch (error) {
     return apiError(res, error.message || 'Failed to fetch AI audit logs', 500, error);
   }
+};
+
+/**
+ * GET /api/ai/health
+ * Diagnostic endpoint: checks whether the Gemini API key is configured and
+ * which models are reachable. Protected by auth. Returns plain JSON — never
+ * exposes the actual API key value.
+ */
+export const getAiHealth = async (req, res) => {
+  const { GoogleGenAI } = await import('@google/genai');
+  const { getUsageLimitsConfig } = await import('../services/ai/AIUsageService.js');
+  const cfg = getUsageLimitsConfig();
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+
+  const result = {
+    apiKeyPresent: !!apiKey,
+    apiKeyLength: apiKey.length,
+    primaryModel: cfg.model,
+    fallbackModel: cfg.fallbackModel,
+    models: {},
+  };
+
+  if (!apiKey) {
+    return res.status(200).json({ success: true, data: result });
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const modelsToTest = [
+    cfg.model,
+    cfg.fallbackModel,
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
+  ].filter(Boolean).filter((m, i, a) => a.indexOf(m) === i);
+
+  for (const m of modelsToTest) {
+    try {
+      const r = await ai.models.generateContent({
+        model: m,
+        contents: 'Reply with only: OK',
+        config: { maxOutputTokens: 10, httpOptions: { timeout: 15000, retryOptions: { attempts: 1 } } },
+      });
+      result.models[m] = { status: 'ok', text: (r.text || '').trim().slice(0, 20) };
+    } catch (err) {
+      let msgStr = err.message || '';
+      let parsed;
+      try { parsed = JSON.parse(msgStr); } catch { /* not JSON */ }
+      const code = err.status || parsed?.error?.code;
+      const msg = parsed?.error?.message || msgStr;
+      result.models[m] = { status: 'error', httpStatus: code, message: msg.slice(0, 200) };
+    }
+  }
+
+  return res.status(200).json({ success: true, data: result });
 };

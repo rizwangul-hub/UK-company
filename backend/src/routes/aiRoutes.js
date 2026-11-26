@@ -10,12 +10,16 @@ import {
   rejectAction,
   getUsageStats,
   getAuditHistory,
+  getAiHealth,
 } from '../controllers/aiController.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.use(protect);
+
+// Diagnostic health endpoint (authenticated admin tool)
+router.get('/health', getAiHealth);
 
 router.get('/conversations', getConversations);
 router.post('/conversations', startConversation);
