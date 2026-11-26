@@ -199,6 +199,7 @@ export function PixxAIAssistantPage({ selectedCompany }) {
           userMessageId: saved.userMessage._id,
           message: text,
           companyContext,
+          retryable: err?.response?.data?.retryable !== false,
         });
         loadConversations();
       } else {
@@ -528,7 +529,7 @@ export function PixxAIAssistantPage({ selectedCompany }) {
                 <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex flex-wrap items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span className="flex-1">{error}</span>
-                  {failedRequest && (
+                  {failedRequest?.retryable && (
                     <button type="button" disabled={sending} onClick={() => handleSend(failedRequest.message)} className="font-semibold underline cursor-pointer disabled:opacity-50">Try again</button>
                   )}
                 </div>

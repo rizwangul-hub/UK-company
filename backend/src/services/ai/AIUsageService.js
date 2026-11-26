@@ -1,4 +1,5 @@
 import AIUsageLog from '../../models/AIUsageLog.js';
+import { normalizeGeminiModelName } from './GeminiModelConfig.js';
 
 /**
  * Configurable AI Usage, Cost Calculation & Rate-Limiting Service.
@@ -6,13 +7,18 @@ import AIUsageLog from '../../models/AIUsageLog.js';
  */
 export const getUsageLimitsConfig = () => {
   const rawModel = (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
-  const normalizedModel = rawModel.toLowerCase() === 'gemini 3.5 flash' ? 'gemini-3.5-flash' : rawModel;
+  const normalizedModel = normalizeGeminiModelName(rawModel);
   // Fallback: if primary is the standard flash, fall back to flash-lite; otherwise use 3.1-flash-lite
   const defaultFallback = normalizedModel === 'gemini-3.5-flash' ? 'gemini-3.5-flash-lite' : 'gemini-3.1-flash-lite';
-  const fallbackModel = (process.env.GEMINI_FALLBACK_MODEL || defaultFallback).trim() || null;
+  const rawFallback = (process.env.GEMINI_FALLBACK_MODEL || defaultFallback).trim();
+  const fallbackModel = normalizeGeminiModelName(rawFallback);
   return {
     model: normalizedModel,
     fallbackModel: fallbackModel !== normalizedModel ? fallbackModel : null,
+    modelConfigurationWarnings: [
+      ...(!normalizedModel ? ['GEMINI_MODEL must contain a Gemini model ID.'] : []),
+      ...(!fallbackModel && rawFallback ? ['GEMINI_FALLBACK_MODEL is invalid and has been disabled. Enter a Gemini model ID or remove the variable.'] : []),
+    ],
     maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS) || 4096,
     maxHistoryMessages: Number(process.env.AI_MAX_HISTORY_MESSAGES) || 20,
     userRpmLimit: Number(process.env.AI_USER_RPM_LIMIT) || 30,

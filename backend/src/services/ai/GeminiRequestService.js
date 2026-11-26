@@ -1,3 +1,5 @@
+import { modelConfigurationError, normalizeGeminiModelName } from './GeminiModelConfig.js';
+
 const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const NETWORK_CODES = new Set(['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ERR_NETWORK']);
 
@@ -18,6 +20,10 @@ export function getProviderStatus(error) {
 export function toAIProviderError(cause) {
   if (typeof cause?.code === 'string' && cause.code.startsWith('AI_')) return cause;
   const status = getProviderStatus(cause);
+  // A syntactically valid ID can still name an unavailable or unsupported model.
+  if ([400, 404].includes(status) && /unexpected model name format|(?:model|models\/).*(?:not found|not supported|invalid)|GenerateContentRequest\.model/i.test(cause?.message || '')) {
+    return modelConfigurationError(cause);
+  }
   const retryable = TRANSIENT_STATUSES.has(status);
   const message = status === 429
     ? 'The AI service has reached its request limit. Please wait a moment and try again.'
@@ -43,9 +49,15 @@ export async function requestGeminiContent(client, params, {
   random = Math.random,
   fallbackModel = null,
 } = {}) {
-  const modelsToTry = [params.model];
-  if (fallbackModel && fallbackModel !== params.model) {
-    modelsToTry.push(fallbackModel);
+  const primaryModel = normalizeGeminiModelName(params.model);
+  if (!primaryModel) throw modelConfigurationError();
+  const validFallback = normalizeGeminiModelName(fallbackModel);
+  if (fallbackModel && !validFallback) {
+    console.warn('[GeminiRequestService] Invalid GEMINI_FALLBACK_MODEL ignored. Set a Gemini model ID or remove the variable.');
+  }
+  const modelsToTry = [primaryModel];
+  if (validFallback && validFallback !== primaryModel) {
+    modelsToTry.push(validFallback);
   }
 
   for (const currentModel of modelsToTry) {
@@ -74,11 +86,10 @@ export async function requestGeminiContent(client, params, {
         const isLastModel = currentModel === modelsToTry[modelsToTry.length - 1];
         const delay = 800 * (2 ** attempt) + Math.floor(random() * 400);
 
-        // If this model is rate-limited (429/503) and we have a fallback available, switch immediately.
-        // 429 = daily/minute quota exhausted (no point retrying same model); 503 = high demand.
+        // Switch to a configured alternative on a transient provider failure.
         const shouldFailover = (error.retryable || error.status === 429) && !isLastModel && attempt === 0;
         if (shouldFailover) {
-          console.warn(`[GeminiRequestService] Model ${currentModel} returned ${error.status}. Failing over to fallback ${fallbackModel}...`);
+          console.warn(`[GeminiRequestService] Model ${currentModel} returned ${error.status}. Failing over to fallback ${validFallback}...`);
           break;
         }
 

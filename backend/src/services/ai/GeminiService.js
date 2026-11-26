@@ -71,7 +71,8 @@ export const runGeminiTurn = async ({
 }) => {
   const ai = client || getGeminiClient();
   const deadline = Date.now() + 65_000;
-  const { model: primaryModel, fallbackModel, maxOutputTokens } = getUsageLimitsConfig();
+  const { model: primaryModel, fallbackModel, maxOutputTokens, modelConfigurationWarnings } = getUsageLimitsConfig();
+  for (const warning of modelConfigurationWarnings) console.warn(`[AI Configuration] ${warning}`);
   const systemInstruction = buildSystemInstruction({ user, activeCompanyId });
   let activeModel = primaryModel;
 

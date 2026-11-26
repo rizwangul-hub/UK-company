@@ -26,6 +26,7 @@ import {
   rejectApprovalRequest,
 } from '../services/ai/ApprovalService.js';
 import { getUserAuditLogs } from '../services/ai/AuditService.js';
+import { normalizeGeminiModelName } from '../services/ai/GeminiModelConfig.js';
 
 export const getConversations = async (req, res) => {
   try {
@@ -210,7 +211,7 @@ export const chatWithAssistant = async (req, res) => {
       userId: req.user._id,
       companyContext: activeCompanyId || 'GENERAL',
       conversationId: convId,
-      model: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
+      model: normalizeGeminiModelName(process.env.GEMINI_MODEL) || 'gemini-3.5-flash-lite',
       durationMs: Date.now() - started,
       status: error.status === 429 ? 'RATE_LIMITED' : 'ERROR',
       errorMessage: error.message || 'AI chat failed',
@@ -225,8 +226,8 @@ export const chatWithAssistant = async (req, res) => {
       causeStatus: error.cause?.status,
       causeMessage: (error.cause?.message || '').slice(0, 500),
       userId: req.user?._id,
-      model: process.env.GEMINI_MODEL,
-      fallback: process.env.GEMINI_FALLBACK_MODEL,
+      model: normalizeGeminiModelName(process.env.GEMINI_MODEL),
+      fallback: normalizeGeminiModelName(process.env.GEMINI_FALLBACK_MODEL),
       apiKeyPresent: !!(process.env.GEMINI_API_KEY || '').trim(),
     });
     return res.status(Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500).json({
@@ -322,6 +323,7 @@ export const getAiHealth = async (req, res) => {
     apiKeyLength: apiKey.length,
     primaryModel: cfg.model,
     fallbackModel: cfg.fallbackModel,
+    modelConfigurationWarnings: cfg.modelConfigurationWarnings,
     models: {},
   };
 

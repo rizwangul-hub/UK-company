@@ -41,3 +41,9 @@ test('AI errors show readable recovery instructions instead of raw JSON', () => 
   assert.match(getAIErrorMessage({ code: 'ECONNABORTED' }), /connection was interrupted/);
   assert.match(getAIErrorMessage({ response: { status: 429 } }), /request limit/);
 });
+
+test('Model configuration failures ask for an administrator instead of suggesting a retry', () => {
+  const error = { response: { status: 503, data: { code: 'AI_MODEL_CONFIGURATION_ERROR', retryable: false } } };
+  assert.match(getAIErrorMessage(error), /GEMINI_MODEL or GEMINI_FALLBACK_MODEL/);
+  assert.doesNotMatch(getAIErrorMessage(error), /temporarily busy|try again/i);
+});

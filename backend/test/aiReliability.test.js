@@ -6,6 +6,8 @@ import { chatWithAssistant } from '../src/controllers/aiController.js';
 import AIConversation from '../src/models/AIConversation.js';
 import AIMessage from '../src/models/AIMessage.js';
 import AIUsageLog from '../src/models/AIUsageLog.js';
+import { normalizeGeminiModelName } from '../src/services/ai/GeminiModelConfig.js';
+import { getUsageLimitsConfig } from '../src/services/ai/AIUsageService.js';
 
 const user = { _id: 'user-1', name: 'Test', role: 'admin', allowedCompanies: ['old-street'] };
 
@@ -17,14 +19,14 @@ test('Gemini recovers from a nested 503 using bounded backoff', async () => {
     if (calls.length === 1) throw new Error('{"error":{"code":503,"status":"UNAVAILABLE"}}');
     return { text: 'Recovered' };
   } } };
-  const result = await requestGeminiContent(client, { model: 'configured-model', config: { maxOutputTokens: 4096 } }, {
+  const result = await requestGeminiContent(client, { model: 'gemini-test-primary', config: { maxOutputTokens: 4096 } }, {
     sleep: async (ms) => delays.push(ms), random: () => 0,
   });
   assert.equal(result.response.text, 'Recovered');
   assert.deepEqual(delays, [800]);
   assert.equal(calls.length, 2);
   assert.equal(getProviderStatus({ status: '503' }), 503);
-  assert.ok(calls.every((call) => call.model === 'configured-model' && call.config.maxOutputTokens === 4096));
+  assert.ok(calls.every((call) => call.model === 'gemini-test-primary' && call.config.maxOutputTokens === 4096));
   assert.ok(calls.every((call) => call.config.httpOptions.timeout <= 30_000 && call.config.httpOptions.retryOptions.attempts === 1));
 });
 
@@ -33,7 +35,7 @@ test('Gemini persistent overload stops after two attempts and hides raw provider
   await assert.rejects(requestGeminiContent({ models: { generateContent: async () => {
     calls++;
     throw { code: 503, message: '{"error":{"message":"internal provider response"}}' };
-  } } }, {}, { sleep: async () => {}, random: () => 0 }), (error) => {
+  } } }, { model: 'gemini-test-primary' }, { sleep: async () => {}, random: () => 0 }), (error) => {
     assert.equal(error.status, 503);
     assert.equal(error.retryable, true);
     assert.equal(error.retryAfterSeconds, 10);
@@ -50,7 +52,7 @@ test('Gemini does not retry invalid credentials, bad requests, or programming er
     await assert.rejects(requestGeminiContent({ models: { generateContent: async () => {
       calls++;
       throw failure;
-    } } }, { model: 'primary' }, { fallbackModel: 'configured-alternative' }), (error) => error.retryable === false && error.status === 502);
+    } } }, { model: 'gemini-test-primary' }, { fallbackModel: 'gemini-test-alternative' }), (error) => error.retryable === false && error.status === 502);
     assert.equal(calls, 1);
   }
 });
@@ -59,11 +61,11 @@ test('Gemini uses an explicitly configured fallback on overload and reports the 
   const calls = [];
   const result = await requestGeminiContent({ models: { generateContent: async ({ model }) => {
     calls.push(model);
-    if (model === 'primary') throw { status: 503 };
+    if (model === 'gemini-test-primary') throw { status: 503 };
     return { text: 'Recovered on alternative' };
-  } } }, { model: 'primary' }, { fallbackModel: 'configured-alternative' });
-  assert.deepEqual(calls, ['primary', 'configured-alternative']);
-  assert.equal(result.activeModel, 'configured-alternative');
+  } } }, { model: 'gemini-test-primary' }, { fallbackModel: 'gemini-test-alternative' });
+  assert.deepEqual(calls, ['gemini-test-primary', 'gemini-test-alternative']);
+  assert.equal(result.activeModel, 'gemini-test-alternative');
   assert.equal(result.response.text, 'Recovered on alternative');
 });
 
@@ -72,11 +74,71 @@ test('Gemini respects a shared deadline and recognizes network timeouts', async 
   assert.equal(getProviderStatus({ cause: { code: 'ECONNRESET' } }), 504);
   let calls = 0;
   const client = { models: { generateContent: async () => { calls++; throw { status: 503 }; } } };
-  await assert.rejects(requestGeminiContent(client, {}, {
+  await assert.rejects(requestGeminiContent(client, { model: 'gemini-test-primary' }, {
     deadline: 500, now: () => 0, random: () => 0, sleep: async () => assert.fail('Deadline forbids retry'),
   }), { status: 503 });
   assert.equal(calls, 1);
-  await assert.rejects(requestGeminiContent(client, {}, { deadline: 0, now: () => 0 }), { status: 503 });
+  await assert.rejects(requestGeminiContent(client, { model: 'gemini-test-primary' }, { deadline: 0, now: () => 0 }), { status: 503 });
+  assert.equal(calls, 1);
+});
+
+test('Model configuration rejects masked values, keys and URLs and normalizes IDs', () => {
+  assert.equal(normalizeGeminiModelName(' models/gemini-3.5-flash-lite '), 'gemini-3.5-flash-lite');
+  assert.equal(normalizeGeminiModelName('Gemini 3.5 Flash Lite'), 'gemini-3.5-flash-lite');
+  for (const invalid of ['•••••••••••••••••••••', '********', 'AIza-not-a-model', 'https://example.com/models/gemini-test', '<model-id>', '', null]) {
+    assert.equal(normalizeGeminiModelName(invalid), null);
+  }
+});
+
+test('Production masked fallback setting is disabled without exposing its value', (t) => {
+  const originalModel = process.env.GEMINI_MODEL;
+  const originalFallback = process.env.GEMINI_FALLBACK_MODEL;
+  t.after(() => {
+    if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+    else process.env.GEMINI_MODEL = originalModel;
+    if (originalFallback === undefined) delete process.env.GEMINI_FALLBACK_MODEL;
+    else process.env.GEMINI_FALLBACK_MODEL = originalFallback;
+  });
+  process.env.GEMINI_MODEL = 'models/gemini-3.5-flash';
+  process.env.GEMINI_FALLBACK_MODEL = '•••••••••••••••••••••';
+  const config = getUsageLimitsConfig();
+  assert.equal(config.model, 'gemini-3.5-flash');
+  assert.equal(config.fallbackModel, null);
+  assert.match(config.modelConfigurationWarnings.join(' '), /GEMINI_FALLBACK_MODEL is invalid/);
+  assert.doesNotMatch(JSON.stringify(config), /•/);
+});
+
+test('Primary overload with a masked fallback preserves the original retryable error', async (t) => {
+  const calls = [];
+  const warnings = t.mock.method(console, 'warn', () => {});
+  await assert.rejects(requestGeminiContent({ models: { generateContent: async ({ model }) => {
+    calls.push(model);
+    throw { status: 503 };
+  } } }, { model: 'gemini-3.5-flash' }, {
+    fallbackModel: '•••••••••••••••••••••', sleep: async () => {}, random: () => 0,
+  }), { status: 503, code: 'AI_TEMPORARILY_UNAVAILABLE', retryable: true });
+  assert.deepEqual(calls, ['gemini-3.5-flash', 'gemini-3.5-flash']);
+  assert.match(warnings.mock.calls[0].arguments[0], /Invalid GEMINI_FALLBACK_MODEL/);
+  assert.doesNotMatch(warnings.mock.calls[0].arguments[0], /•/);
+});
+
+test('Invalid primary model is rejected before calling the provider', async () => {
+  await assert.rejects(requestGeminiContent({ models: { generateContent: () => assert.fail('Invalid model must not reach Gemini') } }, {
+    model: '••••••••',
+  }), { status: 503, code: 'AI_MODEL_CONFIGURATION_ERROR', retryable: false });
+});
+
+test('Provider model-format errors give an actionable configuration message', async () => {
+  let calls = 0;
+  await assert.rejects(requestGeminiContent({ models: { generateContent: async () => {
+    calls++;
+    throw Object.assign(new Error('{"error":{"code":400,"message":"* GenerateContentRequest.model: unexpected model name format\\n","status":"INVALID_ARGUMENT"}}'), { status: 400 });
+  } } }, { model: 'gemini-test-primary' }), (error) => {
+    assert.equal(error.code, 'AI_MODEL_CONFIGURATION_ERROR');
+    assert.equal(error.retryable, false);
+    assert.match(error.message, /GEMINI_MODEL and GEMINI_FALLBACK_MODEL/);
+    return true;
+  });
   assert.equal(calls, 1);
 });
 
