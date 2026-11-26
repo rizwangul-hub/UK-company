@@ -7,17 +7,18 @@ import AIUsageLog from '../../models/AIUsageLog.js';
 export const getUsageLimitsConfig = () => {
   const rawModel = (process.env.GEMINI_MODEL || 'gemini-3.5-flash').trim();
   const normalizedModel = rawModel.toLowerCase() === 'gemini 3.5 flash' ? 'gemini-3.5-flash' : rawModel;
+  // Default fallback to gemini-3.5-flash-lite during Google 3.5-flash high demand spikes
+  const fallbackModel = (process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash-lite').trim() || null;
   return {
     model: normalizedModel,
-    // Only use an alternative model when the deployment explicitly configures one.
-    fallbackModel: (process.env.GEMINI_FALLBACK_MODEL || '').trim() || null,
-  maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS) || 4096,
-  maxHistoryMessages: Number(process.env.AI_MAX_HISTORY_MESSAGES) || 20,
-  userRpmLimit: Number(process.env.AI_USER_RPM_LIMIT) || 30,
-  monthlySpendAlertUsd: Number(process.env.AI_MONTHLY_SPEND_ALERT_USD) || 25,
-  maxDocumentChars: Number(process.env.AI_MAX_DOCUMENT_CHARS) || 24000,
-  inputCostPer1MUsd: Number(process.env.AI_INPUT_COST_PER_1M_USD) || 0.15,
-  outputCostPer1MUsd: Number(process.env.AI_OUTPUT_COST_PER_1M_USD) || 0.60,
+    fallbackModel: fallbackModel !== normalizedModel ? fallbackModel : null,
+    maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS) || 4096,
+    maxHistoryMessages: Number(process.env.AI_MAX_HISTORY_MESSAGES) || 20,
+    userRpmLimit: Number(process.env.AI_USER_RPM_LIMIT) || 30,
+    monthlySpendAlertUsd: Number(process.env.AI_MONTHLY_SPEND_ALERT_USD) || 25,
+    maxDocumentChars: Number(process.env.AI_MAX_DOCUMENT_CHARS) || 24000,
+    inputCostPer1MUsd: Number(process.env.AI_INPUT_COST_PER_1M_USD) || 0.15,
+    outputCostPer1MUsd: Number(process.env.AI_OUTPUT_COST_PER_1M_USD) || 0.60,
   };
 };
 
