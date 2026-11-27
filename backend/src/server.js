@@ -46,6 +46,7 @@ app.use((req, res, next) => {
       cleanOrigin.endsWith('.vercel.app') ||
       cleanOrigin.includes('localhost') ||
       cleanOrigin.includes('127.0.0.1') ||
+      cleanOrigin.includes('leabridgecycles.co.uk') ||
       configuredOrigins.includes('*') ||
       configuredOrigins.includes(cleanOrigin)
     ) {
@@ -74,7 +75,8 @@ app.use(
         configuredOrigins.includes(cleanOrigin) ||
         cleanOrigin.endsWith('.vercel.app') ||
         cleanOrigin.includes('localhost') ||
-        cleanOrigin.includes('127.0.0.1')
+        cleanOrigin.includes('127.0.0.1') ||
+        cleanOrigin.includes('leabridgecycles.co.uk')
       ) {
         return callback(null, true);
       }
